@@ -1,12 +1,9 @@
-// The shell's only dependency on authentication, which HRITHIK owns.
-//
-// When the frontend auth implementation lands, this hook should return:
-//   - user: the signed-in user from GET /api/auth/me/ (the fields below are a subset of that response)
-//   - logout: the app's single logout, which clears tokens and redirects to the login route
-//
-// Until then there is no signed-in user: the shell shows no account details and both logout
-// actions (sidebar and account menu) stay disabled. Do not add token or API logic here.
+import { useSyncExternalStore } from "react";
 
+import { useApi } from "@/lib/api";
+import { isSignedIn, signOut, subscribeToSession } from "@/lib/auth";
+
+// The shell's view of the signed-in user (a subset of GET /api/auth/me/).
 export type ShellUser = {
   name: string;
   email: string;
@@ -14,10 +11,18 @@ export type ShellUser = {
 };
 
 export type ShellSession = {
+  // null until the browser's stored session has been read: the server can't see it.
+  signedIn: boolean | null;
   user: ShellUser | null;
   logout: (() => void) | null;
 };
 
 export function useShellSession(): ShellSession {
-  return { user: null, logout: null };
+  const signedIn = useSyncExternalStore(subscribeToSession, isSignedIn, () => null);
+  const { data: user } = useApi<ShellUser>(signedIn ? "/auth/me/" : null);
+  return {
+    signedIn,
+    user: signedIn ? (user ?? null) : null,
+    logout: signedIn ? signOut : null,
+  };
 }

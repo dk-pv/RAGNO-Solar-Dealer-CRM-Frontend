@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-// Inline icons: the project has no icon library, and the shell only needs a handful.
+// Inline icons: the project has no icon library. Add new icons here rather than in feature folders.
 export type IconProps = SVGProps<SVGSVGElement>;
 
 function Icon({ children, className = "size-5", ...props }: IconProps) {
@@ -129,6 +129,94 @@ export function WhatsAppIcon(props: IconProps) {
     <Icon {...props}>
       <path d="M3.5 20.5 4.6 15.8A8.5 8.5 0 1 1 8.4 19.2Z" />
       <path d="M9.2 8.4c-.4 3 3.4 6.8 6.4 6.4l.6-1.6-2-1.1-.9.9a4.2 4.2 0 0 1-2.3-2.3l.9-.9-1.1-2Z" />
+    </Icon>
+  );
+}
+
+export function PlusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  );
+}
+
+export function SearchIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.4-4.4" />
+    </Icon>
+  );
+}
+
+export function FilterIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 5.5h16l-6 7v5.5l-4 2v-7.5Z" />
+    </Icon>
+  );
+}
+
+export function DownloadIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+    </Icon>
+  );
+}
+
+// Pass fill="currentColor" for the pinned (filled) state.
+export function PinIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9.5 4h5M10.5 4v5.2L7.5 13h9l-3-3.8V4" />
+      <path d="M12 13v7" />
+    </Icon>
+  );
+}
+
+export function MoreIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="5.5" cy="12" r="1" fill="currentColor" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" />
+      <circle cx="18.5" cy="12" r="1" fill="currentColor" />
+    </Icon>
+  );
+}
+
+export function PhoneIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6.5 3.5h3l1.5 4.5-2 1.5a12 12 0 0 0 5.5 5.5l1.5-2 4.5 1.5v3a2 2 0 0 1-2 2A16.5 16.5 0 0 1 4.5 5.5a2 2 0 0 1 2-2Z" />
+    </Icon>
+  );
+}
+
+export function PencilIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.5 19.5h4l10-10a2.1 2.1 0 0 0-3-3l-10 10Z" />
+      <path d="m14 8 2.5 2.5" />
+    </Icon>
+  );
+}
+
+export function CalendarIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+    </Icon>
+  );
+}
+
+export function ConvertIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m8.5 12 2.5 2.5 4.5-5" />
     </Icon>
   );
 }

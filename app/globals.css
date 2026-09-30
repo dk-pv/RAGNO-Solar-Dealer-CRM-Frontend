@@ -4,6 +4,8 @@
 @custom-variant sidebar-collapsed (&:where([data-sidebar="collapsed"], [data-sidebar="collapsed"] *));
 
 :root {
+  /* Native controls (selects, date pickers, scrollbars) follow the light or dark theme. */
+  color-scheme: light dark;
   --background: #ffffff;
   --foreground: #171717;
   --muted: #f4f4f5;

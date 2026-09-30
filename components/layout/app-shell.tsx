@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { Navbar } from "./navbar";
 import { Sidebar, SidebarPanel } from "./sidebar";
@@ -8,9 +9,17 @@ import { useShellSession } from "./use-shell-session";
 
 export function AppShell({ children }: { children: ReactNode }) {
   // One session read for the whole shell, so the sidebar and the account menu share the same logout.
-  const { user, logout } = useShellSession();
+  const { signedIn, user, logout } = useShellSession();
+  const router = useRouter();
+  const pathname = usePathname();
   const drawerRef = useRef<HTMLDialogElement>(null);
   const closeDrawer = () => drawerRef.current?.close();
+
+  // Signed out (never signed in, logged out, or the session expired): go to the sign-in page and come back after.
+  // This only guides people; the API checks the token on every request.
+  useEffect(() => {
+    if (signedIn === false) router.replace(`/login?next=${encodeURIComponent(pathname + window.location.search)}`);
+  }, [signedIn, pathname, router]);
 
   return (
     <div className="flex flex-1">
@@ -31,7 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Navbar user={user} onLogout={logout} onOpenNavigation={() => drawerRef.current?.showModal()} />
-        <main className="flex-1 p-4 lg:p-6">{children}</main>
+        <main className="flex-1 p-4 lg:p-6">{signedIn === false ? null : children}</main>
       </div>
     </div>
   );
