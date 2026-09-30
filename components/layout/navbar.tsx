@@ -24,7 +24,7 @@ const iconButtonClass =
 const panelClass =
   "fixed top-15 right-3 bottom-auto left-auto w-72 max-w-[calc(100vw-1.5rem)] rounded-md border border-border bg-background text-foreground shadow-md";
 
-function initials(name: string) {
+export function initials(name: string) {
   return name
     .split(/\s+/)
     .filter(Boolean)
