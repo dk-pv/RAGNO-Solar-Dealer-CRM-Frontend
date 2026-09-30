@@ -19,8 +19,8 @@ import {
 import { StatusBadge, fieldClass, iconButton, inputClass, primaryButton, secondaryButton } from "./ui";
 
 // Callers add the padding and width.
-const dialogClass =
-  "m-auto w-[calc(100%-2rem)] rounded-lg border border-border bg-background text-foreground shadow-xl backdrop:bg-black/50";
+export const dialogClass =
+  "m-auto w-[calc(100%-2rem)] rounded-lg border border-border bg-background text-foreground shadow-lg backdrop:bg-foreground/30";
 
 type FormValues = {
   name: string;
@@ -121,7 +121,7 @@ function toInput(values: FormValues): LeadInput {
   };
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <fieldset>
       <legend className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{title}</legend>
@@ -132,13 +132,13 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 type FieldProps = { label: string; id: string; error?: string; required?: boolean; hint?: ReactNode; wide?: boolean; children: ReactNode };
 
-function Field({ label, id, error, required, hint, wide, children }: FieldProps) {
+export function Field({ label, id, error, required, hint, wide, children }: FieldProps) {
   return (
     <div className={wide ? "sm:col-span-2" : undefined}>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-label">
         {label}
         {required && (
-          <span aria-hidden="true" className="text-red-600 dark:text-red-400">
+          <span aria-hidden="true" className="text-destructive">
             {" "}
             *
           </span>
@@ -146,7 +146,7 @@ function Field({ label, id, error, required, hint, wide, children }: FieldProps)
       </label>
       {children}
       {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+        <p id={`${id}-error`} className="mt-1.5 text-xs text-error">
           {error}
         </p>
       ) : (
@@ -277,7 +277,7 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
           {formError && (
             <p
               role="alert"
-              className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+              className="rounded-md border border-error-border bg-error-soft px-3 py-2 text-sm text-error"
             >
               {formError}
             </p>
@@ -364,7 +364,7 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
                     <button
                       type="button"
                       onClick={() => setValues((current) => ({ ...current, amount: plainAmount(selectedPlan.amount) }))}
-                      className="font-medium text-foreground underline underline-offset-2"
+                      className="font-medium text-link underline underline-offset-2 hover:text-link-hover"
                     >
                       Use plan price
                     </button>
@@ -480,7 +480,7 @@ export function ConvertDialog({ lead, onClose, onConverted }: ConvertDialogProps
         <dd>{lead.assigned_to_name ?? "Unassigned"}</dd>
       </dl>
       {error && (
-        <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="mt-4 text-sm text-error">
           {error}
         </p>
       )}

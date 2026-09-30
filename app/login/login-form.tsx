@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { inputClass, primaryButton } from "@/components/leads/ui";
+import { PasswordInput } from "@/components/password-input";
 import { toApiError } from "@/lib/api";
 import { isSignedIn, signIn, subscribeToSession } from "@/lib/auth";
 
@@ -39,11 +40,11 @@ export function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full max-w-sm rounded-lg border border-border bg-background p-6 sm:p-8">
       <div className="flex items-center gap-3">
         <span
           aria-hidden="true"
-          className="grid size-10 place-items-center rounded-lg bg-brand text-base font-bold text-zinc-950"
+          className="grid size-10 place-items-center rounded-lg bg-brand text-base font-bold text-white"
         >
           R
         </span>
@@ -56,7 +57,7 @@ export function LoginForm() {
       <h1 className="mt-10 text-xl font-semibold">Sign in</h1>
       <form onSubmit={submit} className="mt-6 space-y-4">
         <div>
-          <label htmlFor={`${formId}-email`} className="mb-1.5 block text-sm font-medium">
+          <label htmlFor={`${formId}-email`} className="mb-1.5 block text-sm font-medium text-label">
             Email
           </label>
           <input
@@ -70,20 +71,19 @@ export function LoginForm() {
           />
         </div>
         <div>
-          <label htmlFor={`${formId}-password`} className="mb-1.5 block text-sm font-medium">
+          <label htmlFor={`${formId}-password`} className="mb-1.5 block text-sm font-medium text-label">
             Password
           </label>
-          <input
+          <PasswordInput
             id={`${formId}-password`}
             name="password"
-            type="password"
             autoComplete="current-password"
             required
             className={inputClass}
           />
         </div>
         {error && (
-          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+          <p role="alert" className="text-sm text-error">
             {error}
           </p>
         )}

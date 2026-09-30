@@ -183,12 +183,12 @@ export function LeadsPage() {
           >
             <caption className="sr-only">Leads</caption>
             <thead>
-              <tr className="border-b border-border bg-muted text-left text-xs font-medium whitespace-nowrap text-muted-foreground">
+              <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
                 <th scope="col" className="w-11 px-3 py-2.5">
                   <PinIcon className="size-3.5" />
                   <span className="sr-only">Pinned</span>
                 </th>
-                <th scope="col" className="sticky left-0 z-1 bg-muted px-3 py-2.5">
+                <th scope="col" className="sticky left-0 z-1 bg-page px-3 py-2.5">
                   Customer
                 </th>
                 <th scope="col" className="px-3 py-2.5">Phone</th>
@@ -199,7 +199,7 @@ export function LeadsPage() {
                 <th scope="col" className="px-3 py-2.5">Assigned</th>
                 <th scope="col" className="px-3 py-2.5">Created</th>
                 <th scope="col" className="px-3 py-2.5">Next follow-up</th>
-                <th scope="col" className="sticky right-0 z-1 w-12 bg-muted px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
+                <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>
@@ -264,7 +264,7 @@ export function LeadsPage() {
           <FilterIcon className="size-4" />
           Filter
           {activeFilters > 0 && (
-            <span className="rounded bg-foreground px-1.5 text-xs leading-5 text-background">{activeFilters}</span>
+            <span className="rounded bg-primary px-1.5 text-xs leading-5 text-white">{activeFilters}</span>
           )}
         </button>
         <label className="flex items-center gap-2 text-sm">
@@ -329,10 +329,10 @@ type LeadRowProps = {
 function LeadRow({ lead, onChanged, onError, onEdit, onConvert }: LeadRowProps) {
   const location = [lead.area, lead.district].filter(Boolean).join(", ");
   // Sticky cells need an opaque background, so the row hover colour is the solid muted colour.
-  const stickyCell = "sticky z-1 bg-background group-hover:bg-muted";
+  const stickyCell = "sticky z-1 bg-background group-hover:bg-row-hover";
 
   return (
-    <tr className="group border-b border-border last:border-0 hover:bg-muted">
+    <tr className="group border-b border-border last:border-0 hover:bg-row-hover">
       <td className="px-1.5 py-1.5">
         {/* Unpinned rows show a faint pin until hovered, so the pinned ones stand out. */}
         <PinButton
@@ -475,7 +475,7 @@ function SkeletonRows() {
     <tr key={row} className="border-b border-border last:border-0">
       {Array.from({ length: COLUMN_COUNT }, (_, cell) => (
         <td key={cell} className="px-3 py-3.5">
-          <span className="block h-3 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+          <span className="block h-3 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
         </td>
       ))}
     </tr>
@@ -640,7 +640,7 @@ function Pagination({ page, pageSize, count }: { page: number; pageSize: number;
                 onClick={() => go(n)}
                 aria-label={`Page ${n}`}
                 aria-current={n === page ? "page" : undefined}
-                className={`${pageButton} ${n === page ? "bg-foreground font-medium text-background" : "hover:bg-muted"}`}
+                className={`${pageButton} ${n === page ? "bg-primary font-medium text-white" : "hover:bg-muted"}`}
               >
                 {n}
               </button>
