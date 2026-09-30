@@ -60,7 +60,7 @@ export function LeadDetail({ id }: { id: number }) {
         ) : (
           <div aria-busy="true" aria-label="Loading lead" className="mt-4 space-y-3">
             {["w-56", "w-40", "w-full", "w-full", "w-2/3"].map((width, index) => (
-              <span key={index} className={`block h-4 animate-pulse rounded bg-muted motion-reduce:animate-none ${width}`} />
+              <span key={index} className={`block h-4 animate-pulse rounded bg-subtle motion-reduce:animate-none ${width}`} />
             ))}
           </div>
         )}
@@ -298,7 +298,7 @@ function StatusChange({ lead, onChanged }: { lead: Lead; onChanged: (lead: Lead)
         <p className="text-xs text-muted-foreground">Lost is a final outcome. The lead and its history are kept.</p>
       )}
       {error && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-error">
           {error}
         </p>
       )}

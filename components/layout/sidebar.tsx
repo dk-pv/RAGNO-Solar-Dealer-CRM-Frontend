@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { useId, useRef, useSyncExternalStore } from "react";
 
 import { ChevronLeftIcon, CloseIcon, LogoutIcon } from "./icons";
-import { NAVIGATION, activeHrefFor } from "./navigation";
+import { activeHrefFor, navigationFor } from "./navigation";
+import type { ShellUser } from "./use-shell-session";
 
 // ---- Collapsed preference, remembered in localStorage ----
 
@@ -51,7 +52,7 @@ const RESTORE_SCRIPT = `try{if(localStorage.getItem(${JSON.stringify(STORAGE_KEY
 const fadeClass = "transition-opacity duration-200 motion-reduce:transition-none sidebar-collapsed:opacity-0";
 
 const itemClass =
-  "flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md pl-3.75 pr-3 text-sm text-zinc-400 transition-colors hover:bg-white/5 hover:text-white aria-[current=page]:bg-white/10 aria-[current=page]:font-medium aria-[current=page]:text-white";
+  "flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md pl-3.75 pr-3 text-sm text-secondary-foreground transition-colors hover:bg-muted hover:text-label aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong";
 
 // Flyouts and tooltips sit just past the sidebar's right edge, beside the element they belong to.
 function besideRail(anchor: HTMLElement) {
@@ -69,6 +70,8 @@ function positionFlyout(button: HTMLElement, flyoutId: string) {
 }
 
 type SidebarPanelProps = {
+  /** Only the entries this user can open are listed; none until the user has loaded. */
+  user: ShellUser | null;
   onLogout: (() => void) | null;
   /** Desktop rail: adds the icon buttons and flyouts that keep grouped links reachable when collapsed. */
   collapsible?: boolean;
@@ -76,29 +79,29 @@ type SidebarPanelProps = {
   onClose?: () => void;
 };
 
-export function SidebarPanel({ onLogout, collapsible = false, onClose }: SidebarPanelProps) {
+export function SidebarPanel({ user, onLogout, collapsible = false, onClose }: SidebarPanelProps) {
   const activeHref = activeHrefFor(usePathname());
   const idPrefix = useId();
 
   return (
-    <div className="flex h-full flex-col bg-zinc-950 text-zinc-400">
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-white/8 px-5">
+    <div className="flex h-full flex-col bg-background text-secondary-foreground">
+      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-5">
         <span
           aria-hidden="true"
-          className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand text-sm font-bold text-zinc-950"
+          className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand text-sm font-bold text-white"
         >
           R
         </span>
         <div className={`min-w-0 leading-tight ${fadeClass}`}>
-          <p className="whitespace-nowrap text-sm font-semibold text-white">Ragno Power System</p>
-          <p className="whitespace-nowrap text-xs text-zinc-400">Solar Dealer CRM</p>
+          <p className="whitespace-nowrap text-sm font-semibold text-foreground">Ragno Power System</p>
+          <p className="whitespace-nowrap text-xs text-muted-foreground">Solar Dealer CRM</p>
         </div>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
             aria-label="Close navigation"
-            className="ml-auto grid size-9 shrink-0 place-items-center rounded-md hover:bg-white/5 hover:text-white"
+            className="ml-auto grid size-9 shrink-0 place-items-center rounded-md text-faint hover:bg-muted hover:text-label"
           >
             <CloseIcon />
           </button>
@@ -107,7 +110,7 @@ export function SidebarPanel({ onLogout, collapsible = false, onClose }: Sidebar
 
       <nav aria-label="Main" className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-3">
         <ul className="space-y-0.5">
-          {NAVIGATION.map((item, index) => {
+          {(user ? navigationFor(user) : []).map((item, index) => {
             if ("href" in item) {
               const active = item.href === activeHref;
               return (
@@ -119,7 +122,7 @@ export function SidebarPanel({ onLogout, collapsible = false, onClose }: Sidebar
                     data-tooltip={item.label}
                     className={itemClass}
                   >
-                    <item.icon className={`size-4.5 shrink-0 ${active ? "text-brand" : ""}`} />
+                    <item.icon className={`size-4.5 shrink-0 ${active ? "text-brand" : "text-faint"}`} />
                     <span className={fadeClass}>{item.label}</span>
                   </Link>
                 </li>
@@ -135,10 +138,10 @@ export function SidebarPanel({ onLogout, collapsible = false, onClose }: Sidebar
               >
                 <div
                   className={`flex h-9 items-center gap-3 overflow-hidden whitespace-nowrap rounded-md pl-3.75 pr-3 text-sm font-medium ${
-                    groupActive ? "text-white sidebar-collapsed:bg-white/10" : "text-zinc-300"
+                    groupActive ? "text-foreground sidebar-collapsed:bg-primary-soft" : "text-label"
                   }`}
                 >
-                  <item.icon className={`size-4.5 shrink-0 ${groupActive ? "sidebar-collapsed:text-brand" : ""}`} />
+                  <item.icon className={`size-4.5 shrink-0 text-faint ${groupActive ? "sidebar-collapsed:text-brand" : ""}`} />
                   <span aria-hidden="true" className={fadeClass}>
                     {item.label}
                   </span>
@@ -153,14 +156,14 @@ export function SidebarPanel({ onLogout, collapsible = false, onClose }: Sidebar
                       onClick={(event) => positionFlyout(event.currentTarget, flyoutId)}
                       aria-label={item.label}
                       data-tooltip={item.label}
-                      className="absolute inset-x-0 top-0 hidden h-9 rounded-md hover:bg-white/5 sidebar-collapsed:block"
+                      className="absolute inset-x-0 top-0 hidden h-9 rounded-md hover:bg-muted sidebar-collapsed:block"
                     />
                     <div
                       id={flyoutId}
                       popover="auto"
-                      className="fixed right-auto bottom-auto m-0 w-52 rounded-lg border border-white/10 bg-zinc-900 p-1.5 text-sm text-zinc-300 shadow-xl"
+                      className="fixed right-auto bottom-auto m-0 w-52 rounded-lg border border-border bg-background p-1.5 text-sm text-secondary-foreground shadow-lg"
                     >
-                      <p className="px-2.5 pt-1 pb-1.5 text-xs font-medium text-zinc-400">{item.label}</p>
+                      <p className="px-2.5 pt-1 pb-1.5 text-xs font-medium text-muted-foreground">{item.label}</p>
                       <ul>
                         {item.children.map((child) => (
                           <li key={child.href}>
@@ -168,7 +171,7 @@ export function SidebarPanel({ onLogout, collapsible = false, onClose }: Sidebar
                               href={child.href}
                               onClick={() => document.getElementById(flyoutId)?.hidePopover()}
                               aria-current={child.href === activeHref ? "page" : undefined}
-                              className="flex h-8 items-center rounded-md px-2.5 transition-colors hover:bg-white/5 hover:text-white aria-[current=page]:bg-white/10 aria-[current=page]:font-medium aria-[current=page]:text-white"
+                              className="flex h-8 items-center rounded-md px-2.5 transition-colors hover:bg-muted hover:text-label aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong"
                             >
                               {child.label}
                             </Link>
@@ -188,7 +191,7 @@ export function SidebarPanel({ onLogout, collapsible = false, onClose }: Sidebar
                           href={child.href}
                           onClick={onClose}
                           aria-current={child.href === activeHref ? "page" : undefined}
-                          className="flex h-8 items-center whitespace-nowrap rounded-r-md border-l-2 border-white/10 pl-4.75 text-sm text-zinc-400 transition-colors hover:bg-white/5 hover:text-white aria-[current=page]:border-brand aria-[current=page]:bg-white/5 aria-[current=page]:font-medium aria-[current=page]:text-white"
+                          className="flex h-8 items-center whitespace-nowrap rounded-r-md border-l-2 border-border pl-4.75 text-sm text-secondary-foreground transition-colors hover:bg-muted hover:text-label aria-[current=page]:border-brand aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong"
                         >
                           {child.label}
                         </Link>
@@ -202,13 +205,13 @@ export function SidebarPanel({ onLogout, collapsible = false, onClose }: Sidebar
         </ul>
       </nav>
 
-      <div className="shrink-0 border-t border-white/8 p-3">
+      <div className="shrink-0 border-t border-border p-3">
         <button
           type="button"
           onClick={onLogout ?? undefined}
           disabled={!onLogout}
           data-tooltip="Log out"
-          className="flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md border border-white/10 pl-3.5 text-sm text-zinc-400 transition-colors enabled:hover:bg-white/5 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md border border-input pl-3.5 text-sm text-label transition-colors enabled:hover:border-border-strong enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
           <LogoutIcon className="size-4.5 shrink-0" />
           <span className={fadeClass}>Log out</span>
@@ -220,7 +223,7 @@ export function SidebarPanel({ onLogout, collapsible = false, onClose }: Sidebar
 
 // ---- Desktop sidebar: collapsible, hidden below the lg breakpoint (the drawer takes over there) ----
 
-export function Sidebar({ onLogout }: { onLogout: (() => void) | null }) {
+export function Sidebar({ user, onLogout }: { user: ShellUser | null; onLogout: (() => void) | null }) {
   const collapsed = useSyncExternalStore(subscribe, readCollapsed, () => false);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -274,18 +277,18 @@ export function Sidebar({ onLogout }: { onLogout: (() => void) | null }) {
           aria-expanded={!collapsed}
           data-tooltip={toggleLabel}
           data-tooltip-always=""
-          className="absolute top-4 -right-3 grid size-6 place-items-center rounded-full border border-white/15 bg-zinc-900 text-zinc-400 shadow-sm transition-colors hover:bg-zinc-800 hover:text-white"
+          className="absolute top-4 -right-3 grid size-6 place-items-center rounded-full border border-input bg-background text-faint shadow-sm transition-colors hover:bg-muted hover:text-label"
         >
           <ChevronLeftIcon className="size-3.5 transition-transform duration-200 motion-reduce:transition-none sidebar-collapsed:rotate-180" />
         </button>
-        <div className="h-full overflow-hidden border-r border-white/8">
-          <SidebarPanel onLogout={onLogout} collapsible />
+        <div className="h-full overflow-hidden border-r border-border">
+          <SidebarPanel user={user} onLogout={onLogout} collapsible />
         </div>
         <div
           ref={tooltipRef}
           hidden
           aria-hidden="true"
-          className="pointer-events-none fixed z-30 -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-zinc-800 px-2 py-1 text-xs font-medium text-white shadow-lg"
+          className="pointer-events-none fixed z-30 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-white shadow-lg"
         />
       </div>
     </aside>

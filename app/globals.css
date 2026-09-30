@@ -3,42 +3,129 @@
 /* Styles for the collapsed desktop sidebar. The attribute is set before first paint (see components/layout/sidebar.tsx). */
 @custom-variant sidebar-collapsed (&:where([data-sidebar="collapsed"], [data-sidebar="collapsed"] *));
 
+/* The CRM's one colour system: soft red and warm cream on a light base. Components use these tokens, never raw colours.
+   The CRM is light only, so it looks the same whatever the operating system's dark-mode setting. */
 :root {
-  /* Native controls (selects, date pickers, scrollbars) follow the light or dark theme. */
-  color-scheme: light dark;
-  --background: #ffffff;
-  --foreground: #171717;
-  --muted: #f4f4f5;
-  --muted-foreground: #52525b;
-  --border: #e4e4e7;
+  /* Native controls (selects, date pickers, scrollbars) stay light. */
+  color-scheme: light;
+
+  /* Surfaces */
+  --page: #fbf7f2; /* behind content; also table headers */
+  --background: #fffdfc; /* cards, tables, dialogs, dropdowns, sidebar, navbar */
+  --field: #fffefc; /* inputs and selects */
+  --muted: #f8f1e8; /* cream: secondary surface and hover */
+  --row-hover: #fcf8f4;
+  --subtle: #eee8e2; /* loading skeletons */
+
+  /* Text: dark and warm */
+  --foreground: #302a28; /* headings, values, primary text */
+  --secondary-foreground: #625956; /* supporting text, navigation, table headers */
+  --muted-foreground: #746a65; /* descriptions, helper text, metadata */
+  --faint: #817773; /* icons and less important metadata */
+  --label: #403936; /* form labels, secondary button text */
+  --placeholder: #978d87;
+  --disabled: #a49b96;
+  --disabled-surface: #f4efeb;
+
+  /* Borders: warm neutrals */
+  --border: #e6dcd4;
+  --input: #ded3cb;
+  --input-hover: #cfc1b8;
+  --border-strong: #d8ccc3;
+
+  /* Brand soft red: an accent for primary actions, active and selected states, links and focus */
+  --primary: #b85c5c;
+  --primary-hover: #a84f4f;
+  --primary-active: #964545;
+  --primary-strong: #984848; /* text on a primary-soft background */
+  --primary-soft: #f7e7e5;
+  --primary-softer: #fbf1f0;
+  --link: #a84f4f;
+  --link-hover: #8f4141;
+  --ring: #f1d3d0;
+
+  --destructive: #c94b4b;
+  --destructive-hover: #b43f3f;
+
+  /* Status colours: soft backgrounds, readable text. Kept apart from the brand red so meanings stay distinct. */
+  --success: #39734a;
+  --success-soft: #e8f3ea;
+  --success-border: #c9e1ce;
+  --warning: #8a6500;
+  --warning-soft: #fff4d9;
+  --warning-border: #ebd89f;
+  --error: #c43f3f;
+  --error-soft: #fbe9e8;
+  --error-border: #ebc8c6;
+  --info: #536b82;
+  --info-soft: #edf2f7;
+  --info-border: #d2dde7;
+  --neutral: #746a65;
+  --neutral-soft: #f1eeeb;
+  --neutral-border: #ded8d3;
 }
 
 @theme inline {
+  --color-page: var(--page);
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-field: var(--field);
   --color-muted: var(--muted);
+  --color-row-hover: var(--row-hover);
+  --color-subtle: var(--subtle);
+  --color-foreground: var(--foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
   --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
+  --color-label: var(--label);
+  --color-placeholder: var(--placeholder);
+  --color-disabled: var(--disabled);
+  --color-disabled-surface: var(--disabled-surface);
   --color-border: var(--border);
-  /* Brand accent: the logo mark and the active navigation indicator only. */
-  --color-brand: #f59e0b;
+  --color-input: var(--input);
+  --color-input-hover: var(--input-hover);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-softer: var(--primary-softer);
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-border: var(--warning-border);
+  --color-error: var(--error);
+  --color-error-soft: var(--error-soft);
+  --color-error-border: var(--error-border);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-border: var(--info-border);
+  --color-neutral: var(--neutral);
+  --color-neutral-soft: var(--neutral-soft);
+  --color-neutral-border: var(--neutral-border);
+  /* The logo mark, the active navigation indicator and pinned leads. */
+  --color-brand: var(--primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --muted: #27272a;
-    --muted-foreground: #a1a1aa;
-    --border: #27272a;
-  }
-}
-
 body {
-  background: var(--background);
+  background: var(--page);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* One focus style for every interactive element. Inputs replace it with a border and ring (fieldClass). */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* Keep the page from scrolling behind an open modal, such as the mobile navigation drawer. */

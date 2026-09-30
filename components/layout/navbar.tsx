@@ -18,7 +18,7 @@ const WHATSAPP_NUMBER = toWhatsAppNumber(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER
 const ROLE_LABELS: Record<ShellUser["role"], string> = { ADMIN: "Admin", STAFF: "Staff" };
 
 const iconButtonClass =
-  "grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground";
+  "grid size-9 place-items-center rounded-md text-faint hover:bg-muted hover:text-label";
 
 // Popovers sit in the browser's top layer, pinned under the navbar's right edge.
 const panelClass =

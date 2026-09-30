@@ -7,25 +7,28 @@ import { toApiError } from "@/lib/api";
 import { setLeadPinned, statusLabel, type Lead, type LeadStatus } from "./api";
 
 export const primaryButton =
-  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-foreground px-3.5 text-sm font-medium text-background hover:bg-foreground/85 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-3.5 text-sm font-medium text-white hover:bg-primary-hover active:bg-primary-active disabled:cursor-not-allowed disabled:opacity-50";
 export const secondaryButton =
-  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium text-label hover:border-border-strong hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50";
+export const destructiveButton =
+  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive px-3.5 text-sm font-medium text-white hover:bg-destructive-hover disabled:cursor-not-allowed disabled:opacity-50";
 // Callers add the size (size-8 or size-9).
 export const iconButton =
-  "grid shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50";
+  "grid shrink-0 place-items-center rounded-md text-faint hover:bg-muted hover:text-label disabled:cursor-not-allowed disabled:opacity-50";
 // Inputs and selects without a size; inputClass adds the usual full-width size.
 export const fieldClass =
-  "min-w-0 rounded-md border border-border bg-background px-3 text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-red-500";
+  "min-w-0 rounded-md border border-input bg-field px-3 text-sm text-foreground placeholder:text-placeholder enabled:hover:border-input-hover focus:border-primary focus:ring-3 focus:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-disabled-surface disabled:text-disabled aria-[invalid=true]:border-error";
 export const inputClass = `${fieldClass} h-9 w-full`;
 
 // Colour carries meaning only: neutral, information, attention, high priority, success, negative.
 const STATUS_STYLES: Record<LeadStatus, string> = {
-  NEW: "bg-zinc-100 text-zinc-700 ring-zinc-500/20 dark:bg-zinc-400/10 dark:text-zinc-300 dark:ring-zinc-400/20",
-  INITIAL_CONTACT: "bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-400/10 dark:text-sky-300 dark:ring-sky-400/30",
-  HOT: "bg-amber-50 text-amber-800 ring-amber-600/25 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/25",
-  SUPERHOT: "bg-orange-600 text-white ring-orange-600 dark:bg-orange-500 dark:ring-orange-500",
-  WON: "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-400/25",
-  LOST: "bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-400/10 dark:text-red-300 dark:ring-red-400/25",
+  NEW: "bg-neutral-soft text-neutral ring-neutral-border",
+  INITIAL_CONTACT: "bg-info-soft text-info ring-info-border",
+  HOT: "bg-warning-soft text-warning ring-warning-border",
+  // High priority: the one solid badge, so it stands out in a list.
+  SUPERHOT: "bg-warning text-white ring-warning",
+  WON: "bg-success-soft text-success ring-success-border",
+  LOST: "bg-error-soft text-error ring-error-border",
 };
 
 export function StatusBadge({ status }: { status: LeadStatus }) {
@@ -90,7 +93,7 @@ export function useNotice() {
           role={notice.error ? "alert" : "status"}
           className="flex items-start gap-3 rounded-md border border-border bg-background px-4 py-3 text-sm shadow-lg"
         >
-          <span className={notice.error ? "text-red-600 dark:text-red-400" : undefined}>{notice.text}</span>
+          <span className={notice.error ? "text-error" : undefined}>{notice.text}</span>
           <button
             type="button"
             onClick={() => setNotice(undefined)}
