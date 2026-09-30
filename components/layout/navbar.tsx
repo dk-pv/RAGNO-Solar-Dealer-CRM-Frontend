@@ -5,8 +5,15 @@ import type { ReactNode } from "react";
 import { BellIcon, LogoutIcon, MenuIcon, UserIcon, WhatsAppIcon } from "./icons";
 import type { ShellUser } from "./use-shell-session";
 
-// International format without "+" (e.g. 917994890820). Next.js inlines it at build time.
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "");
+// wa.me needs the full international number without "+". A 10-digit local number is an Indian
+// mobile, so it gets the 91 country code: 7994890820 -> 917994890820.
+function toWhatsAppNumber(value: string | undefined) {
+  const digits = (value ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  return digits.length === 10 ? `91${digits}` : digits;
+}
+
+// Next.js inlines NEXT_PUBLIC_ values at build time.
+const WHATSAPP_NUMBER = toWhatsAppNumber(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER);
 
 const ROLE_LABELS: Record<ShellUser["role"], string> = { ADMIN: "Admin", STAFF: "Staff" };
 
