@@ -5,6 +5,7 @@ import { isSignedIn, signOut, subscribeToSession } from "@/lib/auth";
 
 // The shell's view of the signed-in user (a subset of GET /api/auth/me/).
 export type ShellUser = {
+  id: number;
   name: string;
   email: string;
   role: "ADMIN" | "STAFF";

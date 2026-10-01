@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api";
+import type { ActivityType } from "@/components/leads/api";
 
 // The Work Pipeline, in order. Values and labels must match the backend's WorkStage choices.
 // The classes use the stage colour tokens in globals.css: a dot, and the column header's background and text.
@@ -58,6 +59,11 @@ export type Work = {
   assigned_to: number | null;
   assigned_to_name: string | null;
   due_date: string | null; // YYYY-MM-DD
+  is_pinned: boolean; // shared by the whole team: pinned Works are listed first
+  // The Work's activities in brief; GET /api/activities/?work={id} has them all.
+  activity_count: number;
+  pending_activity_count: number;
+  next_activity_due: string | null; // the earliest due date among the pending activities
   created_at: string;
   updated_at: string;
 };
@@ -65,11 +71,51 @@ export type Work = {
 // GET /api/works/summary/: every stage with its number of Works and their total confirmed amount.
 export type StageSummary = { stage: WorkStage; label: string; count: number; total_amount: string };
 
-// Only the pipeline fields change; the backend accepts any stage, in either direction, and validates it.
-export type WorkChanges = Partial<Pick<Work, "stage" | "assigned_to" | "due_date">>;
+// Only the pipeline fields and the pin change; the backend accepts any stage, in either direction, and validates it.
+export type WorkChanges = Partial<Pick<Work, "stage" | "assigned_to" | "due_date" | "is_pinned">>;
+
+// Must match the backend's Activity statuses.
+export const ACTIVITY_STATUSES = [
+  { value: "PENDING", label: "Pending" },
+  { value: "COMPLETED", label: "Completed" },
+] as const;
+export type ActivityStatus = (typeof ACTIVITY_STATUSES)[number]["value"];
+
+// GET /api/activities/?work={id} (paginated: pending first, the soonest due first, then completed, the latest first), and
+// GET /api/activities/works/ (every Work's, each Work's together; needs the Work and Activities modules).
+// The same activity log as the leads', with a Work's activities linked to the Work. Anyone with the Work module manages them.
+export type WorkActivity = {
+  id: number;
+  work: number;
+  type: ActivityType;
+  type_display: string;
+  description: string;
+  assigned_to: number | null;
+  assigned_to_name: string | null;
+  due_date: string | null; // YYYY-MM-DD
+  status: ActivityStatus;
+  completed_at: string | null;
+  completed_by_name: string | null;
+  created_by_name: string | null;
+  created_at: string;
+  // The Work it belongs to, for tables that list several Works' activities.
+  work_summary: Pick<Work, "id" | "customer_name" | "country_code" | "phone" | "plan_name" | "stage">;
+};
+
+export type WorkActivityInput = Pick<WorkActivity, "type" | "description" | "assigned_to" | "due_date" | "status">;
 
 export function updateWork(id: number, changes: WorkChanges) {
   return apiRequest<Work>(`/works/${id}/`, { method: "PATCH", json: changes });
 }
+
+// Completing records when and by whom on the server; setting it back to Pending clears that.
+export function saveWorkActivity(input: Partial<WorkActivityInput>, target: { id: number } | { work: number }) {
+  return "id" in target
+    ? apiRequest<WorkActivity>(`/activities/${target.id}/`, { method: "PATCH", json: input })
+    : apiRequest<WorkActivity>("/activities/", { method: "POST", json: { ...input, work: target.work } });
+}
+
+// Today in the CRM's time zone (YYYY-MM-DD), to mark what is overdue.
+export const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 
 export const stageFor = (value: WorkStage) => WORK_STAGES.find((stage) => stage.value === value) ?? WORK_STAGES[0];

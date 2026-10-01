@@ -2,26 +2,17 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useContext, useEffect, useId, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useState, type ChangeEvent } from "react";
 
-import {
-  ChevronLeftIcon,
-  FilterIcon,
-  LeadsIcon,
-  MoreIcon,
-  PencilIcon,
-  PhoneIcon,
-  SearchIcon,
-  WhatsAppIcon,
-} from "@/components/layout/icons";
+import { ChevronLeftIcon, FilterIcon, PinIcon, SearchIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
-import { CurrentUserContext } from "@/components/layout/use-shell-session";
-import { formatDate, formatMoney, formatPhone, telHref, whatsappHref, type Assignee, type Page, type Plan } from "@/components/leads/api";
-import { Pagination, menuItemClass, placeMenu, updateQuery } from "@/components/leads/leads-page";
-import { ErrorState, iconButton, inputClass, fieldClass, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
+import { formatDate, formatMoney, formatPhone, type Assignee, type Page, type Plan } from "@/components/leads/api";
+import { Pagination } from "@/components/leads/leads-page";
+import { updateQuery } from "@/components/leads/leads-toolbar";
+import { ErrorState, inputClass, fieldClass, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
 import { toApiError, useApi } from "@/lib/api";
-import { WORK_STAGES, stageFor, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
-import { WorkDialog, isOverdue } from "./work-pipeline";
+import { WORK_STAGES, stageFor, today, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
+import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
 
 const FILTER_KEYS = ["stage", "plan", "assigned_to", "created_after", "created_before"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
@@ -29,7 +20,7 @@ type FilterKey = (typeof FILTER_KEYS)[number];
 const QUERY_KEYS = ["search", ...FILTER_KEYS, "ordering", "page", "page_size"];
 const DEFAULT_ORDERING = "-created_at";
 const DEFAULT_PAGE_SIZE = 25; // the API's default page size
-const COLUMN_COUNT = 11;
+const COLUMN_COUNT = 13;
 
 // Must match the backend's Work orderings.
 const SORT_OPTIONS = [
@@ -56,8 +47,8 @@ export function WorksPage() {
   const search = searchParams.get("search") ?? "";
   const [searchText, setSearchText] = useState(search);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [openWork, setOpenWork] = useState<Work>();
   const [noticeElement, notify] = useNotice();
+  const actions = useWorkActions(notify, reload, assignees);
   const filterPanelId = useId();
 
   // Search as the user types, once they pause.
@@ -121,11 +112,15 @@ export function WorksPage() {
         <div className="scrollbar-none mt-4 overflow-x-auto rounded-lg border border-border bg-background">
           <table
             aria-busy={loading}
-            className={`w-full min-w-270 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
+            className={`w-full min-w-300 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
           >
             <caption className="sr-only">Works</caption>
             <thead>
               <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
+                <th scope="col" className="w-11 px-3 py-2.5">
+                  <PinIcon className="size-3.5" />
+                  <span className="sr-only">Pinned</span>
+                </th>
                 <th scope="col" className="w-16 px-3 py-2.5">
                   Work
                 </th>
@@ -139,6 +134,7 @@ export function WorksPage() {
                 <th scope="col" className="px-3 py-2.5">Stage</th>
                 <th scope="col" className="px-3 py-2.5">Assigned</th>
                 <th scope="col" className="px-3 py-2.5">Due date</th>
+                <th scope="col" className="px-3 py-2.5">Next follow-up</th>
                 <th scope="col" className="px-3 py-2.5">Converted</th>
                 <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
                   <span className="sr-only">Actions</span>
@@ -153,7 +149,7 @@ export function WorksPage() {
                     key={`${work.id}-${work.updated_at}`}
                     work={work}
                     assignees={assignees.data}
-                    onOpen={setOpenWork}
+                    actions={actions}
                     onSaved={(text) => {
                       notify({ text });
                       reload();
@@ -238,17 +234,7 @@ export function WorksPage() {
 
       {content}
 
-      {openWork && (
-        <WorkDialog
-          work={openWork}
-          assignees={assignees}
-          onClose={() => setOpenWork(undefined)}
-          onSaved={(_, saved) => {
-            notify({ text: `Saved changes to ${saved.customer_name}.` });
-            reload();
-          }}
-        />
-      )}
+      {actions.dialogs}
       {noticeElement}
     </div>
   );
@@ -257,7 +243,7 @@ export function WorksPage() {
 type WorkRowProps = {
   work: Work;
   assignees?: Assignee[];
-  onOpen: (work: Work) => void;
+  actions: WorkActions;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
 };
@@ -266,7 +252,7 @@ const chevron = (
   <ChevronLeftIcon className="pointer-events-none absolute top-1/2 right-1.5 size-3 -translate-y-1/2 -rotate-90 opacity-70" />
 );
 
-function WorkRow({ work, assignees, onOpen, onSaved, onError }: WorkRowProps) {
+function WorkRow({ work, assignees, actions, onSaved, onError }: WorkRowProps) {
   // A change being saved shows straight away; if the API refuses it, the saved value comes back.
   const [pending, setPending] = useState<WorkChanges>();
   const [saving, setSaving] = useState(false);
@@ -303,11 +289,19 @@ function WorkRow({ work, assignees, onOpen, onSaved, onError }: WorkRowProps) {
 
   return (
     <tr className="group border-b border-border last:border-0 hover:bg-row-hover">
+      <td className="px-1.5 py-1.5">
+        {/* Unpinned rows show a faint pin until hovered, so the pinned ones stand out. */}
+        <WorkPinButton
+          work={work}
+          actions={actions}
+          className="size-8 opacity-40 group-hover:opacity-100 focus-visible:opacity-100 aria-pressed:opacity-100"
+        />
+      </td>
       <td className="px-3 py-2 whitespace-nowrap text-muted-foreground tabular-nums">#{work.id}</td>
       <th scope="row" className={`${stickyCell} left-0 px-3 py-2 text-left font-medium`}>
-        <button type="button" onClick={() => onOpen(work)} className="block max-w-52 truncate text-left hover:underline">
+        <Link href={`/works/${work.id}`} className="block max-w-52 truncate hover:underline">
           {work.customer_name}
-        </button>
+        </Link>
       </th>
       <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(work)}</td>
       <td className="px-3 py-2">
@@ -375,64 +369,30 @@ function WorkRow({ work, assignees, onOpen, onSaved, onError }: WorkRowProps) {
       <td className={`px-3 py-2 whitespace-nowrap ${overdue ? "font-medium text-error" : ""}`}>
         {work.due_date ? `${formatDate(work.due_date)}${overdue ? " · Overdue" : ""}` : "—"}
       </td>
+      <td className="px-3 py-2 whitespace-nowrap">
+        <NextFollowUp work={work} />
+      </td>
       <td className="px-3 py-2 whitespace-nowrap">{formatDate(work.created_at)}</td>
       <td className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)]`}>
-        <RowActions work={work} onOpen={onOpen} />
+        <WorkMenu work={work} actions={actions} />
       </td>
     </tr>
   );
 }
 
-function RowActions({ work, onOpen }: { work: Work; onOpen: (work: Work) => void }) {
-  const me = useContext(CurrentUserContext);
-  const menuId = useId();
-  const hide = () => document.getElementById(menuId)?.hidePopover();
-  // The lead's page needs the Leads module.
-  const canOpenLeads = me?.role === "ADMIN" || me?.modules.includes("leads");
-
+// The earliest due date among the Work's pending activities, linked to them.
+function NextFollowUp({ work }: { work: Work }) {
+  if (work.pending_activity_count === 0) return <span className="text-muted-foreground">—</span>;
+  const overdue = work.next_activity_due !== null && work.next_activity_due < today();
   return (
-    <>
-      <button
-        type="button"
-        popoverTarget={menuId}
-        onClick={(event) => placeMenu(event.currentTarget, menuId)}
-        aria-label={`Actions for ${work.customer_name}`}
-        className={`${iconButton} size-8`}
-      >
-        <MoreIcon className="size-4" />
-      </button>
-      <div
-        id={menuId}
-        popover="auto"
-        className="fixed inset-auto m-0 w-56 rounded-md border border-border bg-background p-1 text-foreground shadow-lg"
-      >
-        <button
-          type="button"
-          onClick={() => {
-            hide();
-            onOpen(work);
-          }}
-          className={menuItemClass}
-        >
-          <PencilIcon className="size-4 text-faint" />
-          Stage, staff and due date
-        </button>
-        <a href={whatsappHref(work)} target="_blank" rel="noopener noreferrer" onClick={hide} className={menuItemClass}>
-          <WhatsAppIcon className="size-4 text-faint" />
-          WhatsApp
-        </a>
-        <a href={telHref(work)} onClick={hide} className={menuItemClass}>
-          <PhoneIcon className="size-4 text-faint" />
-          Call
-        </a>
-        {canOpenLeads && (
-          <Link href={`/leads/${work.lead}`} className={menuItemClass}>
-            <LeadsIcon className="size-4 text-faint" />
-            View lead #{work.lead}
-          </Link>
-        )}
-      </div>
-    </>
+    <Link
+      href={`/works/${work.id}#activities`}
+      className={`underline-offset-2 hover:underline ${overdue ? "font-medium text-error" : ""}`}
+    >
+      {work.next_activity_due ? formatDate(work.next_activity_due) : "No date"}
+      {overdue ? " · Overdue" : ""}
+      <span className="block text-xs font-normal text-muted-foreground">{work.pending_activity_count} pending</span>
+    </Link>
   );
 }
 

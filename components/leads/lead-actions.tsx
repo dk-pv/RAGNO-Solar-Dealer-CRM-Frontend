@@ -90,7 +90,7 @@ const MENU_WIDTH = 224; // w-56
 const MENU_HEIGHT = 320; // ponytail: fixed estimate of the open menu's height; measure it if the menu grows
 
 // The menu opens in the browser's top layer, outside any scrolling table or board, next to its button.
-function placeMenu(button: HTMLElement, menuId: string) {
+export function placeMenu(button: HTMLElement, menuId: string) {
   const menu = document.getElementById(menuId);
   if (!menu) return;
   const rect = button.getBoundingClientRect();
@@ -100,7 +100,7 @@ function placeMenu(button: HTMLElement, menuId: string) {
   menu.style.bottom = openUp ? `${window.innerHeight - rect.top + 4}px` : "auto";
 }
 
-const menuItemClass =
+export const menuItemClass =
   "flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent";
 
 const READ_ONLY = "You can view this lead but not change it";
