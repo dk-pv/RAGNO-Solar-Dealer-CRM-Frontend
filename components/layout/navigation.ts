@@ -31,6 +31,7 @@ export const NAVIGATION: NavItem[] = [
     module: "work",
     icon: WorksIcon,
     children: [
+      { label: "All Works", href: "/works" },
       { label: "Pipeline", href: "/works/pipeline" },
       { label: "Activities", href: "/works/activities", module: "activities" },
     ],

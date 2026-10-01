@@ -79,7 +79,7 @@ export function UsersPage() {
     const rows = data?.results;
     content = (
       <>
-        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
+        <div className="scrollbar-none relative mt-4 overflow-x-auto rounded-lg border border-border">
           <table aria-busy={loading} className={`w-full min-w-200 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}>
             <caption className="sr-only">Users</caption>
             <thead>

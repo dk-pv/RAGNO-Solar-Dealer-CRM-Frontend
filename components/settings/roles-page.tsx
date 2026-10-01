@@ -33,7 +33,7 @@ export function RolesPage() {
           <ErrorState title="Couldn't load roles" message={roles.error.message} onRetry={roles.reload} />
         </div>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
+        <div className="scrollbar-none relative mt-4 overflow-x-auto rounded-lg border border-border">
           <table aria-busy={roles.loading} className="w-full min-w-160 text-sm">
             <caption className="sr-only">Roles</caption>
             <thead>

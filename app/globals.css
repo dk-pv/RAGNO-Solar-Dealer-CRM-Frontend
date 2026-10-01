@@ -63,6 +63,29 @@
   --neutral: #746a65;
   --neutral-soft: #f1eeeb;
   --neutral-border: #ded8d3;
+
+  /* Work Pipeline stages: soft colours that tell the seven columns apart (dot, header background, header text) */
+  --stage-loan: #b85c5c;
+  --stage-loan-soft: #f7e7e5;
+  --stage-loan-text: #8f4141;
+  --stage-feasibility: #a67c45;
+  --stage-feasibility-soft: #f4ebdd;
+  --stage-feasibility-text: #76572f;
+  --stage-structure: #806a9c;
+  --stage-structure-soft: #eee9f4;
+  --stage-structure-text: #67527e;
+  --stage-electrical: #b4873d;
+  --stage-electrical-soft: #f4ebdd;
+  --stage-electrical-text: #7c5c27;
+  --stage-kseb: #66859d;
+  --stage-kseb-soft: #e8eff4;
+  --stage-kseb-text: #4f6c80;
+  --stage-subsidy: #6b9877;
+  --stage-subsidy-soft: #e9f2eb;
+  --stage-subsidy-text: #4f7659;
+  --stage-completed: #4d8a62;
+  --stage-completed-soft: #e9f3ec;
+  --stage-completed-text: #39734a;
 }
 
 @theme inline {
@@ -110,6 +133,27 @@
   --color-neutral: var(--neutral);
   --color-neutral-soft: var(--neutral-soft);
   --color-neutral-border: var(--neutral-border);
+  --color-stage-loan: var(--stage-loan);
+  --color-stage-loan-soft: var(--stage-loan-soft);
+  --color-stage-loan-text: var(--stage-loan-text);
+  --color-stage-feasibility: var(--stage-feasibility);
+  --color-stage-feasibility-soft: var(--stage-feasibility-soft);
+  --color-stage-feasibility-text: var(--stage-feasibility-text);
+  --color-stage-structure: var(--stage-structure);
+  --color-stage-structure-soft: var(--stage-structure-soft);
+  --color-stage-structure-text: var(--stage-structure-text);
+  --color-stage-electrical: var(--stage-electrical);
+  --color-stage-electrical-soft: var(--stage-electrical-soft);
+  --color-stage-electrical-text: var(--stage-electrical-text);
+  --color-stage-kseb: var(--stage-kseb);
+  --color-stage-kseb-soft: var(--stage-kseb-soft);
+  --color-stage-kseb-text: var(--stage-kseb-text);
+  --color-stage-subsidy: var(--stage-subsidy);
+  --color-stage-subsidy-soft: var(--stage-subsidy-soft);
+  --color-stage-subsidy-text: var(--stage-subsidy-text);
+  --color-stage-completed: var(--stage-completed);
+  --color-stage-completed-soft: var(--stage-completed-soft);
+  --color-stage-completed-text: var(--stage-completed-text);
   /* The logo mark, the active navigation indicator and pinned leads. */
   --color-brand: var(--primary);
   --font-sans: var(--font-geist-sans);
@@ -120,6 +164,14 @@ body {
   background: var(--page);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Scrolls by wheel, trackpad, touch or keyboard without showing a scrollbar. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* One focus style for every interactive element. Inputs replace it with a border and ring (fieldClass). */
