@@ -50,7 +50,7 @@ export type Lead = {
   plan_name: string | null;
   amount: string | null; // stored on the lead, so later plan price changes never alter it
   status: LeadStatus;
-  // The statuses the backend lets this user move the lead to. "WON" means the lead can be converted.
+  // The statuses the backend lets this user move the lead to, Won included (from Superhot).
   allowed_transitions: LeadStatus[];
   source: LeadSource | "";
   assigned_to: number | null;
@@ -58,6 +58,12 @@ export type Lead = {
   next_follow_up: string | null; // YYYY-MM-DD
   notes: string;
   is_pinned: boolean;
+  // What the signed-in user may do with this lead, decided by the API: an admin everything, the assigned staff member
+  // edit (not delete or reassign). These only shape the screens; the API enforces the same rules on every request.
+  can_edit: boolean;
+  can_delete: boolean;
+  can_assign: boolean;
+  can_convert: boolean; // only for a Won lead, and only for someone who can change it
   work?: number | null; // the Work created by the conversion; sent once the Works module links one
   created_by_name: string | null;
   created_at: string;
@@ -87,10 +93,20 @@ export type LeadInput = Pick<
 export type Plan = { id: number; name: string; amount: string; is_active: boolean };
 // GET /api/leads/assignees/: the active users a lead can be assigned to.
 export type Assignee = { id: number; name: string };
-// GET /api/activities/?lead={id} (paginated, newest first).
+// Must match the backend's Activity types.
+export const ACTIVITY_TYPES = [
+  { value: "PHONE_CALL", label: "Phone call" },
+  { value: "FOLLOW_UP", label: "Follow-up" },
+  { value: "SITE_VISIT", label: "Site visit" },
+  { value: "MEETING", label: "Customer meeting" },
+  { value: "NOTE", label: "Note" },
+] as const;
+export type ActivityType = (typeof ACTIVITY_TYPES)[number]["value"];
+
+// GET /api/activities/?lead={id} (paginated, newest first). Whoever can edit the lead manages its activities.
 export type Activity = {
   id: number;
-  type: string;
+  type: ActivityType;
   type_display: string;
   description: string;
   created_by_name: string | null;
@@ -112,10 +128,27 @@ export function changeLeadStatus(id: number, status: LeadStatus) {
   return apiRequest<Lead>(`/leads/${id}/status/`, { method: "POST", json: { status } });
 }
 
-// One backend operation: it validates the lead, marks it Won and creates its Work in a single transaction.
-// Until the Works module exists the API refuses it (409) with a message, and nothing changes.
+// Creates the Work for a Won lead; the API refuses any other status (409) and never changes the status itself.
+// Until the Works module exists the API refuses every conversion (409) with a message, and nothing changes.
 export function convertLead(id: number) {
   return apiRequest<Lead>(`/leads/${id}/convert/`, { method: "POST" });
+}
+
+// Admins only (the Leads module doesn't give staff the delete permission). Its activities go with it.
+export function deleteLead(id: number) {
+  return apiRequest<void>(`/leads/${id}/`, { method: "DELETE" });
+}
+
+export function addActivity(lead: number, type: ActivityType, description: string) {
+  return apiRequest<Activity>("/activities/", { method: "POST", json: { lead, type, description } });
+}
+
+export function updateActivity(id: number, type: ActivityType, description: string) {
+  return apiRequest<Activity>(`/activities/${id}/`, { method: "PATCH", json: { type, description } });
+}
+
+export function deleteActivity(id: number) {
+  return apiRequest<void>(`/activities/${id}/`, { method: "DELETE" });
 }
 
 export function exportLeads(query: URLSearchParams) {
@@ -123,7 +156,20 @@ export function exportLeads(query: URLSearchParams) {
   return apiDownload(query.toString() ? `/leads/export/?${query}` : "/leads/export/", `leads-${today}.csv`);
 }
 
-export const canConvert = (lead: Lead) => lead.allowed_transitions.includes("WON");
+// Why this user can't change the lead's status, or undefined when they can (the API decides allowed_transitions).
+export function statusBlocker(lead: Lead) {
+  if (lead.allowed_transitions.length > 0) return undefined;
+  if (!lead.can_edit) return "You can view this lead but not change it.";
+  return `${statusLabel(lead.status)} is a final status.`;
+}
+
+// Why this user can't convert the lead, or undefined when they can (the API decides can_convert and enforces it).
+export function convertBlocker(lead: Lead) {
+  if (lead.can_convert) return undefined;
+  if (lead.status === "LOST") return "Lost leads can't be converted.";
+  if (lead.status !== "WON") return "Only Won leads can be converted. Move the lead to Won first.";
+  return "You can view this lead but not convert it.";
+}
 
 export const statusLabel = (status: LeadStatus) =>
   LEAD_STATUSES.find((item) => item.value === status)?.label ?? status;

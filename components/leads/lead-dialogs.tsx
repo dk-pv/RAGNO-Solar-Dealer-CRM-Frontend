@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useContext, useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 
 import { CloseIcon } from "@/components/layout/icons";
+import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { toApiError, useApi } from "@/lib/api";
 import {
   COUNTRY_CODES,
   LEAD_SOURCES,
+  LEAD_STATUSES,
+  changeLeadStatus,
   convertLead,
   formatMoney,
   saveLead,
@@ -14,6 +17,7 @@ import {
   type Lead,
   type LeadInput,
   type LeadSource,
+  type LeadStatus,
   type Plan,
 } from "./api";
 import { StatusBadge, fieldClass, iconButton, inputClass, primaryButton, secondaryButton } from "./ui";
@@ -164,6 +168,9 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
   const formId = useId();
   const plans = useApi<Plan[]>("/plans/");
   const assignees = useApi<Assignee[]>("/leads/assignees/");
+  // Only admins assign leads; a lead staff add is assigned to them by the API.
+  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
+  const canAssign = lead ? lead.can_assign : isAdmin;
   const [values, setValues] = useState(() => initialValues(lead));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string>();
@@ -404,10 +411,14 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
               label="Assigned staff"
               id={fieldId("assigned_to")}
               error={errors.assigned_to}
-              hint={assignees.error && `Staff couldn't be loaded: ${assignees.error.message}`}
+              hint={
+                assignees.error
+                  ? `Staff couldn't be loaded: ${assignees.error.message}`
+                  : !canAssign && "Only an admin can change who a lead is assigned to."
+              }
             >
-              <select {...bind("assigned_to")}>
-                <option value="">Unassigned</option>
+              <select {...bind("assigned_to")} disabled={!canAssign}>
+                <option value="">{canAssign ? "Unassigned" : "You"}</option>
                 {[...assigneeOptions, ...(keepAssignee ? [keepAssignee] : [])].map((person) => (
                   <option key={person.id} value={person.id}>
                     {person.name}
@@ -430,6 +441,90 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
           </button>
           <button type="submit" disabled={saving} className={primaryButton}>
             {saving ? "Saving…" : lead ? "Save changes" : "Save lead"}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+type StatusDialogProps = { lead: Lead; onClose: () => void; onChanged: (lead: Lead) => void };
+
+// Moves the lead to another Lead Pipeline status through the API, which checks the user and the pipeline rules again.
+// All six statuses are listed; the ones this lead can't move to (back, or out of Won or Lost) can't be chosen.
+export function StatusDialog({ lead, onClose, onChanged }: StatusDialogProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const selectId = useId();
+  const [status, setStatus] = useState<LeadStatus>(lead.status);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    dialogRef.current?.showModal();
+  }, []);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setError(undefined);
+    try {
+      onChanged(await changeLeadStatus(lead.id, status));
+      dialogRef.current?.close();
+    } catch (err) {
+      setError(toApiError(err).message);
+      setPending(false);
+    }
+  }
+
+  return (
+    <dialog ref={dialogRef} onClose={onClose} aria-labelledby={titleId} className={`${dialogClass} max-w-sm p-5`}>
+      <form onSubmit={submit}>
+        <h2 id={titleId} className="text-base font-semibold">
+          Update lead status
+        </h2>
+        <p className="mt-1 truncate text-sm text-muted-foreground">{lead.name}</p>
+        <div className="mt-4 flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Current status</span>
+          <StatusBadge status={lead.status} />
+        </div>
+        <label htmlFor={selectId} className="mt-4 mb-1.5 block text-sm">
+          New status
+        </label>
+        <select
+          id={selectId}
+          value={status}
+          onChange={(event) => setStatus(event.target.value as LeadStatus)}
+          className={inputClass}
+        >
+          {LEAD_STATUSES.map((item) => (
+            <option
+              key={item.value}
+              value={item.value}
+              disabled={item.value !== lead.status && !lead.allowed_transitions.includes(item.value)}
+            >
+              {item.value === lead.status ? `${item.label} (current)` : item.label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {status === "WON"
+            ? "Won is final. Convert the lead afterwards to create its Work."
+            : status === "LOST"
+              ? "Lost is final. The lead and its history are kept."
+              : "Leads only move forward. Won and Lost are final."}
+        </p>
+        {error && (
+          <p role="alert" className="mt-3 text-sm text-error">
+            {error}
+          </p>
+        )}
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={() => dialogRef.current?.close()} className={secondaryButton}>
+            Cancel
+          </button>
+          <button type="submit" disabled={pending || status === lead.status} className={primaryButton}>
+            {pending ? "Updating…" : "Update Status"}
           </button>
         </div>
       </form>
@@ -468,8 +563,7 @@ export function ConvertDialog({ lead, onClose, onConverted }: ConvertDialogProps
         Convert lead to Work
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        {lead.name} will be marked <strong className="font-medium text-foreground">Won</strong> and a Work will be
-        created for the installation with this plan and amount.
+        A Work will be created for {lead.name}&apos;s installation with this plan and amount.
       </p>
       <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-md bg-muted px-4 py-3 text-sm">
         <dt className="text-muted-foreground">Plan</dt>

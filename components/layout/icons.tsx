@@ -212,6 +212,15 @@ export function CalendarIcon(props: IconProps) {
   );
 }
 
+export function TrashIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.5 7h15M10 11v6M14 11v6" />
+      <path d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7" />
+    </Icon>
+  );
+}
+
 export function ConvertIcon(props: IconProps) {
   return (
     <Icon {...props}>
