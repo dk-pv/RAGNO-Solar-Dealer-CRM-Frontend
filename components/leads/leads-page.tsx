@@ -2,123 +2,40 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useId, useState, type ChangeEvent } from "react";
+import { useContext, useState } from "react";
 
-import {
-  CalendarIcon,
-  ChevronLeftIcon,
-  ConvertIcon,
-  DownloadIcon,
-  FilterIcon,
-  MoreIcon,
-  PencilIcon,
-  PhoneIcon,
-  PinIcon,
-  PlusIcon,
-  SearchIcon,
-  WhatsAppIcon,
-} from "@/components/layout/icons";
+import { ChevronLeftIcon, DownloadIcon, PinIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
+import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { toApiError, useApi } from "@/lib/api";
-import {
-  LEAD_SOURCES,
-  LEAD_STATUSES,
-  canConvert,
-  exportLeads,
-  formatDate,
-  formatMoney,
-  formatPhone,
-  telHref,
-  whatsappHref,
-  type Assignee,
-  type Lead,
-  type Page,
-  type Plan,
-} from "./api";
-import { ConvertDialog, LeadFormDialog } from "./lead-dialogs";
-import {
-  ErrorState,
-  PinButton,
-  StatusBadge,
-  fieldClass,
-  iconButton,
-  inputClass,
-  primaryButton,
-  secondaryButton,
-  useNotice,
-} from "./ui";
+import { exportLeads, formatDate, formatMoney, formatPhone, type Lead, type Page } from "./api";
+import { LeadMenu, useLeadActions, type LeadActions } from "./lead-actions";
+import { FILTER_KEYS, LeadsHeader, LeadsToolbar, VIEW_KEYS, pickParams, updateQuery } from "./leads-toolbar";
+import { ErrorState, PinButton, StatusBadge, fieldClass, iconButton, secondaryButton, useNotice } from "./ui";
 
-const FILTER_KEYS = ["status", "plan", "assigned_to", "source", "created_after", "created_before"] as const;
-type FilterKey = (typeof FILTER_KEYS)[number];
 // The URL query and the API query use the same names.
-const QUERY_KEYS = ["search", ...FILTER_KEYS, "ordering", "page", "page_size"];
-const DEFAULT_ORDERING = "-created_at";
+const QUERY_KEYS = [...VIEW_KEYS, "page", "page_size"];
 const DEFAULT_PAGE_SIZE = 25; // the API's default page size
 const PAGE_SIZES = [10, 25, 50, 100];
 const COLUMN_COUNT = 11;
 
-// The API always lists pinned leads first, then in the chosen order.
-const SORT_OPTIONS = [
-  { value: "-created_at", label: "Newest first" },
-  { value: "created_at", label: "Oldest first" },
-  { value: "name", label: "Customer name" },
-  { value: "status", label: "Status" },
-  { value: "next_follow_up", label: "Next follow-up" },
-  { value: "-amount", label: "Amount: high to low" },
-  { value: "amount", label: "Amount: low to high" },
-  { value: "plan__capacity", label: "Plan size" },
-  { value: "assigned_to__name", label: "Assigned staff" },
-];
-
-// Search, filters, sort and page live in the URL, so a refresh or the back button keeps the view.
-// replaceState updates useSearchParams without a server round trip (Next.js integrates the History API).
-function updateQuery(changes: Record<string, string | null>) {
-  const params = new URLSearchParams(window.location.search);
-  for (const [key, value] of Object.entries(changes)) {
-    if (value) params.set(key, value);
-    else params.delete(key);
-  }
-  // Any change other than paging starts again from the first page.
-  if (!("page" in changes)) params.delete("page");
-  const query = params.toString();
-  window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
-}
-
 export function LeadsPage() {
   const searchParams = useSearchParams();
-  const query = new URLSearchParams();
-  for (const key of QUERY_KEYS) {
-    const value = searchParams.get(key);
-    if (value) query.set(key, value);
-  }
+  const query = pickParams(searchParams, QUERY_KEYS);
   const { data, error, loading, reload } = useApi<Page<Lead>>(query.toString() ? `/leads/?${query}` : "/leads/");
 
-  const search = searchParams.get("search") ?? "";
-  const [searchText, setSearchText] = useState(search);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [formLead, setFormLead] = useState<Lead | null>(); // null: a new lead; undefined: the form is closed
-  const [convertTarget, setConvertTarget] = useState<Lead>();
   const [exporting, setExporting] = useState(false);
+  const [clears, setClears] = useState(0);
   const [noticeElement, notify] = useNotice();
-  const filterPanelId = useId();
+  const actions = useLeadActions(notify, reload);
+  // Exporting the whole customer list is admin-only on the API, so only admins are offered it.
+  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
-  // Search as the user types, once they pause.
-  useEffect(() => {
-    const next = searchText.trim();
-    if (next === search) return;
-    const timer = setTimeout(() => updateQuery({ search: next || null }), 300);
-    return () => clearTimeout(timer);
-  }, [searchText, search]);
-
+  const search = searchParams.get("search") ?? "";
   const page = Number(searchParams.get("page")) || 1;
   const pageSize = Number(searchParams.get("page_size")) || DEFAULT_PAGE_SIZE;
   const activeFilters = FILTER_KEYS.filter((key) => searchParams.get(key)).length;
   const showError = (text: string) => notify({ text, error: true });
-
-  function clearSearchAndFilters() {
-    setSearchText("");
-    updateQuery(Object.fromEntries(["search", ...FILTER_KEYS].map((key) => [key, null])));
-  }
 
   async function exportCsv() {
     // Same search, filters and sort as the table, without paging.
@@ -165,7 +82,15 @@ export function LeadsPage() {
         </p>
         <button
           type="button"
-          onClick={filtered ? clearSearchAndFilters : () => setFormLead(null)}
+          onClick={
+            filtered
+              ? () => {
+                  updateQuery(Object.fromEntries(["search", ...FILTER_KEYS].map((key) => [key, null])));
+                  // A fresh toolbar also drops a search still being typed (not yet in the URL).
+                  setClears((count) => count + 1);
+                }
+              : actions.add
+          }
           className={`${secondaryButton} mt-4`}
         >
           {filtered ? "Clear search and filters" : "Add Lead"}
@@ -207,14 +132,7 @@ export function LeadsPage() {
             <tbody>
               {rows ? (
                 rows.map((lead) => (
-                  <LeadRow
-                    key={lead.id}
-                    lead={lead}
-                    onChanged={reload}
-                    onError={showError}
-                    onEdit={setFormLead}
-                    onConvert={setConvertTarget}
-                  />
+                  <LeadRow key={lead.id} lead={lead} actions={actions} onChanged={reload} onError={showError} />
                 ))
               ) : (
                 <SkeletonRows />
@@ -229,90 +147,21 @@ export function LeadsPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Leads</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "lead" : "leads"}` : " "}
-          </p>
-        </div>
-        <button type="button" onClick={() => setFormLead(null)} className={primaryButton}>
-          <PlusIcon className="size-4" />
-          Add Lead
-        </button>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-72">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Search name, phone, email or ID"
-            aria-label="Search leads"
-            className={`${inputClass} pl-8`}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((open) => !open)}
-          aria-expanded={filtersOpen}
-          aria-controls={filterPanelId}
-          className={secondaryButton}
-        >
-          <FilterIcon className="size-4" />
-          Filter
-          {activeFilters > 0 && (
-            <span className="rounded bg-primary px-1.5 text-xs leading-5 text-white">{activeFilters}</span>
-          )}
-        </button>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Sort</span>
-          <select
-            value={searchParams.get("ordering") ?? DEFAULT_ORDERING}
-            onChange={(event) =>
-              updateQuery({ ordering: event.target.value === DEFAULT_ORDERING ? null : event.target.value })
-            }
-            className={`${fieldClass} h-9`}
-          >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={exportCsv} disabled={exporting} className={`${secondaryButton} sm:ml-auto`}>
-          <DownloadIcon className="size-4" />
-          {exporting ? "Exporting…" : "Export"}
-        </button>
-      </div>
-
-      {filtersOpen && <FilterPanel id={filterPanelId} searchParams={searchParams} onDone={() => setFiltersOpen(false)} />}
-
+      <LeadsHeader
+        title="Leads"
+        description={data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "lead" : "leads"}` : undefined}
+        onAdd={actions.add}
+      />
+      <LeadsToolbar key={clears}>
+        {isAdmin && (
+          <button type="button" onClick={exportCsv} disabled={exporting} className={`${secondaryButton} sm:ml-auto`}>
+            <DownloadIcon className="size-4" />
+            {exporting ? "Exporting…" : "Export"}
+          </button>
+        )}
+      </LeadsToolbar>
       {content}
-
-      {formLead !== undefined && (
-        <LeadFormDialog
-          lead={formLead}
-          onClose={() => setFormLead(undefined)}
-          onSaved={(saved) => {
-            notify({ text: formLead ? `Saved changes to ${saved.name}.` : `Added ${saved.name} as a new lead.` });
-            reload();
-          }}
-        />
-      )}
-      {convertTarget && (
-        <ConvertDialog
-          lead={convertTarget}
-          onClose={() => setConvertTarget(undefined)}
-          onConverted={(converted) => {
-            notify({ text: `${converted.name} is now Won${converted.work ? `. Work #${converted.work} was created.` : "."}` });
-            reload();
-          }}
-        />
-      )}
+      {actions.dialogs}
       {noticeElement}
     </div>
   );
@@ -320,13 +169,12 @@ export function LeadsPage() {
 
 type LeadRowProps = {
   lead: Lead;
+  actions: LeadActions;
   onChanged: () => void;
   onError: (message: string) => void;
-  onEdit: (lead: Lead) => void;
-  onConvert: (lead: Lead) => void;
 };
 
-function LeadRow({ lead, onChanged, onError, onEdit, onConvert }: LeadRowProps) {
+function LeadRow({ lead, actions, onChanged, onError }: LeadRowProps) {
   const location = [lead.area, lead.district].filter(Boolean).join(", ");
   // Sticky cells need an opaque background, so the row hover colour is the solid muted colour.
   const stickyCell = "sticky z-1 bg-background group-hover:bg-row-hover";
@@ -374,99 +222,9 @@ function LeadRow({ lead, onChanged, onError, onEdit, onConvert }: LeadRowProps) 
       <td className="px-3 py-2 whitespace-nowrap">{formatDate(lead.created_at)}</td>
       <td className="px-3 py-2 whitespace-nowrap">{formatDate(lead.next_follow_up)}</td>
       <td className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)]`}>
-        <RowActions lead={lead} onEdit={onEdit} onConvert={onConvert} />
+        <LeadMenu lead={lead} actions={actions} />
       </td>
     </tr>
-  );
-}
-
-const MENU_WIDTH = 224; // w-56
-const MENU_HEIGHT = 240; // ponytail: fixed estimate of the open menu's height; measure it if the menu grows
-
-// The menu opens in the browser's top layer, outside the scrolling table, next to its button.
-function placeMenu(button: HTMLElement, menuId: string) {
-  const menu = document.getElementById(menuId);
-  if (!menu) return;
-  const rect = button.getBoundingClientRect();
-  const openUp = rect.bottom + MENU_HEIGHT > window.innerHeight && rect.top > MENU_HEIGHT;
-  menu.style.left = `${Math.max(8, rect.right - MENU_WIDTH)}px`;
-  menu.style.top = openUp ? "auto" : `${rect.bottom + 4}px`;
-  menu.style.bottom = openUp ? `${window.innerHeight - rect.top + 4}px` : "auto";
-}
-
-const menuItemClass =
-  "flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent";
-
-type RowActionsProps = { lead: Lead; onEdit: (lead: Lead) => void; onConvert: (lead: Lead) => void };
-
-function RowActions({ lead, onEdit, onConvert }: RowActionsProps) {
-  const menuId = useId();
-  const hide = () => document.getElementById(menuId)?.hidePopover();
-  const whatsapp = whatsappHref(lead);
-  const tel = telHref(lead);
-
-  return (
-    <>
-      <button
-        type="button"
-        popoverTarget={menuId}
-        onClick={(event) => placeMenu(event.currentTarget, menuId)}
-        aria-label={`Actions for ${lead.name}`}
-        className={`${iconButton} size-8`}
-      >
-        <MoreIcon className="size-4" />
-      </button>
-      <div
-        id={menuId}
-        popover="auto"
-        className="fixed inset-auto m-0 w-56 rounded-md border border-border bg-background p-1 text-foreground shadow-lg"
-      >
-        <button
-          type="button"
-          onClick={() => {
-            hide();
-            onEdit(lead);
-          }}
-          className={menuItemClass}
-        >
-          <PencilIcon className="size-4 text-muted-foreground" />
-          Edit
-        </button>
-        <a href={whatsapp} target="_blank" rel="noopener noreferrer" onClick={hide} className={menuItemClass}>
-          <WhatsAppIcon className="size-4 text-muted-foreground" />
-          WhatsApp
-        </a>
-        <a href={tel} onClick={hide} className={menuItemClass}>
-          <PhoneIcon className="size-4 text-muted-foreground" />
-          Call
-        </a>
-        <Link href={`/leads/${lead.id}#activities`} className={menuItemClass}>
-          <CalendarIcon className="size-4 text-muted-foreground" />
-          Follow-up / Activity
-        </Link>
-        <div className="my-1 border-t border-border" />
-        {lead.status === "WON" ? (
-          <p className="flex items-center gap-2.5 px-2.5 py-2 text-sm text-muted-foreground">
-            <ConvertIcon className="size-4" />
-            {lead.work ? `Converted to Work #${lead.work}` : "Converted"}
-          </p>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              hide();
-              onConvert(lead);
-            }}
-            disabled={!canConvert(lead)}
-            title={canConvert(lead) ? undefined : "Not available in this lead's current status"}
-            className={menuItemClass}
-          >
-            <ConvertIcon className="size-4 text-muted-foreground" />
-            Convert to Work
-          </button>
-        )}
-      </div>
-    </>
   );
 }
 
@@ -480,102 +238,6 @@ function SkeletonRows() {
       ))}
     </tr>
   ));
-}
-
-type FilterPanelProps = { id: string; searchParams: URLSearchParams; onDone: () => void };
-
-function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
-  const plans = useApi<Plan[]>("/plans/");
-  const assignees = useApi<Assignee[]>("/leads/assignees/");
-  const [draft, setDraft] = useState(
-    () => Object.fromEntries(FILTER_KEYS.map((key) => [key, searchParams.get(key) ?? ""])) as Record<FilterKey, string>,
-  );
-  const bind = (key: FilterKey) => ({
-    value: draft[key],
-    onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setDraft((current) => ({ ...current, [key]: event.target.value })),
-    className: inputClass,
-  });
-
-  return (
-    <form
-      id={id}
-      onSubmit={(event) => {
-        event.preventDefault();
-        updateQuery(Object.fromEntries(FILTER_KEYS.map((key) => [key, draft[key] || null])));
-        onDone();
-      }}
-      className="mt-3 grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Status</span>
-        <select {...bind("status")}>
-          <option value="">All statuses</option>
-          {LEAD_STATUSES.map((status) => (
-            <option key={status.value} value={status.value}>
-              {status.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Plan</span>
-        <select {...bind("plan")}>
-          <option value="">{plans.error ? "All plans (plans couldn't be loaded)" : "All plans"}</option>
-          {plans.data?.map((plan) => (
-            <option key={plan.id} value={plan.id}>
-              {plan.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Assigned staff</span>
-        <select {...bind("assigned_to")}>
-          <option value="">{assignees.error ? "Anyone (staff couldn't be loaded)" : "Anyone"}</option>
-          {assignees.data?.map((person) => (
-            <option key={person.id} value={person.id}>
-              {person.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Lead source</span>
-        <select {...bind("source")}>
-          <option value="">All sources</option>
-          {LEAD_SOURCES.map((source) => (
-            <option key={source.value} value={source.value}>
-              {source.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Created from</span>
-        <input type="date" max={draft.created_before || undefined} {...bind("created_after")} />
-      </label>
-      <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Created to</span>
-        <input type="date" min={draft.created_after || undefined} {...bind("created_before")} />
-      </label>
-      <div className="flex justify-end gap-2 sm:col-span-2 lg:col-span-3">
-        <button
-          type="button"
-          onClick={() => {
-            updateQuery(Object.fromEntries(FILTER_KEYS.map((key) => [key, null])));
-            onDone();
-          }}
-          className={secondaryButton}
-        >
-          Clear filters
-        </button>
-        <button type="submit" className={primaryButton}>
-          Apply
-        </button>
-      </div>
-    </form>
-  );
 }
 
 // Page numbers to show: the first, the last and the current page with its neighbours; null marks a gap.

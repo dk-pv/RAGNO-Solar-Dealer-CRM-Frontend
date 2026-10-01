@@ -1,38 +1,62 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 
-import { CalendarIcon, ChevronLeftIcon, PencilIcon, PhoneIcon, WhatsAppIcon } from "@/components/layout/icons";
+import {
+  CalendarIcon,
+  ChevronLeftIcon,
+  FlagIcon,
+  PencilIcon,
+  PhoneIcon,
+  TrashIcon,
+  WhatsAppIcon,
+} from "@/components/layout/icons";
 import { toApiError, useApi } from "@/lib/api";
 import {
-  LEAD_STATUSES,
-  canConvert,
-  changeLeadStatus,
+  ACTIVITY_TYPES,
+  addActivity,
+  convertBlocker,
+  deleteActivity,
+  deleteLead,
   formatDate,
   formatDateTime,
   formatMoney,
   formatPhone,
   sourceLabel,
+  statusBlocker,
   statusLabel,
   telHref,
+  updateActivity,
   whatsappHref,
   type Activity,
+  type ActivityType,
   type Lead,
-  type LeadStatus,
   type Page,
 } from "./api";
-import { ConvertDialog, LeadFormDialog } from "./lead-dialogs";
-import { ErrorState, PinButton, StatusBadge, iconButton, inputClass, primaryButton, secondaryButton, useNotice } from "./ui";
+import { ConvertDialog, LeadFormDialog, StatusDialog } from "./lead-dialogs";
+import {
+  ErrorState,
+  PinButton,
+  StatusBadge,
+  fieldClass,
+  iconButton,
+  primaryButton,
+  secondaryButton,
+  useNotice,
+} from "./ui";
 
 const outlinedIcon = `${iconButton} size-9 border border-border`;
 
 export function LeadDetail({ id }: { id: number }) {
   const { data: lead, error, reload } = useApi<Lead>(`/leads/${id}/`);
   const [editing, setEditing] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [converting, setConverting] = useState(false);
   const [activitiesVersion, setActivitiesVersion] = useState(0);
   const [noticeElement, notify] = useNotice();
+  const router = useRouter();
   const loaded = lead !== undefined;
 
   // The Follow-up / Activity action links to #activities, which exists only once the lead has loaded.
@@ -70,6 +94,16 @@ export function LeadDetail({ id }: { id: number }) {
 
   const whatsapp = whatsappHref(lead);
   const tel = telHref(lead);
+
+  async function removeLead(target: Lead) {
+    if (!window.confirm(`Delete ${target.name}? The lead and its activities are removed for good.`)) return;
+    try {
+      await deleteLead(target.id);
+      router.push("/leads");
+    } catch (err) {
+      notify({ text: toApiError(err).message, error: true });
+    }
+  }
 
   return (
     <div>
@@ -109,10 +143,22 @@ export function LeadDetail({ id }: { id: number }) {
             <CalendarIcon className="size-4" />
             Follow-up / Activity
           </a>
-          <button type="button" onClick={() => setEditing(true)} className={secondaryButton}>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            disabled={!lead.can_edit}
+            title={lead.can_edit ? undefined : "You can view this lead but not change it"}
+            className={secondaryButton}
+          >
             <PencilIcon className="size-4" />
             Edit
           </button>
+          {lead.can_delete && (
+            <button type="button" onClick={() => removeLead(lead)} className={`${secondaryButton} text-error`}>
+              <TrashIcon className="size-4" />
+              Delete
+            </button>
+          )}
         </div>
       </header>
 
@@ -156,8 +202,7 @@ export function LeadDetail({ id }: { id: number }) {
           )}
           <Activities
             key={activitiesVersion}
-            leadId={lead.id}
-            nextFollowUp={lead.next_follow_up}
+            lead={lead}
             onScheduleFollowUp={() => setEditing(true)}
           />
         </div>
@@ -165,31 +210,37 @@ export function LeadDetail({ id }: { id: number }) {
         <aside className="space-y-6 lg:border-l lg:border-border lg:pl-6">
           <section>
             <h2 className="text-sm font-semibold">Status</h2>
-            <StatusChange
-              lead={lead}
-              onChanged={(updated) => {
-                notify({ text: `Status changed to ${statusLabel(updated.status)}.` });
-                refresh();
-              }}
-            />
+            <p className="mt-2 text-sm text-muted-foreground">
+              {statusBlocker(lead) ?? "Move the lead forward, or mark it Won or Lost."}
+            </p>
+            <button
+              type="button"
+              onClick={() => setUpdatingStatus(true)}
+              disabled={!!statusBlocker(lead)}
+              className={`${secondaryButton} mt-3 w-full`}
+            >
+              <FlagIcon className="size-4" />
+              Update Status
+            </button>
           </section>
           <section className="border-t border-border pt-6">
             <h2 className="text-sm font-semibold">Conversion</h2>
-            {lead.status === "WON" ? (
-              <p className="mt-2 text-sm">
-                Converted.{lead.work ? ` Work #${lead.work} was created for the installation.` : ""}
-              </p>
-            ) : canConvert(lead) ? (
+            {lead.work ? (
+              <p className="mt-2 text-sm">Converted to Work #{lead.work} for the installation.</p>
+            ) : (
               <>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  When the customer confirms, convert the lead: it becomes Won and a Work is created for the installation.
+                  {convertBlocker(lead) ?? "The lead is Won. Convert it to create its Work for the installation."}
                 </p>
-                <button type="button" onClick={() => setConverting(true)} className={`${primaryButton} mt-3 w-full`}>
+                <button
+                  type="button"
+                  onClick={() => setConverting(true)}
+                  disabled={!lead.can_convert}
+                  className={`${primaryButton} mt-3 w-full`}
+                >
                   Convert to Work
                 </button>
               </>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">This lead can&apos;t be converted in its current status.</p>
             )}
           </section>
         </aside>
@@ -205,12 +256,22 @@ export function LeadDetail({ id }: { id: number }) {
           }}
         />
       )}
+      {updatingStatus && (
+        <StatusDialog
+          lead={lead}
+          onClose={() => setUpdatingStatus(false)}
+          onChanged={(updated) => {
+            notify({ text: `Status changed to ${statusLabel(updated.status)}.` });
+            refresh();
+          }}
+        />
+      )}
       {converting && (
         <ConvertDialog
           lead={lead}
           onClose={() => setConverting(false)}
           onConverted={(converted) => {
-            notify({ text: `${converted.name} is now Won${converted.work ? `. Work #${converted.work} was created.` : "."}` });
+            notify({ text: `Converted ${converted.name}${converted.work ? ` to Work #${converted.work}` : ""}.` });
             refresh();
           }}
         />
@@ -245,79 +306,29 @@ function Details({ title, items }: { title: string; items: [string, ReactNode][]
   );
 }
 
-// Offers only the moves the backend allows for this lead (allowed_transitions); the API validates the change again.
-function StatusChange({ lead, onChanged }: { lead: Lead; onChanged: (lead: Lead) => void }) {
-  const formId = useId();
-  const [status, setStatus] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
-  // Won is reached only through conversion, which also creates the Work.
-  const options = LEAD_STATUSES.filter((item) => item.value !== "WON" && lead.allowed_transitions.includes(item.value));
+type ActivitiesProps = { lead: Lead; onScheduleFollowUp: () => void };
 
-  if (options.length === 0) {
-    return <p className="mt-2 text-sm text-muted-foreground">No status changes are available for this lead.</p>;
-  }
+// The lead's activity log. Whoever can edit the lead (an admin, or the staff member it's assigned to) adds, edits and
+// deletes its activities; the API applies the same rule.
+function Activities({ lead, onScheduleFollowUp }: ActivitiesProps) {
+  const { data, error, loading, reload } = useApi<Page<Activity>>(`/activities/?lead=${lead.id}`);
+  const [editingId, setEditingId] = useState<number>();
+  const [actionError, setActionError] = useState<string>();
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending(true);
-    setError(undefined);
+  async function remove(activity: Activity) {
+    if (!window.confirm(`Delete this ${activity.type_display.toLowerCase()} activity?`)) return;
+    setActionError(undefined);
     try {
-      const updated = await changeLeadStatus(lead.id, status as LeadStatus);
-      setStatus("");
-      onChanged(updated);
+      await deleteActivity(activity.id);
+      reload();
     } catch (err) {
-      setError(toApiError(err).message);
-    } finally {
-      setPending(false);
+      setActionError(toApiError(err).message);
     }
   }
 
-  return (
-    <form onSubmit={submit} className="mt-3 space-y-3">
-      <div>
-        <label htmlFor={`${formId}-status`} className="mb-1.5 block text-sm">
-          Move to
-        </label>
-        <select
-          id={`${formId}-status`}
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
-          required
-          className={inputClass}
-        >
-          <option value="">Choose a status</option>
-          {options.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      {status === "LOST" && (
-        <p className="text-xs text-muted-foreground">Lost is a final outcome. The lead and its history are kept.</p>
-      )}
-      {error && (
-        <p role="alert" className="text-sm text-error">
-          {error}
-        </p>
-      )}
-      <button type="submit" disabled={!status || pending} className={`${secondaryButton} w-full`}>
-        {pending ? "Updating…" : "Update status"}
-      </button>
-    </form>
-  );
-}
-
-type ActivitiesProps = { leadId: number; nextFollowUp: string | null; onScheduleFollowUp: () => void };
-
-// Read-only for now: the Activity form is a separate task. Activities are shared by Leads and Works (see /api/activities/).
-function Activities({ leadId, nextFollowUp, onScheduleFollowUp }: ActivitiesProps) {
-  const { data, error, loading, reload } = useApi<Page<Activity>>(`/activities/?lead=${leadId}`);
-
   let content;
   if (error?.status === 404) {
-    // The Activities module isn't on the server yet; this isn't a failure the user can retry.
+    // The Activities API isn't on this server; not something the user can retry.
     content = <p className="mt-4 text-sm text-muted-foreground">Activity history isn&apos;t available yet.</p>;
   } else if (error) {
     content = (
@@ -336,14 +347,51 @@ function Activities({ leadId, nextFollowUp, onScheduleFollowUp }: ActivitiesProp
           {data.results.map((activity) => (
             <li key={activity.id} className="relative">
               <span aria-hidden="true" className="absolute top-1.5 -left-[24.5px] size-2 rounded-full bg-muted-foreground" />
-              <p className="text-sm">
-                <span className="font-medium">{activity.type_display}</span>
-                {activity.description && <span className="text-muted-foreground"> — {activity.description}</span>}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {formatDateTime(activity.created_at)}
-                {activity.created_by_name ? ` · ${activity.created_by_name}` : ""}
-              </p>
+              {editingId === activity.id ? (
+                <ActivityForm
+                  initial={activity}
+                  submitLabel="Save"
+                  onSubmit={(type, description) => updateActivity(activity.id, type, description)}
+                  onDone={() => {
+                    setEditingId(undefined);
+                    reload();
+                  }}
+                  onCancel={() => setEditingId(undefined)}
+                />
+              ) : (
+                <>
+                  <p className="text-sm">
+                    <span className="font-medium">{activity.type_display}</span>
+                    <span className="text-muted-foreground"> — {activity.description}</span>
+                  </p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                    <span>
+                      {formatDateTime(activity.created_at)}
+                      {activity.created_by_name ? ` · ${activity.created_by_name}` : ""}
+                    </span>
+                    {lead.can_edit && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(activity.id)}
+                          aria-label={`Edit ${activity.type_display} activity`}
+                          className="font-medium text-foreground underline-offset-2 hover:underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => remove(activity)}
+                          aria-label={`Delete ${activity.type_display} activity`}
+                          className="font-medium text-error underline-offset-2 hover:underline"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </p>
+                </>
+              )}
             </li>
           ))}
         </ol>
@@ -363,17 +411,113 @@ function Activities({ leadId, nextFollowUp, onScheduleFollowUp }: ActivitiesProp
         <CalendarIcon className="size-4 text-muted-foreground" />
         <span>
           Next follow-up:{" "}
-          <span className="font-medium">{nextFollowUp ? formatDate(nextFollowUp) : "Not scheduled"}</span>
+          <span className="font-medium">{lead.next_follow_up ? formatDate(lead.next_follow_up) : "Not scheduled"}</span>
         </span>
-        <button
-          type="button"
-          onClick={onScheduleFollowUp}
-          className="ml-auto text-sm font-medium underline-offset-2 hover:underline"
-        >
-          {nextFollowUp ? "Change" : "Schedule"}
-        </button>
+        {lead.can_edit && (
+          <button
+            type="button"
+            onClick={onScheduleFollowUp}
+            className="ml-auto text-sm font-medium underline-offset-2 hover:underline"
+          >
+            {lead.next_follow_up ? "Change" : "Schedule"}
+          </button>
+        )}
       </div>
+      {lead.can_edit && !error && (
+        <ActivityForm
+          submitLabel="Add activity"
+          onSubmit={(type, description) => addActivity(lead.id, type, description)}
+          onDone={reload}
+        />
+      )}
+      {actionError && (
+        <p role="alert" className="mt-3 text-sm text-error">
+          {actionError}
+        </p>
+      )}
       {content}
     </section>
+  );
+}
+
+type ActivityFormProps = {
+  initial?: Activity;
+  submitLabel: string;
+  onSubmit: (type: ActivityType, description: string) => Promise<unknown>;
+  onDone: () => void;
+  onCancel?: () => void;
+};
+
+// Adds an activity, or edits one when `initial` is given.
+function ActivityForm({ initial, submitLabel, onSubmit, onDone, onCancel }: ActivityFormProps) {
+  const formId = useId();
+  const [type, setType] = useState<ActivityType>(initial?.type ?? "PHONE_CALL");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!description.trim()) {
+      setError("Describe what happened.");
+      return;
+    }
+    setPending(true);
+    setError(undefined);
+    try {
+      await onSubmit(type, description.trim());
+      if (!initial) setDescription("");
+      onDone();
+    } catch (err) {
+      setError(toApiError(err).message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-3 space-y-2">
+      <label htmlFor={`${formId}-type`} className="sr-only">
+        Activity type
+      </label>
+      <select
+        id={`${formId}-type`}
+        value={type}
+        onChange={(event) => setType(event.target.value as ActivityType)}
+        className={`${fieldClass} h-9`}
+      >
+        {ACTIVITY_TYPES.map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+      <label htmlFor={`${formId}-description`} className="sr-only">
+        What happened
+      </label>
+      <textarea
+        id={`${formId}-description`}
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+        rows={2}
+        placeholder="What happened, or what was agreed"
+        className={`${fieldClass} w-full py-2`}
+      />
+      {error && (
+        <p role="alert" className="text-sm text-error">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button type="submit" disabled={pending} className={secondaryButton}>
+          {pending ? "Saving…" : submitLabel}
+        </button>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className={secondaryButton}>
+            Cancel
+          </button>
+        )}
+      </div>
+    </form>
   );
 }

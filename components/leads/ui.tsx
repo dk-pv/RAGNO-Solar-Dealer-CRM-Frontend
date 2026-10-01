@@ -14,7 +14,7 @@ export const destructiveButton =
   "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive px-3.5 text-sm font-medium text-white hover:bg-destructive-hover disabled:cursor-not-allowed disabled:opacity-50";
 // Callers add the size (size-8 or size-9).
 export const iconButton =
-  "grid shrink-0 place-items-center rounded-md text-faint hover:bg-muted hover:text-label disabled:cursor-not-allowed disabled:opacity-50";
+  "grid shrink-0 place-items-center rounded-md text-faint hover:bg-muted hover:text-label disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50";
 // Inputs and selects without a size; inputClass adds the usual full-width size.
 export const fieldClass =
   "min-w-0 rounded-md border border-input bg-field px-3 text-sm text-foreground placeholder:text-placeholder enabled:hover:border-input-hover focus:border-primary focus:ring-3 focus:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-disabled-surface disabled:text-disabled aria-[invalid=true]:border-error";
@@ -48,6 +48,7 @@ export function PinButton({ lead, onChanged, onError, className = "size-8" }: Pi
   const [pending, setPending] = useState(false);
 
   async function toggle() {
+    if (pending) return;
     setPending(true);
     try {
       await setLeadPinned(lead.id, !lead.is_pinned);
@@ -63,10 +64,12 @@ export function PinButton({ lead, onChanged, onError, className = "size-8" }: Pi
     <button
       type="button"
       onClick={toggle}
-      disabled={pending}
+      // aria-disabled, not disabled, while saving: a disabled button would drop the keyboard focus.
+      disabled={!lead.can_edit}
+      aria-disabled={pending || undefined}
       aria-pressed={lead.is_pinned}
       aria-label={`Pin ${lead.name}`}
-      title={lead.is_pinned ? "Unpin" : "Pin"}
+      title={lead.can_edit ? (lead.is_pinned ? "Unpin" : "Pin") : "You can't change this lead"}
       className={`${iconButton} ${className}`}
     >
       <PinIcon className={`size-4 ${lead.is_pinned ? "text-brand" : ""}`} fill={lead.is_pinned ? "currentColor" : "none"} />
