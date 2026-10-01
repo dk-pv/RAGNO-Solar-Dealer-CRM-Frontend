@@ -290,7 +290,7 @@ function BackLink() {
   );
 }
 
-function Details({ title, items }: { title: string; items: [string, ReactNode][] }) {
+export function Details({ title, items }: { title: string; items: [string, ReactNode][] }) {
   return (
     <section>
       <h2 className="text-sm font-semibold">{title}</h2>
