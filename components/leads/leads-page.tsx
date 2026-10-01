@@ -72,7 +72,7 @@ const SORT_OPTIONS = [
 
 // Search, filters, sort and page live in the URL, so a refresh or the back button keeps the view.
 // replaceState updates useSearchParams without a server round trip (Next.js integrates the History API).
-function updateQuery(changes: Record<string, string | null>) {
+export function updateQuery(changes: Record<string, string | null>) {
   const params = new URLSearchParams(window.location.search);
   for (const [key, value] of Object.entries(changes)) {
     if (value) params.set(key, value);
@@ -176,7 +176,7 @@ export function LeadsPage() {
     const rows = data && data.results.length > 0 ? data.results : undefined;
     content = (
       <>
-        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
+        <div className="scrollbar-none mt-4 overflow-x-auto rounded-lg border border-border">
           <table
             aria-busy={loading}
             className={`w-full min-w-270 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
@@ -384,7 +384,7 @@ const MENU_WIDTH = 224; // w-56
 const MENU_HEIGHT = 240; // ponytail: fixed estimate of the open menu's height; measure it if the menu grows
 
 // The menu opens in the browser's top layer, outside the scrolling table, next to its button.
-function placeMenu(button: HTMLElement, menuId: string) {
+export function placeMenu(button: HTMLElement, menuId: string) {
   const menu = document.getElementById(menuId);
   if (!menu) return;
   const rect = button.getBoundingClientRect();
@@ -394,7 +394,7 @@ function placeMenu(button: HTMLElement, menuId: string) {
   menu.style.bottom = openUp ? `${window.innerHeight - rect.top + 4}px` : "auto";
 }
 
-const menuItemClass =
+export const menuItemClass =
   "flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent";
 
 type RowActionsProps = { lead: Lead; onEdit: (lead: Lead) => void; onConvert: (lead: Lead) => void };
@@ -586,7 +586,7 @@ function pageNumbers(current: number, total: number) {
   return shown.flatMap((n, i) => (i > 0 && n - shown[i - 1] > 1 ? [null, n] : [n]));
 }
 
-function Pagination({ page, pageSize, count }: { page: number; pageSize: number; count: number }) {
+export function Pagination({ page, pageSize, count }: { page: number; pageSize: number; count: number }) {
   const pages = Math.max(1, Math.ceil(count / pageSize));
   const first = (page - 1) * pageSize + 1;
   const last = Math.min(page * pageSize, count);

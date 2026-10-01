@@ -56,7 +56,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Navbar user={user} onLogout={logout} onOpenNavigation={() => drawerRef.current?.showModal()} />
-        <main className="flex-1 p-4 lg:p-6">
+        {/* Pages never widen the window: wide content (boards, tables) scrolls inside its own box. `relative` makes main
+            the frame for absolutely positioned content such as screen-reader labels, and overflow-x-clip trims
+            anything still wider, without creating a scroll box. Pop-ups and dialogs sit above the page and aren't affected. */}
+        <main className="relative flex-1 overflow-x-clip p-4 lg:p-6">
           <CurrentUserContext value={user}>{content}</CurrentUserContext>
         </main>
       </div>
