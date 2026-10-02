@@ -19,6 +19,10 @@ const DEFAULT_PAGE_SIZE = 25; // the API's default page size
 const PAGE_SIZES = [10, 25, 50, 100];
 const COLUMN_COUNT = 11;
 
+// The Works list imports these from here.
+export { menuItemClass, placeMenu } from "./lead-actions";
+export { updateQuery } from "./leads-toolbar";
+
 export function LeadsPage() {
   const searchParams = useSearchParams();
   const query = pickParams(searchParams, QUERY_KEYS);

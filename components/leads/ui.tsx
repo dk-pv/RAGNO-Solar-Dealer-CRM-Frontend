@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { CloseIcon, PinIcon } from "@/components/layout/icons";
 import { toApiError } from "@/lib/api";
-import { setLeadPinned, statusLabel, type Lead, type LeadStatus } from "./api";
+import { FOLLOW_UP_STATUSES, setLeadPinned, statusLabel, type FollowUpStatus, type Lead, type LeadStatus } from "./api";
 
 export const primaryButton =
   "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-3.5 text-sm font-medium text-white hover:bg-primary-hover active:bg-primary-active disabled:cursor-not-allowed disabled:opacity-50";
@@ -37,6 +37,21 @@ export function StatusBadge({ status }: { status: LeadStatus }) {
       className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${STATUS_STYLES[status]}`}
     >
       {statusLabel(status)}
+    </span>
+  );
+}
+
+const FOLLOW_UP_STYLES: Record<FollowUpStatus, string> = {
+  PENDING: "bg-warning-soft text-warning ring-warning-border",
+  COMPLETED: "bg-success-soft text-success ring-success-border",
+};
+
+export function FollowUpBadge({ status }: { status: FollowUpStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${FOLLOW_UP_STYLES[status]}`}
+    >
+      {FOLLOW_UP_STATUSES.find((item) => item.value === status)?.label ?? status}
     </span>
   );
 }

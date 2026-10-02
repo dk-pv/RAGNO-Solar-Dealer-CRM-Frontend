@@ -82,9 +82,16 @@ async function errorFrom(response: Response) {
     if (body && typeof body === "object" && !Array.isArray(body)) {
       for (const [key, value] of Object.entries(body)) {
         const text = firstText(value);
-        if (!text) continue;
-        if (key === "detail" || key === "non_field_errors") message = text;
-        else fields[key] = text;
+        if (text) {
+          if (key === "detail" || key === "non_field_errors") message = text;
+          else fields[key] = text;
+        } else if (value && typeof value === "object" && !Array.isArray(value)) {
+          // A nested object's messages, such as a new lead's initial follow-up: "initial_follow_up.title".
+          for (const [inner, innerValue] of Object.entries(value)) {
+            const innerText = firstText(innerValue);
+            if (innerText) fields[`${key}.${inner}`] = innerText;
+          }
+        }
       }
     }
     if (!message && Object.keys(fields).length > 0) message = "Some fields need attention.";

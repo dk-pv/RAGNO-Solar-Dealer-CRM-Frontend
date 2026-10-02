@@ -105,14 +105,34 @@ type LeadsToolbarProps = { sortOptions?: typeof SORT_OPTIONS; children?: ReactNo
 // Search (as the user types), filters and sort, all kept in the URL. `children` adds the page's own buttons.
 export function LeadsToolbar({ sortOptions = SORT_OPTIONS, children }: LeadsToolbarProps) {
   const searchParams = useSearchParams();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterPanelId = useId();
+
+  return (
+    <>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <SearchBox label="Search leads" placeholder="Search name, phone, email or ID" />
+        <FilterToggle
+          open={filtersOpen}
+          onToggle={() => setFiltersOpen((open) => !open)}
+          controls={filterPanelId}
+          active={FILTER_KEYS.filter((key) => searchParams.get(key)).length}
+        />
+        <SortSelect options={sortOptions} defaultValue={DEFAULT_ORDERING} />
+        {children}
+      </div>
+      {filtersOpen && <FilterPanel id={filterPanelId} searchParams={searchParams} onDone={() => setFiltersOpen(false)} />}
+    </>
+  );
+}
+
+// The URL's ?search=, typed into a search box. Shared by the Leads pages and Lead Activities.
+export function SearchBox({ label, placeholder }: { label: string; placeholder: string }) {
+  const searchParams = useSearchParams();
   const search = searchParams.get("search") ?? "";
   const [searchText, setSearchText] = useState(search);
   const [shownSearch, setShownSearch] = useState(search);
   const [sentSearch, setSentSearch] = useState<string>(); // this box's latest search, until the URL shows it
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const filterPanelId = useId();
-  const activeFilters = FILTER_KEYS.filter((key) => searchParams.get(key)).length;
-  const ordering = searchParams.get("ordering") ?? DEFAULT_ORDERING;
 
   // The URL's search changed from elsewhere (a Clear button, Back): show it in the box. The box's own search arriving in
   // the URL is left alone, so what was typed since isn't overwritten.
@@ -134,52 +154,51 @@ export function LeadsToolbar({ sortOptions = SORT_OPTIONS, children }: LeadsTool
   }, [searchText, search]);
 
   return (
-    <>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-72">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Search name, phone, email or ID"
-            aria-label="Search leads"
-            className={`${inputClass} pl-8`}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((open) => !open)}
-          aria-expanded={filtersOpen}
-          aria-controls={filterPanelId}
-          className={secondaryButton}
-        >
-          <FilterIcon className="size-4" />
-          Filter
-          {activeFilters > 0 && (
-            <span className="rounded bg-primary px-1.5 text-xs leading-5 text-white">{activeFilters}</span>
-          )}
-        </button>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Sort</span>
-          <select
-            value={sortOptions.some((option) => option.value === ordering) ? ordering : DEFAULT_ORDERING}
-            onChange={(event) =>
-              updateQuery({ ordering: event.target.value === DEFAULT_ORDERING ? null : event.target.value })
-            }
-            className={`${fieldClass} h-9`}
-          >
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {children}
-      </div>
-      {filtersOpen && <FilterPanel id={filterPanelId} searchParams={searchParams} onDone={() => setFiltersOpen(false)} />}
-    </>
+    <div className="relative w-full sm:w-72">
+      <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+      <input
+        type="search"
+        value={searchText}
+        onChange={(event) => setSearchText(event.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+        className={`${inputClass} pl-8`}
+      />
+    </div>
+  );
+}
+
+type FilterToggleProps = { open: boolean; onToggle: () => void; controls: string; active: number };
+
+// Shows and hides a filter panel; the badge counts the filters in use.
+export function FilterToggle({ open, onToggle, controls, active }: FilterToggleProps) {
+  return (
+    <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={controls} className={secondaryButton}>
+      <FilterIcon className="size-4" />
+      Filter
+      {active > 0 && <span className="rounded bg-primary px-1.5 text-xs leading-5 text-white">{active}</span>}
+    </button>
+  );
+}
+
+// The URL's ?ordering=, left out of the URL when it's the default.
+export function SortSelect({ options, defaultValue }: { options: { value: string; label: string }[]; defaultValue: string }) {
+  const ordering = useSearchParams().get("ordering") ?? defaultValue;
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground">Sort</span>
+      <select
+        value={options.some((option) => option.value === ordering) ? ordering : defaultValue}
+        onChange={(event) => updateQuery({ ordering: event.target.value === defaultValue ? null : event.target.value })}
+        className={`${fieldClass} h-9`}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

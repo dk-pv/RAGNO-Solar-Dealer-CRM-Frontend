@@ -47,6 +47,7 @@ export function useLeadActions(notify: Notify, onChanged: (lead?: Lead) => void)
         <LeadFormDialog
           lead={formLead}
           onClose={() => setFormLead(undefined)}
+          onError={(text) => notify({ text, error: true })}
           onSaved={(saved) => {
             notify({ text: formLead ? `Saved changes to ${saved.name}.` : `Added ${saved.name} as a new lead.` });
             onChanged(saved);
@@ -87,14 +88,16 @@ export function useLeadActions(notify: Notify, onChanged: (lead?: Lead) => void)
 }
 
 const MENU_WIDTH = 224; // w-56
-const MENU_HEIGHT = 320; // ponytail: fixed estimate of the open menu's height; measure it if the menu grows
+// ponytail: fixed estimates of an open menu's height (this lead menu; 240 for others, such as the Works list's);
+// measure the menu if they grow.
+const LEAD_MENU_HEIGHT = 320;
 
 // The menu opens in the browser's top layer, outside any scrolling table or board, next to its button.
 export function placeMenu(button: HTMLElement, menuId: string) {
   const menu = document.getElementById(menuId);
   if (!menu) return;
   const rect = button.getBoundingClientRect();
-  const openUp = rect.bottom + MENU_HEIGHT > window.innerHeight && rect.top > MENU_HEIGHT;
+  const openUp = rect.bottom + menuHeight > window.innerHeight && rect.top > menuHeight;
   menu.style.left = `${Math.max(8, rect.right - MENU_WIDTH)}px`;
   menu.style.top = openUp ? "auto" : `${rect.bottom + 4}px`;
   menu.style.bottom = openUp ? `${window.innerHeight - rect.top + 4}px` : "auto";
@@ -120,7 +123,7 @@ export function LeadMenu({ lead, actions, withView = false }: LeadMenuProps) {
       <button
         type="button"
         popoverTarget={menuId}
-        onClick={(event) => placeMenu(event.currentTarget, menuId)}
+        onClick={(event) => placeMenu(event.currentTarget, menuId, LEAD_MENU_HEIGHT)}
         aria-label={`Actions for ${lead.name}`}
         className={`${iconButton} size-8`}
       >
