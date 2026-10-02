@@ -19,32 +19,9 @@ const DEFAULT_PAGE_SIZE = 25; // the API's default page size
 const PAGE_SIZES = [10, 25, 50, 100];
 const COLUMN_COUNT = 11;
 
-// The API always lists pinned leads first, then in the chosen order.
-const SORT_OPTIONS = [
-  { value: "-created_at", label: "Newest first" },
-  { value: "created_at", label: "Oldest first" },
-  { value: "name", label: "Customer name" },
-  { value: "status", label: "Status" },
-  { value: "next_follow_up", label: "Next follow-up" },
-  { value: "-amount", label: "Amount: high to low" },
-  { value: "amount", label: "Amount: low to high" },
-  { value: "plan__capacity", label: "Plan size" },
-  { value: "assigned_to__name", label: "Assigned staff" },
-];
-
-// Search, filters, sort and page live in the URL, so a refresh or the back button keeps the view.
-// replaceState updates useSearchParams without a server round trip (Next.js integrates the History API).
-export function updateQuery(changes: Record<string, string | null>) {
-  const params = new URLSearchParams(window.location.search);
-  for (const [key, value] of Object.entries(changes)) {
-    if (value) params.set(key, value);
-    else params.delete(key);
-  }
-  // Any change other than paging starts again from the first page.
-  if (!("page" in changes)) params.delete("page");
-  const query = params.toString();
-  window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
-}
+// The Works list imports these from here.
+export { menuItemClass, placeMenu } from "./lead-actions";
+export { updateQuery } from "./leads-toolbar";
 
 export function LeadsPage() {
   const searchParams = useSearchParams();
@@ -252,96 +229,6 @@ function LeadRow({ lead, actions, onChanged, onError }: LeadRowProps) {
         <LeadMenu lead={lead} actions={actions} />
       </td>
     </tr>
-  );
-}
-
-const MENU_WIDTH = 224; // w-56
-const MENU_HEIGHT = 240; // ponytail: fixed estimate of the open menu's height; measure it if the menu grows
-
-// The menu opens in the browser's top layer, outside the scrolling table, next to its button.
-export function placeMenu(button: HTMLElement, menuId: string) {
-  const menu = document.getElementById(menuId);
-  if (!menu) return;
-  const rect = button.getBoundingClientRect();
-  const openUp = rect.bottom + MENU_HEIGHT > window.innerHeight && rect.top > MENU_HEIGHT;
-  menu.style.left = `${Math.max(8, rect.right - MENU_WIDTH)}px`;
-  menu.style.top = openUp ? "auto" : `${rect.bottom + 4}px`;
-  menu.style.bottom = openUp ? `${window.innerHeight - rect.top + 4}px` : "auto";
-}
-
-export const menuItemClass =
-  "flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent";
-
-type RowActionsProps = { lead: Lead; onEdit: (lead: Lead) => void; onConvert: (lead: Lead) => void };
-
-function RowActions({ lead, onEdit, onConvert }: RowActionsProps) {
-  const menuId = useId();
-  const hide = () => document.getElementById(menuId)?.hidePopover();
-  const whatsapp = whatsappHref(lead);
-  const tel = telHref(lead);
-
-  return (
-    <>
-      <button
-        type="button"
-        popoverTarget={menuId}
-        onClick={(event) => placeMenu(event.currentTarget, menuId)}
-        aria-label={`Actions for ${lead.name}`}
-        className={`${iconButton} size-8`}
-      >
-        <MoreIcon className="size-4" />
-      </button>
-      <div
-        id={menuId}
-        popover="auto"
-        className="fixed inset-auto m-0 w-56 rounded-md border border-border bg-background p-1 text-foreground shadow-lg"
-      >
-        <button
-          type="button"
-          onClick={() => {
-            hide();
-            onEdit(lead);
-          }}
-          className={menuItemClass}
-        >
-          <PencilIcon className="size-4 text-muted-foreground" />
-          Edit
-        </button>
-        <a href={whatsapp} target="_blank" rel="noopener noreferrer" onClick={hide} className={menuItemClass}>
-          <WhatsAppIcon className="size-4 text-muted-foreground" />
-          WhatsApp
-        </a>
-        <a href={tel} onClick={hide} className={menuItemClass}>
-          <PhoneIcon className="size-4 text-muted-foreground" />
-          Call
-        </a>
-        <Link href={`/leads/${lead.id}#activities`} className={menuItemClass}>
-          <CalendarIcon className="size-4 text-muted-foreground" />
-          Follow-up / Activity
-        </Link>
-        <div className="my-1 border-t border-border" />
-        {lead.status === "WON" ? (
-          <p className="flex items-center gap-2.5 px-2.5 py-2 text-sm text-muted-foreground">
-            <ConvertIcon className="size-4" />
-            {lead.work ? `Converted to Work #${lead.work}` : "Converted"}
-          </p>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              hide();
-              onConvert(lead);
-            }}
-            disabled={!canConvert(lead)}
-            title={canConvert(lead) ? undefined : "Not available in this lead's current status"}
-            className={menuItemClass}
-          >
-            <ConvertIcon className="size-4 text-muted-foreground" />
-            Convert to Work
-          </button>
-        )}
-      </div>
-    </>
   );
 }
 

@@ -71,7 +71,8 @@ export type Lead = {
 };
 
 // POST /api/leads/ and PATCH /api/leads/{id}/. The status is never sent: the server starts every lead as New.
-export type LeadInput = Pick<
+// A new lead can bring its first follow-up (initial_follow_up): the API saves both together, or neither.
+export type LeadInput = { initial_follow_up?: ActivityInput } & Pick<
   Lead,
   | "name"
   | "country_code"
@@ -103,15 +104,40 @@ export const ACTIVITY_TYPES = [
 ] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number]["value"];
 
-// GET /api/activities/?lead={id} (paginated, newest first). Whoever can edit the lead manages its activities.
+// Must match the backend's follow-up statuses. The API starts every new follow-up as Pending.
+export const FOLLOW_UP_STATUSES = [
+  { value: "PENDING", label: "Pending" },
+  { value: "COMPLETED", label: "Completed" },
+] as const;
+export type FollowUpStatus = (typeof FOLLOW_UP_STATUSES)[number]["value"];
+
+// A lead's follow-up. GET /api/activities/ lists every follow-up the user can see (the Activities page: an admin's
+// are all; staff see those on their own leads and those assigned to them); ?lead={id} lists one lead's. Paginated,
+// newest first unless sorted. Follow-ups added before headings, staff and due dates existed may lack them.
 export type Activity = {
   id: number;
+  lead: number;
+  lead_name: string;
+  lead_country_code: string;
+  lead_phone: string;
+  title: string; // the heading
   type: ActivityType;
   type_display: string;
-  description: string;
+  assigned_to: number | null; // the follow-up's own staff, separate from the lead's
+  assigned_to_name: string | null;
+  due_date: string | null; // YYYY-MM-DD
+  description: string; // notes
+  status: FollowUpStatus; // Completed is final
   created_by_name: string | null;
   created_at: string;
+  updated_at: string;
+  // What this user may do with it, as the API decides: complete and edit; delete; open its lead.
+  can_edit: boolean;
+  can_delete: boolean;
+  can_open_lead: boolean;
 };
+// Adding or editing a follow-up: everything but the status, which the API starts at Pending.
+export type ActivityInput = { title: string; type: ActivityType; assigned_to: number; due_date: string; description: string };
 export type Page<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 export function saveLead(input: LeadInput, id?: number) {
@@ -139,21 +165,28 @@ export function deleteLead(id: number) {
   return apiRequest<void>(`/leads/${id}/`, { method: "DELETE" });
 }
 
-export function addActivity(lead: number, type: ActivityType, description: string) {
-  return apiRequest<Activity>("/activities/", { method: "POST", json: { lead, type, description } });
+// No status is sent: the API starts every new follow-up as Pending.
+export function addActivity(lead: number, input: ActivityInput) {
+  return apiRequest<Activity>("/activities/", { method: "POST", json: { lead, ...input } });
 }
 
-export function updateActivity(id: number, type: ActivityType, description: string) {
-  return apiRequest<Activity>(`/activities/${id}/`, { method: "PATCH", json: { type, description } });
+export function updateActivity(id: number, changes: Partial<ActivityInput> | { status: "COMPLETED" }) {
+  return apiRequest<Activity>(`/activities/${id}/`, { method: "PATCH", json: changes });
 }
 
 export function deleteActivity(id: number) {
   return apiRequest<void>(`/activities/${id}/`, { method: "DELETE" });
 }
 
+// Today in the CRM's time zone (Asia/Kolkata), as YYYY-MM-DD.
+export const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+
+// A Pending follow-up whose day has passed.
+export const isOverdue = (activity: Pick<Activity, "status" | "due_date">) =>
+  activity.status === "PENDING" && activity.due_date !== null && activity.due_date < today();
+
 export function exportLeads(query: URLSearchParams) {
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
-  return apiDownload(query.toString() ? `/leads/export/?${query}` : "/leads/export/", `leads-${today}.csv`);
+  return apiDownload(query.toString() ? `/leads/export/?${query}` : "/leads/export/", `leads-${today()}.csv`);
 }
 
 // Why this user can't change the lead's status, or undefined when they can (the API decides allowed_transitions).

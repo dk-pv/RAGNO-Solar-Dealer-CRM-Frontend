@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   CalendarIcon,
@@ -10,13 +10,12 @@ import {
   FlagIcon,
   PencilIcon,
   PhoneIcon,
+  PlusIcon,
   TrashIcon,
   WhatsAppIcon,
 } from "@/components/layout/icons";
 import { toApiError, useApi } from "@/lib/api";
 import {
-  ACTIVITY_TYPES,
-  addActivity,
   convertBlocker,
   deleteActivity,
   deleteLead,
@@ -24,6 +23,7 @@ import {
   formatDateTime,
   formatMoney,
   formatPhone,
+  isOverdue,
   sourceLabel,
   statusBlocker,
   statusLabel,
@@ -31,16 +31,16 @@ import {
   updateActivity,
   whatsappHref,
   type Activity,
-  type ActivityType,
   type Lead,
   type Page,
 } from "./api";
+import { FollowUpDialog } from "./follow-ups";
 import { ConvertDialog, LeadFormDialog, StatusDialog } from "./lead-dialogs";
 import {
   ErrorState,
+  FollowUpBadge,
   PinButton,
   StatusBadge,
-  fieldClass,
   iconButton,
   primaryButton,
   secondaryButton,
@@ -51,10 +51,11 @@ const outlinedIcon = `${iconButton} size-9 border border-border`;
 
 export function LeadDetail({ id }: { id: number }) {
   const { data: lead, error, reload } = useApi<Lead>(`/leads/${id}/`);
+  // Pending first (then newest), so none still to do is ever past the cut-off.
+  const activities = useApi<Page<Activity>>(`/activities/?lead=${id}&ordering=status&page_size=100`);
   const [editing, setEditing] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [converting, setConverting] = useState(false);
-  const [activitiesVersion, setActivitiesVersion] = useState(0);
   const [noticeElement, notify] = useNotice();
   const router = useRouter();
   const loaded = lead !== undefined;
@@ -66,7 +67,7 @@ export function LeadDetail({ id }: { id: number }) {
 
   function refresh() {
     reload();
-    setActivitiesVersion((version) => version + 1);
+    activities.reload();
   }
 
   if (!lead) {
@@ -201,9 +202,10 @@ export function LeadDetail({ id }: { id: number }) {
             </section>
           )}
           <Activities
-            key={activitiesVersion}
+            activities={activities}
             lead={lead}
             onScheduleFollowUp={() => setEditing(true)}
+            notify={(text, error) => notify({ text, error })}
           />
         </div>
 
@@ -250,6 +252,7 @@ export function LeadDetail({ id }: { id: number }) {
         <LeadFormDialog
           lead={lead}
           onClose={() => setEditing(false)}
+          onError={(text) => notify({ text, error: true })}
           onSaved={(saved) => {
             notify({ text: `Saved changes to ${saved.name}.` });
             refresh();
@@ -306,98 +309,162 @@ function Details({ title, items }: { title: string; items: [string, ReactNode][]
   );
 }
 
-type ActivitiesProps = { lead: Lead; onScheduleFollowUp: () => void };
+type ActivitiesProps = {
+  activities: ReturnType<typeof useApi<Page<Activity>>>;
+  lead: Lead;
+  onScheduleFollowUp: () => void;
+  notify: (text: string, error?: boolean) => void;
+};
 
-// The lead's activity log. Whoever can edit the lead (an admin, or the staff member it's assigned to) adds, edits and
-// deletes its activities; the API applies the same rule.
-function Activities({ lead, onScheduleFollowUp }: ActivitiesProps) {
-  const { data, error, loading, reload } = useApi<Page<Activity>>(`/activities/?lead=${lead.id}`);
-  const [editingId, setEditingId] = useState<number>();
+const linkButton = "font-medium text-foreground underline-offset-2 hover:underline aria-disabled:opacity-50";
+
+// The lead's follow-ups, each Pending until marked Completed (which is final). Whoever can edit the lead (an admin, or
+// the staff member it's assigned to) adds, completes, edits and deletes them; the API applies the same rules.
+function Activities({ activities, lead, onScheduleFollowUp, notify }: ActivitiesProps) {
+  const { data, error, loading, reload } = activities;
+  const [dialog, setDialog] = useState<{ activity?: Activity }>(); // the open Add or Edit Follow-up dialog
+  const [busyId, setBusyId] = useState<number>();
   const [actionError, setActionError] = useState<string>();
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
-  async function remove(activity: Activity) {
-    if (!window.confirm(`Delete this ${activity.type_display.toLowerCase()} activity?`)) return;
+  async function run(activity: Activity, action: () => Promise<unknown>, done: string) {
+    setBusyId(activity.id);
     setActionError(undefined);
     try {
-      await deleteActivity(activity.id);
+      await action();
       reload();
+      notify(done);
     } catch (err) {
       setActionError(toApiError(err).message);
+    } finally {
+      setBusyId(undefined);
     }
+  }
+
+  function remove(activity: Activity) {
+    if (!window.confirm(`Delete the follow-up "${heading(activity)}"?`)) return;
+    run(
+      activity,
+      async () => {
+        await deleteActivity(activity.id);
+        headingRef.current?.focus();
+      },
+      "Follow-up deleted.",
+    );
   }
 
   let content;
   if (error?.status === 404) {
     // The Activities API isn't on this server; not something the user can retry.
-    content = <p className="mt-4 text-sm text-muted-foreground">Activity history isn&apos;t available yet.</p>;
+    content = <p className="mt-4 text-sm text-muted-foreground">Follow-ups aren&apos;t available yet.</p>;
   } else if (error) {
     content = (
       <div className="mt-3 rounded-lg border border-border">
-        <ErrorState title="Couldn't load activities" message={error.message} onRetry={reload} />
+        <ErrorState title="Couldn't load follow-ups" message={error.message} onRetry={reload} />
       </div>
     );
-  } else if (!data || loading) {
-    content = <p className="mt-4 text-sm text-muted-foreground">Loading activities…</p>;
+  } else if (!data) {
+    content = <p className="mt-4 text-sm text-muted-foreground">Loading follow-ups…</p>;
   } else if (data.results.length === 0) {
-    content = <p className="mt-4 text-sm text-muted-foreground">No activities recorded for this lead yet.</p>;
+    content = <p className="mt-4 text-sm text-muted-foreground">No follow-ups for this lead yet.</p>;
   } else {
     content = (
       <>
-        <ol className="mt-4 space-y-4 border-l border-border pl-5">
-          {data.results.map((activity) => (
-            <li key={activity.id} className="relative">
-              <span aria-hidden="true" className="absolute top-1.5 -left-[24.5px] size-2 rounded-full bg-muted-foreground" />
-              {editingId === activity.id ? (
-                <ActivityForm
-                  initial={activity}
-                  submitLabel="Save"
-                  onSubmit={(type, description) => updateActivity(activity.id, type, description)}
-                  onDone={() => {
-                    setEditingId(undefined);
-                    reload();
-                  }}
-                  onCancel={() => setEditingId(undefined)}
+        <ol aria-busy={loading} className="mt-4 space-y-4 border-l border-border pl-5">
+          {data.results.map((activity) => {
+            const overdue = isOverdue(activity);
+            return (
+              <li key={activity.id} className="relative">
+                <span
+                  aria-hidden="true"
+                  className={`absolute top-1.5 -left-[24.5px] size-2 rounded-full ${
+                    activity.status === "COMPLETED" ? "bg-success" : overdue ? "bg-error" : "bg-muted-foreground"
+                  }`}
                 />
-              ) : (
-                <>
-                  <p className="text-sm">
-                    <span className="font-medium">{activity.type_display}</span>
-                    <span className="text-muted-foreground"> — {activity.description}</span>
-                  </p>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
-                    <span>
-                      {formatDateTime(activity.created_at)}
-                      {activity.created_by_name ? ` · ${activity.created_by_name}` : ""}
-                    </span>
-                    {lead.can_edit && (
-                      <>
+                <p className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium break-words">
+                    {activity.title || <span className="font-normal text-muted-foreground italic">No heading</span>}
+                  </span>
+                  <FollowUpBadge status={activity.status} />
+                  {overdue && <span className="text-xs font-medium text-error">Overdue</span>}
+                </p>
+                <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                  <div>
+                    <dt className="inline">Type: </dt>
+                    <dd className="inline text-foreground">{activity.type_display}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline">Assigned: </dt>
+                    <dd className="inline text-foreground">{activity.assigned_to_name ?? "Not assigned"}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline">Due: </dt>
+                    <dd className={`inline ${overdue ? "font-medium text-error" : "text-foreground"}`}>
+                      {activity.due_date ? formatDate(activity.due_date) : "No date"}
+                    </dd>
+                  </div>
+                </dl>
+                {activity.description && (
+                  <p className="mt-1 text-sm break-words whitespace-pre-line text-muted-foreground">{activity.description}</p>
+                )}
+                <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                  <span>
+                    Added {formatDateTime(activity.created_at)}
+                    {activity.created_by_name ? ` · ${activity.created_by_name}` : ""}
+                  </span>
+                  {activity.can_edit && (
+                    <>
+                      {activity.status === "PENDING" && (
                         <button
                           type="button"
-                          onClick={() => setEditingId(activity.id)}
-                          aria-label={`Edit ${activity.type_display} activity`}
-                          className="font-medium text-foreground underline-offset-2 hover:underline"
+                          onClick={() => {
+                            if (busyId === activity.id) return;
+                            run(
+                              activity,
+                              async () => {
+                                await updateActivity(activity.id, { status: "COMPLETED" });
+                                // The button goes away once it's completed, so the focus moves to the list's heading.
+                                headingRef.current?.focus();
+                              },
+                              "Follow-up marked complete.",
+                            );
+                          }}
+                          // aria-disabled, not disabled, while saving: a disabled button would drop the focus.
+                          aria-disabled={busyId === activity.id || undefined}
+                          aria-label={`Mark complete: ${heading(activity)}`}
+                          className={linkButton}
                         >
-                          Edit
+                          Mark complete
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => remove(activity)}
-                          aria-label={`Delete ${activity.type_display} activity`}
-                          className="font-medium text-error underline-offset-2 hover:underline"
-                        >
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </p>
-                </>
-              )}
-            </li>
-          ))}
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setDialog({ activity })}
+                        aria-label={`Edit follow-up: ${heading(activity)}`}
+                        className={linkButton}
+                      >
+                        Edit
+                      </button>
+                    </>
+                  )}
+                  {activity.can_delete && (
+                    <button
+                      type="button"
+                      onClick={() => remove(activity)}
+                      aria-label={`Delete follow-up: ${heading(activity)}`}
+                      className="font-medium text-error underline-offset-2 hover:underline"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </p>
+              </li>
+            );
+          })}
         </ol>
         {data.count > data.results.length && (
           <p className="mt-3 text-xs text-muted-foreground">
-            Showing the {data.results.length} most recent of {data.count} activities.
+            Showing {data.results.length} of {data.count} follow-ups, pending first.
           </p>
         )}
       </>
@@ -406,7 +473,17 @@ function Activities({ lead, onScheduleFollowUp }: ActivitiesProps) {
 
   return (
     <section id="activities" className="scroll-mt-20">
-      <h2 className="text-sm font-semibold">Follow-up / Activity</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 ref={headingRef} tabIndex={-1} className="text-sm font-semibold">
+          Follow-ups / Activities
+        </h2>
+        {lead.can_edit && !error && (
+          <button type="button" onClick={() => setDialog({})} className={secondaryButton}>
+            <PlusIcon className="size-4" />
+            Add follow-up
+          </button>
+        )}
+      </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border px-4 py-3 text-sm">
         <CalendarIcon className="size-4 text-muted-foreground" />
         <span>
@@ -423,101 +500,26 @@ function Activities({ lead, onScheduleFollowUp }: ActivitiesProps) {
           </button>
         )}
       </div>
-      {lead.can_edit && !error && (
-        <ActivityForm
-          submitLabel="Add activity"
-          onSubmit={(type, description) => addActivity(lead.id, type, description)}
-          onDone={reload}
-        />
-      )}
       {actionError && (
         <p role="alert" className="mt-3 text-sm text-error">
           {actionError}
         </p>
       )}
       {content}
+      {dialog && (
+        <FollowUpDialog
+          activity={dialog.activity}
+          lead={lead}
+          onClose={() => setDialog(undefined)}
+          onError={(text) => notify(text, true)}
+          onSaved={() => {
+            reload();
+            notify(dialog.activity ? "Follow-up saved." : "Follow-up created.");
+          }}
+        />
+      )}
     </section>
   );
 }
 
-type ActivityFormProps = {
-  initial?: Activity;
-  submitLabel: string;
-  onSubmit: (type: ActivityType, description: string) => Promise<unknown>;
-  onDone: () => void;
-  onCancel?: () => void;
-};
-
-// Adds an activity, or edits one when `initial` is given.
-function ActivityForm({ initial, submitLabel, onSubmit, onDone, onCancel }: ActivityFormProps) {
-  const formId = useId();
-  const [type, setType] = useState<ActivityType>(initial?.type ?? "PHONE_CALL");
-  const [description, setDescription] = useState(initial?.description ?? "");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!description.trim()) {
-      setError("Describe what happened.");
-      return;
-    }
-    setPending(true);
-    setError(undefined);
-    try {
-      await onSubmit(type, description.trim());
-      if (!initial) setDescription("");
-      onDone();
-    } catch (err) {
-      setError(toApiError(err).message);
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="mt-3 space-y-2">
-      <label htmlFor={`${formId}-type`} className="sr-only">
-        Activity type
-      </label>
-      <select
-        id={`${formId}-type`}
-        value={type}
-        onChange={(event) => setType(event.target.value as ActivityType)}
-        className={`${fieldClass} h-9`}
-      >
-        {ACTIVITY_TYPES.map((item) => (
-          <option key={item.value} value={item.value}>
-            {item.label}
-          </option>
-        ))}
-      </select>
-      <label htmlFor={`${formId}-description`} className="sr-only">
-        What happened
-      </label>
-      <textarea
-        id={`${formId}-description`}
-        value={description}
-        onChange={(event) => setDescription(event.target.value)}
-        rows={2}
-        placeholder="What happened, or what was agreed"
-        className={`${fieldClass} w-full py-2`}
-      />
-      {error && (
-        <p role="alert" className="text-sm text-error">
-          {error}
-        </p>
-      )}
-      <div className="flex gap-2">
-        <button type="submit" disabled={pending} className={secondaryButton}>
-          {pending ? "Saving…" : submitLabel}
-        </button>
-        {onCancel && (
-          <button type="button" onClick={onCancel} className={secondaryButton}>
-            Cancel
-          </button>
-        )}
-      </div>
-    </form>
-  );
-}
+const heading = (activity: Activity) => activity.title || activity.type_display;

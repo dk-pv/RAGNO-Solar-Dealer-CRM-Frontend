@@ -6,6 +6,7 @@ import { CloseIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { toApiError, useApi } from "@/lib/api";
 import {
+  ACTIVITY_TYPES,
   COUNTRY_CODES,
   LEAD_SOURCES,
   LEAD_STATUSES,
@@ -13,6 +14,9 @@ import {
   convertLead,
   formatMoney,
   saveLead,
+  type Activity,
+  type ActivityInput,
+  type ActivityType,
   type Assignee,
   type Lead,
   type LeadInput,
@@ -20,7 +24,7 @@ import {
   type LeadStatus,
   type Plan,
 } from "./api";
-import { StatusBadge, fieldClass, iconButton, inputClass, primaryButton, secondaryButton } from "./ui";
+import { FollowUpBadge, StatusBadge, fieldClass, iconButton, inputClass, primaryButton, secondaryButton } from "./ui";
 
 // Callers add the padding and width.
 export const dialogClass =
@@ -160,10 +164,131 @@ export function Field({ label, id, error, required, hint, wide, children }: Fiel
   );
 }
 
-type LeadFormDialogProps = { lead: Lead | null; onClose: () => void; onSaved: (lead: Lead) => void };
+// A follow-up being added or edited, as the form holds it.
+export type FollowUpDraft = { title: string; type: ActivityType; assigned_to: string; due_date: string; description: string };
+export type FollowUpErrors = Partial<Record<keyof FollowUpDraft, string>>;
+export const FOLLOW_UP_FIELDS: (keyof FollowUpDraft)[] = ["title", "type", "assigned_to", "due_date", "description"];
+
+export const emptyFollowUp = (assignedTo = ""): FollowUpDraft => ({
+  title: "",
+  type: "PHONE_CALL",
+  assigned_to: assignedTo,
+  due_date: "",
+  description: "",
+});
+
+export const followUpDraft = (activity: Activity): FollowUpDraft => ({
+  title: activity.title,
+  type: activity.type,
+  assigned_to: activity.assigned_to ? String(activity.assigned_to) : "",
+  due_date: activity.due_date ?? "",
+  description: activity.description,
+});
+
+// Quick checks so people get a helpful message before saving. The API validates everything again.
+export function validateFollowUp(draft: FollowUpDraft) {
+  const errors: FollowUpErrors = {};
+  if (!draft.title.trim()) errors.title = "Enter a heading.";
+  if (!draft.assigned_to) errors.assigned_to = "Choose who does the follow-up.";
+  if (!draft.due_date) errors.due_date = "Choose the due date.";
+  return errors;
+}
+
+export const toFollowUpInput = (draft: FollowUpDraft): ActivityInput => ({
+  title: draft.title.trim(),
+  type: draft.type,
+  assigned_to: Number(draft.assigned_to),
+  due_date: draft.due_date,
+  description: draft.description.trim(),
+});
+
+type FollowUpFieldsProps = {
+  idPrefix: string;
+  values: FollowUpDraft;
+  errors: FollowUpErrors;
+  onChange: (field: keyof FollowUpDraft, value: string) => void;
+  assignees?: Assignee[]; // whom this user may assign: anyone active for an admin, only themselves for staff
+  assigneesError?: string;
+  keepAssignee?: Assignee; // the current staff member when they aren't one of those (staff editing an admin's choice)
+};
+
+// A follow-up's heading, type, assigned staff, due date and notes. Its status isn't here: a new one starts Pending.
+export function FollowUpFields({ idPrefix, values, errors, onChange, assignees, assigneesError, keepAssignee }: FollowUpFieldsProps) {
+  const id = (field: keyof FollowUpDraft) => `${idPrefix}-${field}`;
+  const bind = (field: keyof FollowUpDraft) => ({
+    id: id(field),
+    name: `follow_up_${field}`,
+    value: values[field],
+    required: field !== "description",
+    onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      onChange(field, event.target.value),
+    "aria-invalid": errors[field] ? true : undefined,
+    "aria-describedby": errors[field] ? `${id(field)}-error` : undefined,
+    className: inputClass,
+  });
+  const people = [
+    ...(assignees ?? []),
+    ...(keepAssignee && !assignees?.some((person) => person.id === keepAssignee.id) ? [keepAssignee] : []),
+  ];
+
+  return (
+    <>
+      <Field label="Heading" id={id("title")} required error={errors.title} wide>
+        <input {...bind("title")} maxLength={150} autoComplete="off" placeholder="For example: Call about the solar quotation" />
+      </Field>
+      <Field label="Type" id={id("type")} required error={errors.type}>
+        <select {...bind("type")}>
+          {ACTIVITY_TYPES.map((type) => (
+            <option key={type.value} value={type.value}>
+              {type.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field
+        label="Assigned staff"
+        id={id("assigned_to")}
+        required
+        error={errors.assigned_to}
+        hint={assigneesError ? `Staff couldn't be loaded: ${assigneesError}` : undefined}
+      >
+        <select {...bind("assigned_to")}>
+          <option value="">{assignees ? "Choose staff" : assigneesError ? "Staff unavailable" : "Loading staff…"}</option>
+          {people.map((person) => (
+            <option key={person.id} value={person.id}>
+              {person.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Due date" id={id("due_date")} required error={errors.due_date}>
+        <input {...bind("due_date")} type="date" />
+      </Field>
+      <Field label="Notes" id={id("description")} error={errors.description} wide>
+        <textarea {...bind("description")} rows={3} className={`${fieldClass} w-full py-2`} />
+      </Field>
+    </>
+  );
+}
+
+// "Status: Pending", for a follow-up being added: the API starts every new one there.
+export function StartsPending() {
+  return (
+    <p className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-2">
+      Status <FollowUpBadge status="PENDING" /> New follow-ups start Pending.
+    </p>
+  );
+}
+
+type LeadFormDialogProps = {
+  lead: Lead | null;
+  onClose: () => void;
+  onSaved: (lead: Lead) => void;
+  onError: (message: string) => void; // a save that failed after the dialog was closed
+};
 
 // Add Lead (lead = null) and Edit Lead share this form.
-export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) {
+export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const formId = useId();
   const plans = useApi<Plan[]>("/plans/");
@@ -175,6 +300,10 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  // Add Lead only: the lead's first follow-up, saved with it by the API (both or neither).
+  const [addFollowUp, setAddFollowUp] = useState(false);
+  const [followUp, setFollowUp] = useState(() => emptyFollowUp());
+  const [followUpErrors, setFollowUpErrors] = useState<FollowUpErrors>({});
 
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -182,7 +311,10 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
     dialogRef.current?.querySelector<HTMLInputElement>("input[name=name]")?.focus();
   }, []);
 
-  const close = () => dialogRef.current?.close();
+  // Not while saving: a lead (and its initial follow-up) is being saved.
+  const close = () => {
+    if (!saving) dialogRef.current?.close();
+  };
   const fieldId = (field: FieldName) => `${formId}-${field}`;
   const selectedPlan = plans.data?.find((plan) => String(plan.id) === values.plan);
   // Inactive plans can't be chosen for new leads, but stay visible on a lead that already has one.
@@ -222,13 +354,27 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
     setErrors((current) => ({ ...current, plan: undefined, amount: next && amountFollowsPlan ? undefined : current.amount }));
   }
 
+  // It goes to the lead's assigned staff until someone is chosen for it; staff can assign a follow-up only to
+  // themselves, so their one choice is made for them.
+  const followUpValues = {
+    ...followUp,
+    assigned_to:
+      followUp.assigned_to ||
+      values.assigned_to ||
+      (assigneeOptions.length === 1 ? String(assigneeOptions[0].id) : ""),
+  };
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const found = validate(values);
+    const foundFollowUp = addFollowUp ? validateFollowUp(followUpValues) : {};
     setErrors(found);
+    setFollowUpErrors(foundFollowUp);
     setFormError(undefined);
-    const firstInvalid = FIELD_ORDER.find((field) => found[field]);
+    const firstInvalid =
+      FIELD_ORDER.find((field) => found[field]) ??
+      FOLLOW_UP_FIELDS.filter((field) => foundFollowUp[field]).map((field) => `follow_up_${field}`)[0];
     if (firstInvalid) {
       (form.elements.namedItem(firstInvalid) as HTMLElement | null)?.focus();
       return;
@@ -236,15 +382,31 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
 
     setSaving(true);
     try {
-      onSaved(await saveLead(toInput(values), lead?.id));
-      close();
+      const input = toInput(values);
+      if (!lead && addFollowUp) input.initial_follow_up = toFollowUpInput(followUpValues);
+      onSaved(await saveLead(input, lead?.id));
+      dialogRef.current?.close();
     } catch (error) {
       const apiError = toApiError(error);
-      setErrors(apiError.fields);
-      // Messages for fields this form doesn't show are added to the summary, so none are lost.
-      const others = Object.entries(apiError.fields)
-        .filter(([field]) => !(field in values))
-        .map(([, text]) => text);
+      // Closed while saving (a browser lets a second Escape through): the page says it failed instead.
+      if (!dialogRef.current?.open) {
+        onError(`${lead ? "The changes weren't" : "The lead wasn't"} saved: ${[apiError.message, ...Object.values(apiError.fields)].join(" ")}`);
+        return;
+      }
+      // The follow-up's messages come back as "initial_follow_up.<field>".
+      const leadFields: FieldErrors = {};
+      const followUpFields: FollowUpErrors = {};
+      const others: string[] = [];
+      for (const [field, text] of Object.entries(apiError.fields)) {
+        const followUpField = field.replace(/^initial_follow_up\./, "") as keyof FollowUpDraft;
+        if (field in values) leadFields[field as FieldName] = text;
+        else if (field.startsWith("initial_follow_up.") && FOLLOW_UP_FIELDS.includes(followUpField))
+          followUpFields[followUpField] = text;
+        // Messages for fields this form doesn't show are added to the summary, so none are lost.
+        else others.push(text);
+      }
+      setErrors(leadFields);
+      setFollowUpErrors(followUpFields);
       setFormError([apiError.message, ...others].join(" "));
       setSaving(false);
     }
@@ -254,6 +416,9 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
     <dialog
       ref={dialogRef}
       onClose={onClose}
+      onCancel={(event) => {
+        if (saving) event.preventDefault(); // Escape
+      }}
       aria-labelledby={`${formId}-title`}
       className={`${dialogClass} max-h-[calc(100dvh-2rem)] max-w-2xl overflow-hidden p-0`}
     >
@@ -275,7 +440,13 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
               )}
             </p>
           </div>
-          <button type="button" onClick={close} aria-label="Close" className={`${iconButton} -mr-2 size-9`}>
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Close"
+            aria-disabled={saving || undefined}
+            className={`${iconButton} -mr-2 size-9`}
+          >
             <CloseIcon className="size-4.5" />
           </button>
         </div>
@@ -433,10 +604,47 @@ export function LeadFormDialog({ lead, onClose, onSaved }: LeadFormDialogProps) 
               <textarea {...bind("notes")} rows={3} className={`${fieldClass} w-full py-2`} />
             </Field>
           </Section>
+
+          {!lead && (
+            <fieldset>
+              <legend className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Initial follow-up</legend>
+              <label className="mt-3 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="add_follow_up"
+                  checked={addFollowUp}
+                  onChange={(event) => setAddFollowUp(event.target.checked)}
+                  className="size-4 accent-primary"
+                />
+                Add initial follow-up
+              </label>
+              {addFollowUp && (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <FollowUpFields
+                    idPrefix={`${formId}-follow-up`}
+                    values={followUpValues}
+                    errors={followUpErrors}
+                    onChange={(field, value) => {
+                      setFollowUp((current) => ({ ...current, [field]: value }));
+                      setFollowUpErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
+                    }}
+                    assignees={assignees.data}
+                    assigneesError={assignees.error?.message}
+                  />
+                  <StartsPending />
+                </div>
+              )}
+            </fieldset>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-          <button type="button" onClick={close} className={secondaryButton}>
+          <button
+            type="button"
+            onClick={close}
+            aria-disabled={saving || undefined}
+            className={`${secondaryButton} aria-disabled:opacity-50`}
+          >
             Cancel
           </button>
           <button type="submit" disabled={saving} className={primaryButton}>
