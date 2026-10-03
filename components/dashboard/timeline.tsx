@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { initials } from "@/components/layout/navbar";
 import type { Assignee, Page } from "@/components/leads/api";
-import { ErrorState, StatusBadge, fieldClass, secondaryButton } from "@/components/leads/ui";
+import { ErrorState, StatusBadge, fieldClass, fillClass, paginationFooterClass, secondaryButton } from "@/components/leads/ui";
 import { stageFor } from "@/components/works/api";
 import { ActivityStatusBadge } from "@/components/works/work-activities";
 import { useApi } from "@/lib/api";
@@ -108,7 +108,7 @@ export function CrmTimeline({ today, users, version }: TimelineProps) {
     }
     const first = (page - 1) * PAGE_SIZE + 1;
     content = (
-      <div className={`transition-opacity ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
+      <div className={`${fillClass} transition-opacity ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
         {days.map(({ day, events }) => (
           <section key={day} className="mt-4 first:mt-0">
             <h3 className="sticky top-0 z-1 bg-background py-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -121,7 +121,7 @@ export function CrmTimeline({ today, users, version }: TimelineProps) {
             </ol>
           </section>
         ))}
-        <nav aria-label="Timeline pages" className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <nav aria-label="Timeline pages" className={`${paginationFooterClass} justify-between`}>
           <span className="text-muted-foreground tabular-nums">
             {first.toLocaleString("en-IN")}–{(first + data.results.length - 1).toLocaleString("en-IN")} of{" "}
             {data.count.toLocaleString("en-IN")}
@@ -141,7 +141,8 @@ export function CrmTimeline({ today, users, version }: TimelineProps) {
 
   const select = `${fieldClass} h-9 max-sm:w-full`;
   return (
-    <div>
+    // The card around the timeline stretches to its neighbour in the Dashboard's grid; the pages nav stays at its bottom.
+    <div className={fillClass}>
       <div className="flex flex-wrap gap-2">
         <select value={user} onChange={(event) => filter(setUser)(event.target.value)} aria-label="User" className={select}>
           <option value="">All users</option>
@@ -191,7 +192,7 @@ export function CrmTimeline({ today, users, version }: TimelineProps) {
           </span>
         )}
       </div>
-      <div className="mt-3">{content}</div>
+      <div className={`${fillClass} mt-3`}>{content}</div>
     </div>
   );
 }

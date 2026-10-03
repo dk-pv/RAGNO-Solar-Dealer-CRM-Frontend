@@ -7,7 +7,17 @@ import { FilterIcon, PlusIcon, SearchIcon } from "@/components/layout/icons";
 import { ACTIVITY_TYPES, type Assignee, type Page } from "@/components/leads/api";
 import { Pagination } from "@/components/leads/leads-page";
 import { updateQuery } from "@/components/leads/leads-toolbar";
-import { ErrorState, fieldClass, inputClass, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
+import {
+  ErrorState,
+  emptyAreaClass,
+  fieldClass,
+  fillClass,
+  inputClass,
+  messageAreaClass,
+  primaryButton,
+  secondaryButton,
+  useNotice,
+} from "@/components/leads/ui";
 import { useApi } from "@/lib/api";
 import { ACTIVITY_STATUSES, type WorkActivity } from "./api";
 import { ActivityDialog, WorkActivityTable, useActivityRowActions } from "./work-activities";
@@ -76,7 +86,7 @@ export function WorkActivitiesPage() {
   let content;
   if (error) {
     content = (
-      <div className="mt-4 rounded-lg border border-border bg-background">
+      <div className={`${messageAreaClass} mt-4`}>
         {error.status === 404 && page > 1 ? (
           <ErrorState
             title="This page no longer exists"
@@ -91,7 +101,7 @@ export function WorkActivitiesPage() {
     );
   } else if (data && data.count === 0 && !loading) {
     content = (
-      <div className="mt-4 rounded-lg border border-dashed border-border-strong bg-background px-4 py-12 text-center">
+      <div className={`${emptyAreaClass} mt-4`}>
         <p className="text-sm font-medium">{filtered ? "No activities match your search or filters." : "No activities found."}</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {filtered ? "Try a different search, or clear the filters." : "Add a follow-up to keep track of the next action on a Work."}
@@ -110,7 +120,7 @@ export function WorkActivitiesPage() {
   } else {
     content = (
       <>
-        <div className="mt-4">
+        <div className={`${fillClass} mt-4`}>
           <WorkActivityTable
             rows={data?.results}
             loading={loading}
@@ -120,17 +130,17 @@ export function WorkActivitiesPage() {
             onComplete={rowActions.complete}
           />
         </div>
-        {data && data.count > 0 && <Pagination page={page} pageSize={pageSize} count={data.count} />}
+        <Pagination page={page} pageSize={pageSize} count={data?.count} loading={loading} />
       </>
     );
   }
 
   return (
-    <div>
+    <div className={fillClass}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Work Activities</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className="mt-0.5 min-h-5 text-sm text-muted-foreground">
             {data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "activity" : "activities"}` : " "}
           </p>
         </div>

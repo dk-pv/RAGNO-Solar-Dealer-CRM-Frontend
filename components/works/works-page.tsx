@@ -9,7 +9,19 @@ import { initials } from "@/components/layout/navbar";
 import { formatDate, formatMoney, formatPhone, type Assignee, type Page, type Plan } from "@/components/leads/api";
 import { Pagination } from "@/components/leads/leads-page";
 import { updateQuery } from "@/components/leads/leads-toolbar";
-import { ErrorState, ViewSwitch, inputClass, fieldClass, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
+import {
+  ErrorState,
+  ViewSwitch,
+  emptyAreaClass,
+  fieldClass,
+  fillClass,
+  inputClass,
+  messageAreaClass,
+  primaryButton,
+  secondaryButton,
+  tableAreaClass,
+  useNotice,
+} from "@/components/leads/ui";
 import { toApiError, useApi } from "@/lib/api";
 import { WORK_STAGES, stageFor, today, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
 import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
@@ -77,7 +89,7 @@ export function WorksPage() {
   let content;
   if (error) {
     content = (
-      <div className="mt-4 rounded-lg border border-border bg-background">
+      <div className={`${messageAreaClass} mt-4`}>
         {error.status === 404 && page > 1 ? (
           <ErrorState
             title="This page no longer exists"
@@ -93,7 +105,7 @@ export function WorksPage() {
   } else if (data && data.count === 0 && !loading) {
     const filtered = Boolean(search) || activeFilters > 0;
     content = (
-      <div className="mt-4 rounded-lg border border-dashed border-border-strong bg-background px-4 py-12 text-center">
+      <div className={`${emptyAreaClass} mt-4`}>
         <p className="text-sm font-medium">{filtered ? "No works match your search or filters." : "No works yet."}</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {filtered
@@ -115,7 +127,7 @@ export function WorksPage() {
     const rows = data && data.results.length > 0 ? data.results : undefined;
     content = (
       <>
-        <div className="scrollbar-none mt-4 overflow-x-auto rounded-lg border border-border bg-background">
+        <div className={`${tableAreaClass} mt-4`}>
           <table
             aria-busy={loading}
             className={`w-full min-w-300 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
@@ -169,17 +181,17 @@ export function WorksPage() {
             </tbody>
           </table>
         </div>
-        {data && data.count > 0 && <Pagination page={page} pageSize={pageSize} count={data.count} />}
+        <Pagination page={page} pageSize={pageSize} count={data?.count} loading={loading} />
       </>
     );
   }
 
   return (
-    <div>
+    <div className={fillClass}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Works</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className="mt-0.5 min-h-5 text-sm text-muted-foreground">
             {data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "work" : "works"}` : " "}
           </p>
         </div>

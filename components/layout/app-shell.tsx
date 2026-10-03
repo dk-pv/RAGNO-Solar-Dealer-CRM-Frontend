@@ -71,8 +71,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Navbar user={user} onLogout={logout} onOpenNavigation={() => drawerRef.current?.showModal()} />
         {/* Pages never widen the window: wide content (boards, tables) scrolls inside its own box. `relative` makes main
             the frame for absolutely positioned content such as screen-reader labels, and overflow-x-clip trims
-            anything still wider, without creating a scroll box. Pop-ups and dialogs sit above the page and aren't affected. */}
-        <main className="relative flex-1 overflow-x-clip p-4 lg:p-6">
+            anything still wider, without creating a scroll box. Pop-ups and dialogs sit above the page and aren't affected.
+            main is a flex column so that pages listing records can fill it and keep their pagination at the bottom (see
+            fillClass in components/leads/ui.tsx); other pages are as tall as their content. */}
+        <main className="relative flex flex-1 flex-col overflow-x-clip p-4 lg:p-6">
           <CurrentUserContext value={user}>{content}</CurrentUserContext>
         </main>
       </div>

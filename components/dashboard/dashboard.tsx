@@ -106,7 +106,7 @@ export function Dashboard() {
             <Panel
               title="CRM Timeline"
               description="What happened, who did it and exactly when (India Standard Time)."
-              className="xl:col-span-2"
+              className="flex flex-col xl:col-span-2"
             >
               <CrmTimeline today={today} users={users.data} version={version} />
             </Panel>

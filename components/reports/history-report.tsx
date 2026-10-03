@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { formatDayHeading, formatExact, formatTime, dayOf, type TimelineEvent } from "@/components/dashboard/api";
-import { StatusBadge } from "@/components/leads/ui";
+import { StatusBadge, fillClass } from "@/components/leads/ui";
 import { stageFor } from "@/components/works/api";
 import { useApi } from "@/lib/api";
 import { EVENT_KINDS, type Page } from "./api";
@@ -78,7 +78,7 @@ export function HistoryReport() {
   const people = useAssignees();
 
   return (
-    <div className="space-y-4">
+    <div className={`${fillClass} space-y-4`}>
       <div className="flex flex-wrap items-center gap-2">
         <FilterSelect name="user" label="User" all="All users" options={(people ?? []).map((person) => ({ value: String(person.id), label: person.name }))} />
         <FilterSelect name="record" label="Records" all="All records" options={RECORDS} />
@@ -101,7 +101,7 @@ export function HistoryReport() {
         Every event here was recorded with its user and exact time (India Standard Time). Status and stage changes,
         assignments and edits aren&apos;t recorded with who made them, so they don&apos;t appear.
       </p>
-      <Panel title="CRM history" description="Newest first.">
+      <Panel title="CRM history" description="Newest first." className={fillClass}>
         {error ? (
           <ReportError error={error} onRetry={reload} />
         ) : (

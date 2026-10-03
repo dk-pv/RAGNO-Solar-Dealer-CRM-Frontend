@@ -11,7 +11,21 @@ import { toApiError, useApi } from "@/lib/api";
 import { exportLeads, formatDate, formatMoney, formatPhone, type Lead, type Page } from "./api";
 import { LeadMenu, useLeadActions, type LeadActions } from "./lead-actions";
 import { FILTER_KEYS, LeadsHeader, LeadsToolbar, VIEW_KEYS, pickParams, updateQuery } from "./leads-toolbar";
-import { Busy, ErrorState, PinButton, StatusBadge, fieldClass, iconButton, secondaryButton, useNotice } from "./ui";
+import {
+  Busy,
+  ErrorState,
+  PinButton,
+  StatusBadge,
+  emptyAreaClass,
+  fieldClass,
+  fillClass,
+  iconButton,
+  messageAreaClass,
+  paginationFooterClass,
+  secondaryButton,
+  tableAreaClass,
+  useNotice,
+} from "./ui";
 
 // The URL query and the API query use the same names.
 const QUERY_KEYS = [...VIEW_KEYS, "page", "page_size"];
@@ -59,7 +73,7 @@ export function LeadsPage() {
   let content;
   if (error) {
     content = (
-      <div className="mt-4 rounded-lg border border-border bg-background">
+      <div className={`${messageAreaClass} mt-4`}>
         {error.status === 404 && page > 1 ? (
           <ErrorState
             title="This page no longer exists"
@@ -79,7 +93,7 @@ export function LeadsPage() {
   } else if (data && data.count === 0 && !loading) {
     const filtered = Boolean(search) || activeFilters > 0;
     content = (
-      <div className="mt-4 rounded-lg border border-dashed border-border-strong bg-background px-4 py-12 text-center">
+      <div className={`${emptyAreaClass} mt-4`}>
         <p className="text-sm font-medium">{filtered ? "No leads match your search or filters." : "No leads yet."}</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {filtered ? "Try a different search, or clear the filters." : "Add a lead to start tracking it through the pipeline."}
@@ -105,7 +119,7 @@ export function LeadsPage() {
     const rows = data && data.results.length > 0 ? data.results : undefined;
     content = (
       <>
-        <div className="scrollbar-none mt-4 overflow-x-auto rounded-lg border border-border bg-background">
+        <div className={`${tableAreaClass} mt-4`}>
           <table
             aria-busy={loading}
             className={`w-full min-w-270 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
@@ -144,13 +158,13 @@ export function LeadsPage() {
             </tbody>
           </table>
         </div>
-        {data && data.count > 0 && <Pagination page={page} pageSize={pageSize} count={data.count} />}
+        <Pagination page={page} pageSize={pageSize} count={data?.count} loading={loading} />
       </>
     );
   }
 
   return (
-    <div>
+    <div className={fillClass}>
       <LeadsHeader
         title="Leads"
         description={data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "lead" : "leads"}` : undefined}
@@ -255,77 +269,104 @@ function pageNumbers(current: number, total: number) {
   return shown.flatMap((n, i) => (i > 0 && n - shown[i - 1] > 1 ? [null, n] : [n]));
 }
 
-export function Pagination({ page, pageSize, count }: { page: number; pageSize: number; count: number }) {
-  const pages = Math.max(1, Math.ceil(count / pageSize));
+type PaginationProps = {
+  page: number;
+  pageSize: number;
+  /** The server's total; undefined until the first response. */
+  count?: number;
+  /** A request is in flight. */
+  loading?: boolean;
+};
+
+// The footer of every paginated list. It is always rendered under the list and keeps its place and height while data
+// loads, so the page doesn't shift when the data arrives. The total is the server's: the summary and the page buttons
+// are placeholders until there is one for this request (the first load has none; while another page or a new search
+// loads, the total on hand belongs to the old request). One request at a time: the buttons do nothing meanwhile.
+export function Pagination({ page, pageSize, count, loading = false }: PaginationProps) {
+  const pages = Math.max(1, Math.ceil((count ?? 0) / pageSize));
   const first = (page - 1) * pageSize + 1;
-  const last = Math.min(page * pageSize, count);
+  const last = Math.min(page * pageSize, count ?? 0);
   const go = (target: number) => {
+    if (loading) return;
     updateQuery({ page: target > 1 ? String(target) : null });
     window.scrollTo({ top: 0 });
   };
-  const pageButton = "grid h-8 min-w-8 place-items-center rounded-md px-2 text-sm tabular-nums transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11";
+  const pageButton = "grid h-8 min-w-8 place-items-center rounded-md px-2 text-sm tabular-nums transition-colors aria-disabled:cursor-wait pointer-coarse:min-h-11 pointer-coarse:min-w-11";
+  const placeholder = "block animate-pulse rounded bg-subtle motion-reduce:animate-none";
 
   return (
-    <nav aria-label="Pagination" className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
-      <p className="text-muted-foreground tabular-nums">
-        Showing {first.toLocaleString("en-IN")}–{last.toLocaleString("en-IN")} of {count.toLocaleString("en-IN")}
-      </p>
-      <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-muted-foreground">
-          Rows per page
-          <select
-            value={pageSize}
-            onChange={(event) =>
-              updateQuery({ page_size: Number(event.target.value) === DEFAULT_PAGE_SIZE ? null : event.target.value })
-            }
-            className={`${fieldClass} h-8 text-foreground`}
-          >
-            {PAGE_SIZES.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => go(page - 1)}
-            disabled={page <= 1}
-            aria-label="Previous page"
-            className={`${iconButton} size-8`}
-          >
-            <ChevronLeftIcon className="size-4" />
-          </button>
-          {pageNumbers(page, pages).map((n, i) =>
-            n === null ? (
-              <span key={`gap-${i}`} aria-hidden="true" className="px-1 text-muted-foreground">
-                …
-              </span>
-            ) : (
-              <button
-                key={n}
-                type="button"
-                onClick={() => go(n)}
-                aria-label={`Page ${n}`}
-                aria-current={n === page ? "page" : undefined}
-                className={`${pageButton} ${n === page ? "bg-primary font-medium text-white" : "hover:bg-muted"}`}
-              >
-                {n}
-              </button>
-            ),
-          )}
-          <button
-            type="button"
-            onClick={() => go(page + 1)}
-            disabled={page >= pages}
-            aria-label="Next page"
-            className={`${iconButton} size-8`}
-          >
-            <ChevronLeftIcon className="size-4 rotate-180" />
-          </button>
+    <nav aria-label="Pagination" aria-busy={loading} className={`${paginationFooterClass} justify-between`}>
+      {count === undefined || loading ? (
+        <span aria-hidden="true" className={`${placeholder} h-4 w-40`} />
+      ) : (
+        <p className="text-muted-foreground tabular-nums">
+          Showing {first.toLocaleString("en-IN")}–{last.toLocaleString("en-IN")} of {count.toLocaleString("en-IN")}
+        </p>
+      )}
+      {count === undefined ? (
+        <span aria-hidden="true" className={`${placeholder} h-8 w-56 max-w-full pointer-coarse:h-11`} />
+      ) : (
+        <div className={`flex flex-wrap items-center gap-4 transition-opacity ${loading ? "opacity-60" : ""}`}>
+          <label className="flex items-center gap-2 text-muted-foreground">
+            Rows per page
+            <select
+              value={pageSize}
+              onChange={(event) =>
+                updateQuery({ page_size: Number(event.target.value) === DEFAULT_PAGE_SIZE ? null : event.target.value })
+              }
+              className={`${fieldClass} h-8 text-foreground`}
+            >
+              {PAGE_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => go(page - 1)}
+              disabled={page <= 1}
+              // aria-disabled, not disabled, while loading: a disabled button would drop the keyboard focus.
+              aria-disabled={loading || undefined}
+              aria-label="Previous page"
+              className={`${iconButton} size-8`}
+            >
+              <ChevronLeftIcon className="size-4" />
+            </button>
+            {pageNumbers(page, pages).map((n, i) =>
+              n === null ? (
+                <span key={`gap-${i}`} aria-hidden="true" className="px-1 text-muted-foreground">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => go(n)}
+                  aria-disabled={loading || undefined}
+                  aria-label={`Page ${n}`}
+                  aria-current={n === page ? "page" : undefined}
+                  className={`${pageButton} ${n === page ? "bg-primary font-medium text-white" : "hover:bg-muted"}`}
+                >
+                  {n}
+                </button>
+              ),
+            )}
+            <button
+              type="button"
+              onClick={() => go(page + 1)}
+              disabled={page >= pages}
+              aria-disabled={loading || undefined}
+              aria-label="Next page"
+              className={`${iconButton} size-8`}
+            >
+              <ChevronLeftIcon className="size-4 rotate-180" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </nav>
   );
 }

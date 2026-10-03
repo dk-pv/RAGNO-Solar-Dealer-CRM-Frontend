@@ -27,12 +27,16 @@ import {
   Busy,
   ErrorState,
   FollowUpBadge,
+  emptyAreaClass,
+  fillClass,
   iconButton,
   inputClass,
+  messageAreaClass,
   primaryButton,
   secondaryButton,
   segmentClass,
   segmentedClass,
+  tableAreaClass,
   useNotice,
 } from "./ui";
 
@@ -119,7 +123,7 @@ export function LeadActivitiesPage() {
   let content;
   if (error) {
     content = (
-      <div className="mt-4 rounded-lg border border-border bg-background">
+      <div className={`${messageAreaClass} mt-4`}>
         {error.status === 404 && page > 1 ? (
           <ErrorState
             title="This page no longer exists"
@@ -135,7 +139,7 @@ export function LeadActivitiesPage() {
   } else if (data && data.count === 0 && !loading) {
     const narrowed = Boolean(search || status) || activeFilters > 0;
     content = (
-      <div className="mt-4 rounded-lg border border-dashed border-border-strong bg-background px-4 py-12 text-center">
+      <div className={`${emptyAreaClass} mt-4`}>
         <p className="text-sm font-medium">{narrowed ? "No follow-ups match your search." : "No follow-ups found."}</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {narrowed
@@ -155,7 +159,7 @@ export function LeadActivitiesPage() {
     const rows = data && data.results.length > 0 ? data.results : undefined;
     content = (
       <>
-        <div className="scrollbar-none mt-4 overflow-x-auto rounded-lg border border-border bg-background">
+        <div className={`${tableAreaClass} mt-4`}>
           <table
             aria-busy={loading}
             className={`w-full min-w-240 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
@@ -201,19 +205,19 @@ export function LeadActivitiesPage() {
             </tbody>
           </table>
         </div>
-        {data && data.count > 0 && <Pagination page={page} pageSize={pageSize} count={data.count} />}
+        <Pagination page={page} pageSize={pageSize} count={data?.count} loading={loading} />
       </>
     );
   }
 
   return (
-    <div>
+    <div className={fillClass}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 ref={headingRef} tabIndex={-1} className="text-xl font-semibold">
             Lead Activities
           </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className="mt-0.5 min-h-5 text-sm text-muted-foreground">
             {data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "follow-up" : "follow-ups"}` : " "}
           </p>
         </div>

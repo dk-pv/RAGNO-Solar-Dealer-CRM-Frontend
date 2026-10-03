@@ -14,7 +14,7 @@ import {
 } from "@/components/leads/api";
 import { menuItemClass, placeMenu } from "@/components/leads/lead-actions";
 import { Field, dialogClass } from "@/components/leads/lead-dialogs";
-import { Busy, ErrorState, iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
+import { Busy, ErrorState, iconButton, inputClass, primaryButton, secondaryButton, tableAreaClass } from "@/components/leads/ui";
 import { toApiError, useApi, type ApiError } from "@/lib/api";
 import {
   ACTIVITY_STATUSES,
@@ -120,7 +120,7 @@ export function WorkActivityTable({ rows, loading, showWork, completingId, onEdi
   const columns = showWork ? 8 : 6;
 
   return (
-    <div className="scrollbar-none relative overflow-x-auto rounded-lg border border-border bg-background">
+    <div className={`${tableAreaClass} relative`}>
       <table
         aria-busy={loading}
         className={`w-full text-sm transition-opacity ${showWork ? "min-w-280" : "min-w-200"} ${loading && rows ? "opacity-60" : ""}`}

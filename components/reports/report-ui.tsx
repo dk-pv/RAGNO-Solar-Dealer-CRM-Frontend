@@ -10,7 +10,7 @@ import { formatExact, formatShortDateTime, type LatestActivity } from "@/compone
 import { formatDate, type Assignee } from "@/components/leads/api";
 import { Pagination } from "@/components/leads/leads-page";
 import { updateQuery } from "@/components/leads/leads-toolbar";
-import { ErrorState, fieldClass, secondaryButton } from "@/components/leads/ui";
+import { ErrorState, emptyAreaClass, fieldClass, secondaryButton, tableAreaClass } from "@/components/leads/ui";
 import { apiDownload, toApiError, useApi, type ApiError } from "@/lib/api";
 import { DEFAULT_PERIOD, PERIODS, periodDates, pointEnd, type Period, type TrendUnit } from "./api";
 
@@ -428,14 +428,12 @@ export function DataTable<T>({
 }) {
   if (data && data.count === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-border-strong bg-background px-4 py-10 text-center text-sm text-muted-foreground">
-        {NO_DATA}
-      </p>
+      <p className={`${emptyAreaClass} text-sm text-muted-foreground`}>{NO_DATA}</p>
     );
   }
   return (
     <>
-      <div className="scrollbar-none relative overflow-x-auto rounded-lg border border-border bg-background">
+      <div className={`${tableAreaClass} relative`}>
         <table aria-busy={loading} className={`w-full text-sm transition-opacity ${loading && data ? "opacity-60" : ""}`}>
           <caption className="sr-only">{caption}</caption>
           <thead>
@@ -470,7 +468,7 @@ export function DataTable<T>({
           </tbody>
         </table>
       </div>
-      {data && page !== undefined && pageSize !== undefined && <Pagination page={page} pageSize={pageSize} count={data.count} />}
+      {page !== undefined && pageSize !== undefined && <Pagination page={page} pageSize={pageSize} count={data?.count} loading={loading} />}
     </>
   );
 }

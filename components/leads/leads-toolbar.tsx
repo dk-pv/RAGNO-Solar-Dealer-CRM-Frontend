@@ -69,7 +69,8 @@ export function LeadsHeader({ title, description = " ", onAdd }: LeadsHeaderProp
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
         <h1 className="text-xl font-semibold">{title}</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+        {/* min-h-5: the line is reserved while the count loads, so the title doesn't move when it arrives. */}
+        <p className="mt-0.5 min-h-5 text-sm text-muted-foreground">{description}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <ViewSwitch label="Leads view" views={VIEWS} query={query} />

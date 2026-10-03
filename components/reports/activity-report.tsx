@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 import { ACTIVITY_TYPES, formatDate, formatDateTime } from "@/components/leads/api";
 import { updateQuery } from "@/components/leads/leads-toolbar";
-import { fieldClass } from "@/components/leads/ui";
+import { fieldClass, fillClass } from "@/components/leads/ui";
 import { ACTIVITY_STATUSES } from "@/components/works/api";
 import { ActivityStatusBadge } from "@/components/works/work-activities";
 import { useApi } from "@/lib/api";
@@ -123,7 +123,7 @@ export function ActivityReport() {
   const active = report.active.filter((key) => key !== "date_field");
 
   return (
-    <div className="space-y-4">
+    <div className={`${fillClass} space-y-4`}>
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Period by</span>
@@ -272,6 +272,7 @@ export function ActivityReport() {
         title="Activities"
         description="Every activity behind the numbers above. Completed ones stay as history."
         action={sortSelect(SORTS, report.searchParams.get("ordering") ?? SORTS[0].value)}
+        className={fillClass}
       >
         {rows.error ? (
           <ReportError error={rows.error} onRetry={rows.reload} />

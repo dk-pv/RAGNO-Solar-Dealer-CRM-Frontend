@@ -6,7 +6,7 @@ import { useContext, useEffect, type ReactNode } from "react";
 
 import { canOpen } from "@/components/layout/navigation";
 import { CurrentUserContext, type ShellUser } from "@/components/layout/use-shell-session";
-import { tabClass, tabListClass } from "@/components/leads/ui";
+import { fillClass, tabClass, tabListClass } from "@/components/leads/ui";
 import { PeriodFilter } from "./report-ui";
 
 // The reports, each shown only to roles with the modules its records belong to (the API checks the same).
@@ -36,7 +36,7 @@ export function ReportsShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className={`${fillClass} space-y-4`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Reports</h1>

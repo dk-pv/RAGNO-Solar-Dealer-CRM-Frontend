@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useContext, type ReactNode } from "react";
 
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
-import { tabClass, tabListClass } from "@/components/leads/ui";
+import { fillClass, tabClass, tabListClass } from "@/components/leads/ui";
 
 const TABS = [
   { label: "Users", href: "/settings/users", adminOnly: false },
@@ -17,7 +17,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
   return (
-    <div>
+    <div className={fillClass}>
       <h1 className="text-xl font-semibold">Settings</h1>
       <nav aria-label="Settings" className={`mt-3 ${tabListClass}`}>
         {TABS.filter((tab) => isAdmin || !tab.adminOnly).map((tab) => (
@@ -26,7 +26,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           </Link>
         ))}
       </nav>
-      <div className="mt-5">{children}</div>
+      <div className={`${fillClass} mt-5`}>{children}</div>
     </div>
   );
 }

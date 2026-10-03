@@ -59,6 +59,23 @@ export const tabListClass = "scrollbar-none -mx-1 flex gap-1 overflow-x-auto bor
 export const tabClass =
   "-mb-px shrink-0 border-b-2 border-transparent px-3 py-2 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground aria-[current=page]:border-primary aria-[current=page]:text-foreground pointer-coarse:py-3";
 
+// ---- Pages that list records ----
+// The app shell's <main> is a flex column. A page that lists records fills it, and every wrapper between the page's root
+// and the list (`fillClass`) grows with it, so the footer under the list (pagination) sits at the bottom of the page
+// whether it follows one row or a full page of them. The data area (the table's box, or the box for an empty or error
+// state: `tableAreaClass`, `emptyAreaClass`, `messageAreaClass`) grows as well, so it keeps its size as a page goes
+// from loading to data, to nothing found, to an error. Pages that don't list records keep the height of their content.
+export const fillClass = "flex flex-1 flex-col";
+// The table's scroll box. `tableBoxClass` is the same box without growing, for a page with something else to fill the room.
+export const tableBoxClass = "scrollbar-none overflow-x-auto rounded-lg border border-border bg-background";
+export const tableAreaClass = `${tableBoxClass} grow`;
+// The box that holds a list's error state, and its empty state.
+export const messageAreaClass = "flex grow flex-col justify-center rounded-lg border border-border bg-background";
+export const emptyAreaClass =
+  "flex grow flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-background px-4 py-12 text-center";
+// The footer under a list. `mt-auto` keeps it at the bottom even when nothing above it grows; callers add the alignment.
+export const paginationFooterClass = "mt-auto flex min-h-8 flex-wrap items-center gap-3 pt-3 text-sm pointer-coarse:min-h-11";
+
 // Switches between a module's List and Pipeline views. `query` carries the search and filters both views share.
 export function ViewSwitch({ label, views, query = "" }: { label: string; views: { label: string; href: string }[]; query?: string }) {
   const pathname = usePathname();

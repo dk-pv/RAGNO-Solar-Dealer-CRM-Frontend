@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { formatDate, formatDateTime, formatMoney } from "@/components/leads/api";
+import { fillClass } from "@/components/leads/ui";
 import { updateQuery } from "@/components/leads/leads-toolbar";
 import { WORK_STAGES, stageFor, type WorkStage } from "@/components/works/api";
 import { useApi } from "@/lib/api";
@@ -77,7 +78,7 @@ export function WorkReport() {
   const nameOf = (id: string) => (id === "none" ? "Unassigned" : (people?.find((person) => String(person.id) === id)?.name ?? `User #${id}`));
 
   return (
-    <div className="space-y-4">
+    <div className={`${fillClass} space-y-4`}>
       <div className="flex flex-wrap items-center gap-2">
         <FilterSelect name="stage" label="Stage" all="All stages" options={WORK_STAGES.map(({ value, label }) => ({ value, label }))} />
         <FilterSelect name="assigned_to" label="Assigned staff" all="Anyone" options={assigneeOptions(people)} />
@@ -172,6 +173,7 @@ export function WorkReport() {
         title="Works"
         description="The Works behind the numbers above, with their latest activity."
         action={sortSelect(SORTS, report.searchParams.get("ordering") ?? SORTS[0].value)}
+        className={fillClass}
       >
         {rows.error ? (
           <ReportError error={rows.error} onRetry={rows.reload} />

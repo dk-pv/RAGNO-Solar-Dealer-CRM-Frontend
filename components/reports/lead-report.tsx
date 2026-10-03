@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { formatDateTime, LEAD_SOURCES, LEAD_STATUSES, statusLabel, type LeadStatus } from "@/components/leads/api";
 import { updateQuery } from "@/components/leads/leads-toolbar";
-import { StatusBadge } from "@/components/leads/ui";
+import { StatusBadge, fillClass } from "@/components/leads/ui";
 import { useApi } from "@/lib/api";
 import type { LeadReportRow, LeadReportSummary, Page } from "./api";
 import {
@@ -63,7 +63,7 @@ export function LeadReport() {
   const nameOf = (id: string) => (id === "none" ? "Unassigned" : (people?.find((person) => String(person.id) === id)?.name ?? `User #${id}`));
 
   return (
-    <div className="space-y-4">
+    <div className={`${fillClass} space-y-4`}>
       <div className="flex flex-wrap items-center gap-2">
         <FilterSelect name="status" label="Status" all="All statuses" options={LEAD_STATUSES.map((item) => ({ ...item }))} />
         <FilterSelect name="assigned_to" label="Assigned staff" all="Anyone" options={assigneeOptions(people)} />
@@ -162,6 +162,7 @@ export function LeadReport() {
         title="Leads"
         description="The leads behind the numbers above, with their latest activity."
         action={sortSelect(SORTS, report.searchParams.get("ordering") ?? SORTS[0].value)}
+        className={fillClass}
       >
         {rows.error ? (
           <ReportError error={rows.error} onRetry={rows.reload} />

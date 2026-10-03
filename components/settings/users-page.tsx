@@ -11,12 +11,18 @@ import {
   ErrorState,
   Busy,
   destructiveButton,
+  emptyAreaClass,
+  fillClass,
   ghostButton,
   ghostDangerButton,
   iconButton,
   inputClass,
+  messageAreaClass,
+  paginationFooterClass,
   primaryButton,
   secondaryButton,
+  tableAreaClass,
+  tableBoxClass,
   useNotice,
 } from "@/components/leads/ui";
 import { PasswordInput } from "@/components/password-input";
@@ -64,7 +70,7 @@ export function UsersPage() {
   let content;
   if (error) {
     content = (
-      <div className="mt-4 rounded-lg border border-border bg-background">
+      <div className={`${messageAreaClass} mt-4`}>
         {error.status === 404 && page > 1 ? (
           <ErrorState
             title="This page no longer exists"
@@ -79,9 +85,11 @@ export function UsersPage() {
     );
   } else {
     const rows = data?.results;
+    // With only the signed-in user listed, the hint below the table takes the spare room instead of the table.
+    const emptyHint = Boolean(data && data.count <= 1);
     content = (
       <>
-        <div className="scrollbar-none relative mt-4 overflow-x-auto rounded-lg border border-border bg-background">
+        <div className={`${emptyHint ? tableBoxClass : tableAreaClass} relative mt-4`}>
           <table aria-busy={loading} className={`w-full min-w-200 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}>
             <caption className="sr-only">Users</caption>
             <thead>
@@ -175,8 +183,8 @@ export function UsersPage() {
           </table>
         </div>
 
-        {data && data.count <= 1 && (
-          <div className="mt-4 rounded-lg border border-dashed border-border-strong bg-background px-4 py-10 text-center">
+        {emptyHint && (
+          <div className={`${emptyAreaClass} mt-4`}>
             <p className="text-sm font-medium">No other users yet.</p>
             <p className="mt-1 text-sm text-muted-foreground">Add users and choose the role each of them has.</p>
             {isAdmin && (
@@ -188,7 +196,7 @@ export function UsersPage() {
         )}
 
         {data && (data.previous || data.next) && (
-          <nav aria-label="Pagination" className="mt-3 flex items-center justify-end gap-2 text-sm">
+          <nav aria-label="Pagination" className={`${paginationFooterClass} justify-end`}>
             <button type="button" onClick={() => setPage(page - 1)} disabled={!data.previous} className={secondaryButton}>
               Previous
             </button>
@@ -203,7 +211,7 @@ export function UsersPage() {
   }
 
   return (
-    <div>
+    <div className={fillClass}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Users</h2>
         {isAdmin && (
