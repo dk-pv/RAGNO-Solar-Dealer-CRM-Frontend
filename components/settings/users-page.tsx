@@ -9,6 +9,7 @@ import type { Page } from "@/components/leads/api";
 import { Field, Section, dialogClass } from "@/components/leads/lead-dialogs";
 import {
   ErrorState,
+  Busy,
   destructiveButton,
   ghostButton,
   ghostDangerButton,
@@ -525,8 +526,8 @@ function UserDialog({ mode, user, modules, roles, onClose, onSaved }: UserDialog
           >
             {saving
               ? mode === "delete"
-                ? "Deleting…"
-                : "Saving…"
+                ? <Busy>Deleting…</Busy>
+                : <Busy>Saving…</Busy>
               : {
                   add: "Create user",
                   edit: "Save changes",

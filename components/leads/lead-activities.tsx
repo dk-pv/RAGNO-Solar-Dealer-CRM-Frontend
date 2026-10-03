@@ -24,6 +24,7 @@ import { menuItemClass, placeMenu } from "./lead-actions";
 import { Pagination } from "./leads-page";
 import { FilterToggle, SearchBox, SortSelect, pickParams, updateQuery } from "./leads-toolbar";
 import {
+  Busy,
   ErrorState,
   FollowUpBadge,
   iconButton,
@@ -127,7 +128,7 @@ export function LeadActivitiesPage() {
             retryLabel="Go to the first page"
           />
         ) : (
-          <ErrorState title="Unable to load follow-ups" message={error.message} onRetry={reload} />
+          <ErrorState title="Couldn't load follow-ups" message={error.message} onRetry={reload} />
         )}
       </div>
     );
@@ -368,7 +369,7 @@ function FollowUpRow({ activity, busy, onComplete, onEdit, onDelete }: FollowUpR
                 aria-label={`Mark complete: ${heading(activity)} (${activity.lead_name})`}
                 className={`${secondaryButton} px-2.5 aria-disabled:opacity-50`}
               >
-                Mark complete
+                {busy ? <Busy>Completing…</Busy> : "Mark complete"}
               </button>
             )
           ) : (

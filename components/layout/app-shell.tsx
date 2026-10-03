@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 
-import { ErrorState } from "@/components/leads/ui";
+import { ErrorState, PageLoading } from "@/components/leads/ui";
 import { Navbar } from "./navbar";
 import { blockedEntryFor } from "./navigation";
 import { Sidebar, SidebarPanel } from "./sidebar";
@@ -35,7 +35,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // A page renders once the user is known, and only if they can open its module, so a staff member without access
   // never loads it. This is only for people: the API refuses the same requests on its own.
-  let content: ReactNode = null;
+  let content: ReactNode;
   if (user) {
     const blocked = blockedEntryFor(user, pathname);
     content = blocked ? (
@@ -45,6 +45,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   } else if (userError) {
     content = <ErrorState title="Couldn't load your account" message={userError.message} onRetry={reloadUser} />;
+  } else {
+    // The stored session is being read, or the account is loading: a loader rather than an empty page.
+    content = <PageLoading label="Loading your account…" />;
   }
 
   return (

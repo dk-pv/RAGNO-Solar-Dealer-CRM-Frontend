@@ -170,7 +170,7 @@ export function LeadsPipeline() {
     content = (
       <div className="mt-4 rounded-lg border border-border bg-background">
         <ErrorState
-          title="Unable to load leads"
+          title="Couldn't load leads"
           message={`"${statusFilter}" isn't a Lead status.`}
           onRetry={() => updateQuery({ status: null })}
           retryLabel="Clear the status filter"
@@ -180,7 +180,7 @@ export function LeadsPipeline() {
   } else if (error) {
     content = (
       <div className="mt-4 rounded-lg border border-border bg-background">
-        <ErrorState title="Unable to load leads" message={error.message} onRetry={reload} />
+        <ErrorState title="Couldn't load leads" message={error.message} onRetry={reload} />
       </div>
     );
   } else {

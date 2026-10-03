@@ -24,7 +24,7 @@ import {
   type LeadStatus,
   type Plan,
 } from "./api";
-import { FollowUpBadge, StatusBadge, fieldClass, iconButton, inputClass, primaryButton, secondaryButton } from "./ui";
+import { Busy, FollowUpBadge, StatusBadge, fieldClass, iconButton, inputClass, primaryButton, secondaryButton } from "./ui";
 
 // Callers add the padding and width.
 export const dialogClass =
@@ -648,7 +648,7 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
             Cancel
           </button>
           <button type="submit" disabled={saving} className={primaryButton}>
-            {saving ? "Saving…" : lead ? "Save changes" : "Save lead"}
+            {saving ? <Busy>Saving…</Busy> : lead ? "Save changes" : "Save lead"}
           </button>
         </div>
       </form>
@@ -732,7 +732,7 @@ export function StatusDialog({ lead, onClose, onChanged }: StatusDialogProps) {
             Cancel
           </button>
           <button type="submit" disabled={pending || status === lead.status} className={primaryButton}>
-            {pending ? "Updating…" : "Update Status"}
+            {pending ? <Busy>Updating…</Busy> : "Update Status"}
           </button>
         </div>
       </form>
@@ -791,7 +791,7 @@ export function ConvertDialog({ lead, onClose, onConverted }: ConvertDialogProps
           Cancel
         </button>
         <button type="button" onClick={convert} disabled={pending} className={primaryButton}>
-          {pending ? "Converting…" : "Convert to Work"}
+          {pending ? <Busy>Converting…</Busy> : "Convert to Work"}
         </button>
       </div>
     </dialog>

@@ -181,7 +181,7 @@ function SummaryCards({ summary, onFollowUps }: { summary: Loaded<DashboardSumma
   if (summary.error) {
     return (
       <div className="rounded-lg border border-border bg-background">
-        <ErrorState title="Unable to load the summary" message={summary.error.message} onRetry={summary.reload} />
+        <ErrorState title="Couldn't load the summary" message={summary.error.message} onRetry={summary.reload} />
       </div>
     );
   }
@@ -292,7 +292,7 @@ function FollowUpsPanel({ view, onView, counts, today, version, links, className
 
   let content;
   if (error) {
-    content = <ErrorState title="Unable to load follow-ups" message={error.message} onRetry={reload} />;
+    content = <ErrorState title="Couldn't load follow-ups" message={error.message} onRetry={reload} />;
   } else if (!data) {
     content = <Skeleton lines={5} />;
   } else if (data.count === 0) {
@@ -432,7 +432,7 @@ type MyWorkProps = { summary: Loaded<DashboardSummary>; me: ShellUser; onFollowU
 function MyWork({ summary, me, onFollowUps }: MyWorkProps) {
   let content;
   if (summary.error) {
-    content = <ErrorState title="Unable to load your work" message={summary.error.message} onRetry={summary.reload} />;
+    content = <ErrorState title="Couldn't load your work" message={summary.error.message} onRetry={summary.reload} />;
   } else if (!summary.data) {
     content = <Skeleton lines={6} />;
   } else {
@@ -498,7 +498,7 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
 function LeadOverview({ summary, onAdd }: { summary: Loaded<DashboardSummary>; onAdd: () => void }) {
   let content;
   if (summary.error) {
-    content = <ErrorState title="Unable to load the Lead overview" message={summary.error.message} onRetry={summary.reload} />;
+    content = <ErrorState title="Couldn't load the Lead overview" message={summary.error.message} onRetry={summary.reload} />;
   } else if (!summary.data?.leads) {
     content = <Skeleton lines={6} />;
   } else if (summary.data.leads.total === 0) {
@@ -556,7 +556,7 @@ function LeadOverview({ summary, onAdd }: { summary: Loaded<DashboardSummary>; o
 function WorkOverview({ stages }: { stages: Loaded<StageSummary[]> }) {
   let content;
   if (stages.error) {
-    content = <ErrorState title="Unable to load the Work overview" message={stages.error.message} onRetry={stages.reload} />;
+    content = <ErrorState title="Couldn't load the Work overview" message={stages.error.message} onRetry={stages.reload} />;
   } else if (!stages.data) {
     content = <Skeleton lines={7} />;
   } else if (stages.data.every((row) => row.count === 0)) {

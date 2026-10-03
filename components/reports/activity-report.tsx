@@ -130,7 +130,7 @@ export function ActivityReport() {
           <select
             value={dateField}
             onChange={(event) => updateQuery({ date_field: event.target.value === "created" ? null : event.target.value })}
-            className={`${fieldClass} h-9`}
+            className={`${fieldClass} h-9 max-sm:w-full`}
           >
             {DATE_FIELDS.map((item) => (
               <option key={item.value} value={item.value}>

@@ -85,7 +85,7 @@ export function WorkActivitiesPage() {
             retryLabel="Go to the first page"
           />
         ) : (
-          <ErrorState title="Unable to load activities" message="Something went wrong while loading them." onRetry={reload} />
+          <ErrorState title="Couldn't load activities" message="Something went wrong while loading them." onRetry={reload} />
         )}
       </div>
     );

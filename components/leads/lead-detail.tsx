@@ -327,7 +327,7 @@ type ActivitiesProps = {
   notify: (text: string, error?: boolean) => void;
 };
 
-const linkButton = "font-medium text-foreground underline-offset-2 hover:underline aria-disabled:opacity-50";
+const linkButton = "font-medium text-foreground underline-offset-2 hover:underline aria-disabled:opacity-50 pointer-coarse:py-2";
 
 // The lead's follow-ups, each Pending until marked Completed (which is final). Whoever can edit the lead (an admin, or
 // the staff member it's assigned to) adds, completes, edits and deletes them; the API applies the same rules.
@@ -445,7 +445,7 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
                           aria-label={`Mark complete: ${heading(activity)}`}
                           className={linkButton}
                         >
-                          Mark complete
+                          {busyId === activity.id ? "Completing…" : "Mark complete"}
                         </button>
                       )}
                       <button
@@ -463,7 +463,7 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
                       type="button"
                       onClick={() => remove(activity)}
                       aria-label={`Delete follow-up: ${heading(activity)}`}
-                      className="font-medium text-error underline-offset-2 hover:underline"
+                      className="font-medium text-error underline-offset-2 hover:underline pointer-coarse:py-2"
                     >
                       Delete
                     </button>
@@ -505,7 +505,7 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
           <button
             type="button"
             onClick={onScheduleFollowUp}
-            className="ml-auto text-sm font-medium underline-offset-2 hover:underline"
+            className="ml-auto text-sm font-medium underline-offset-2 hover:underline pointer-coarse:py-2"
           >
             {lead.next_follow_up ? "Change" : "Schedule"}
           </button>

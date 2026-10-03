@@ -120,7 +120,7 @@ export function FilterSelect({ name, label, options, all }: FilterSelectProps) {
       value={searchParams.get(name) ?? ""}
       onChange={(event) => updateQuery({ [name]: event.target.value || null })}
       aria-label={label}
-      className={`${fieldClass} h-9`}
+      className={`${fieldClass} h-9 max-sm:w-full`}
     >
       <option value="">{all}</option>
       {options.map((option) => (
@@ -233,7 +233,7 @@ export function Skeleton({ lines = 4 }: { lines?: number }) {
 }
 
 export function ReportError({ error, onRetry }: { error: ApiError; onRetry: () => void }) {
-  return <ErrorState title="Unable to load report" message={error.message} onRetry={onRetry} />;
+  return <ErrorState title="Couldn't load report" message={error.message} onRetry={onRetry} />;
 }
 
 export const NO_DATA = "No data found for the selected filters.";

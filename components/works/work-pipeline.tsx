@@ -177,7 +177,7 @@ export function WorkPipeline() {
           value={assignedTo}
           onChange={(event) => setAssignedTo(event.target.value)}
           aria-label="Assigned staff"
-          className={`${fieldClass} h-9`}
+          className={`${fieldClass} h-9 max-sm:w-full`}
         >
           <option value="">{assignees.error ? "Anyone (staff couldn't be loaded)" : "Anyone"}</option>
           {assignees.data?.map((person) => (
@@ -186,7 +186,7 @@ export function WorkPipeline() {
             </option>
           ))}
         </select>
-        <select value={plan} onChange={(event) => setPlan(event.target.value)} aria-label="Plan" className={`${fieldClass} h-9`}>
+        <select value={plan} onChange={(event) => setPlan(event.target.value)} aria-label="Plan" className={`${fieldClass} h-9 max-sm:w-full`}>
           <option value="">{plans.error ? "All plans (plans couldn't be loaded)" : "All plans"}</option>
           {plans.data?.map((item) => (
             <option key={item.id} value={item.id}>
@@ -242,7 +242,7 @@ export function WorkPipeline() {
       {summary.error ? (
         <div className="mt-4 rounded-lg border border-border bg-background">
           <ErrorState
-            title="Unable to load Works"
+            title="Couldn't load Works"
             message={summary.error.message}
             onRetry={() => refresh(...WORK_STAGES.map((stage) => stage.value))}
           />

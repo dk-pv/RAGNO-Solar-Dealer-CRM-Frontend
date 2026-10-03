@@ -66,6 +66,7 @@ const STATUS_MESSAGES: Record<number, string> = {
   401: "You're not signed in, or your session has expired. Sign in and try again.",
   403: "You don't have permission to do this.",
   404: "Not found.",
+  429: "Too many requests. Wait a moment and try again.",
 };
 
 const firstText = (value: unknown) =>

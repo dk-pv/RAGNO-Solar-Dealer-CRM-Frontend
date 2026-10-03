@@ -6,6 +6,7 @@ import { useContext, useEffect, type ReactNode } from "react";
 
 import { canOpen } from "@/components/layout/navigation";
 import { CurrentUserContext, type ShellUser } from "@/components/layout/use-shell-session";
+import { tabClass, tabListClass } from "@/components/leads/ui";
 import { PeriodFilter } from "./report-ui";
 
 // The reports, each shown only to roles with the modules its records belong to (the API checks the same).
@@ -45,7 +46,7 @@ export function ReportsShell({ children }: { children: ReactNode }) {
         </div>
         <PeriodFilter />
       </div>
-      <nav aria-label="Reports" className="scrollbar-none -mx-1 flex gap-1 overflow-x-auto border-b border-border px-1">
+      <nav aria-label="Reports" className={tabListClass}>
         {reports.map((report) => {
           const current = pathname === report.href;
           return (
@@ -53,9 +54,7 @@ export function ReportsShell({ children }: { children: ReactNode }) {
               key={report.href}
               href={period.size ? `${report.href}?${period}` : report.href}
               aria-current={current ? "page" : undefined}
-              className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap ${
-                current ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
+              className={tabClass}
             >
               {report.label}
             </Link>

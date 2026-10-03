@@ -19,7 +19,7 @@ import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { formatDate, formatMoney, formatPhone, telHref, whatsappHref, type Assignee } from "@/components/leads/api";
 import { Field, Section, dialogClass } from "@/components/leads/lead-dialogs";
 import { menuItemClass, placeMenu } from "@/components/leads/lead-actions";
-import { iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
+import { Busy, iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
 import { toApiError, type ApiError } from "@/lib/api";
 import { WORK_STAGES, today, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
 import { ActivityDialog } from "./work-activities";
@@ -348,7 +348,7 @@ export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProp
             Cancel
           </button>
           <button type="submit" disabled={saving} className={primaryButton}>
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? <Busy>Saving…</Busy> : "Save changes"}
           </button>
         </div>
       </form>

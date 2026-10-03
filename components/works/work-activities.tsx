@@ -14,7 +14,7 @@ import {
 } from "@/components/leads/api";
 import { menuItemClass, placeMenu } from "@/components/leads/lead-actions";
 import { Field, dialogClass } from "@/components/leads/lead-dialogs";
-import { ErrorState, iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
+import { Busy, ErrorState, iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
 import { toApiError, useApi, type ApiError } from "@/lib/api";
 import {
   ACTIVITY_STATUSES,
@@ -367,7 +367,7 @@ export function WorkActivities({ work, assignees, notify, onAdd, onChanged }: Wo
   if (error) {
     content = (
       <div className="rounded-lg border border-border bg-background">
-        <ErrorState title="Unable to load activities" message="Something went wrong while loading them." onRetry={reload} />
+        <ErrorState title="Couldn't load activities" message="Something went wrong while loading them." onRetry={reload} />
       </div>
     );
   } else if (data?.count === 0) {
@@ -605,7 +605,7 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
             Cancel
           </button>
           <button type="submit" disabled={saving} className={primaryButton}>
-            {saving ? "Saving…" : activity ? "Save changes" : "Save activity"}
+            {saving ? <Busy>Saving…</Busy> : activity ? "Save changes" : "Save activity"}
           </button>
         </div>
       </form>

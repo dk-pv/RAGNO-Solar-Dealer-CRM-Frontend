@@ -86,7 +86,7 @@ export function WorksPage() {
             retryLabel="Go to the first page"
           />
         ) : (
-          <ErrorState title="Unable to load Works" message={error.message} onRetry={reload} />
+          <ErrorState title="Couldn't load Works" message={error.message} onRetry={reload} />
         )}
       </div>
     );
@@ -306,6 +306,11 @@ function WorkRow({ work, assignees, actions, onSaved, onError }: WorkRowProps) {
         <Link href={`/works/${work.id}`} className="block max-w-52 truncate hover:underline">
           {work.customer_name}
         </Link>
+        {/* On a phone the Stage column is off to the right, so the stage also sits under the name. */}
+        <span className="mt-1 flex items-center gap-1.5 text-xs font-normal text-muted-foreground sm:hidden">
+          <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${stage.dot}`} />
+          {stage.label}
+        </span>
       </th>
       <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(work)}</td>
       <td className="px-3 py-2">
@@ -323,7 +328,7 @@ function WorkRow({ work, assignees, actions, onSaved, onError }: WorkRowProps) {
             }}
             disabled={saving}
             aria-label={`Stage for ${work.customer_name}`}
-            className={`cursor-pointer appearance-none rounded-md py-0.5 pr-6 pl-2 text-xs font-medium hover:ring-1 hover:ring-border-strong disabled:cursor-wait disabled:opacity-60 ${stage.header}`}
+            className={`cursor-pointer appearance-none rounded-md py-0.5 pr-6 pl-2 text-xs font-medium hover:ring-1 hover:ring-border-strong pointer-coarse:min-h-11 disabled:cursor-wait disabled:opacity-60 ${stage.header}`}
           >
             {WORK_STAGES.map((option) => (
               <option key={option.value} value={option.value}>
@@ -355,7 +360,7 @@ function WorkRow({ work, assignees, actions, onSaved, onError }: WorkRowProps) {
               // Until the staff list loads, only the current value could be chosen.
               disabled={saving || !assignees}
               aria-label={`Assigned staff for ${work.customer_name}`}
-              className={`cursor-pointer appearance-none rounded-md bg-transparent py-1 pr-6 pl-1.5 text-sm hover:bg-muted disabled:cursor-wait disabled:opacity-60 ${
+              className={`cursor-pointer appearance-none rounded-md bg-transparent py-1 pr-6 pl-1.5 text-sm hover:bg-muted pointer-coarse:min-h-11 disabled:cursor-wait disabled:opacity-60 ${
                 assigneeValue ? "text-foreground" : "text-muted-foreground"
               }`}
             >

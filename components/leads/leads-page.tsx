@@ -11,7 +11,7 @@ import { toApiError, useApi } from "@/lib/api";
 import { exportLeads, formatDate, formatMoney, formatPhone, type Lead, type Page } from "./api";
 import { LeadMenu, useLeadActions, type LeadActions } from "./lead-actions";
 import { FILTER_KEYS, LeadsHeader, LeadsToolbar, VIEW_KEYS, pickParams, updateQuery } from "./leads-toolbar";
-import { ErrorState, PinButton, StatusBadge, fieldClass, iconButton, secondaryButton, useNotice } from "./ui";
+import { Busy, ErrorState, PinButton, StatusBadge, fieldClass, iconButton, secondaryButton, useNotice } from "./ui";
 
 // The URL query and the API query use the same names.
 const QUERY_KEYS = [...VIEW_KEYS, "page", "page_size"];
@@ -159,8 +159,7 @@ export function LeadsPage() {
       <LeadsToolbar key={clears}>
         {isAdmin && (
           <button type="button" onClick={exportCsv} disabled={exporting} className={`${secondaryButton} sm:ml-auto`}>
-            <DownloadIcon className="size-4" />
-            {exporting ? "Exporting…" : "Export"}
+            {exporting ? <Busy>Exporting…</Busy> : <><DownloadIcon className="size-4" />Export</>}
           </button>
         )}
       </LeadsToolbar>
@@ -198,6 +197,10 @@ function LeadRow({ lead, actions, onChanged, onError }: LeadRowProps) {
         <Link href={`/leads/${lead.id}`} className="block max-w-52 truncate hover:underline">
           {lead.name}
         </Link>
+        {/* On a phone the Status column is off to the right, so the status also sits under the name. */}
+        <span className="mt-1 block sm:hidden">
+          <StatusBadge status={lead.status} />
+        </span>
       </th>
       <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(lead)}</td>
       <td className="px-3 py-2">

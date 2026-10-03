@@ -78,7 +78,7 @@ export function CrmTimeline({ today, users, version }: TimelineProps) {
 
   let content;
   if (error) {
-    content = <ErrorState title="Unable to load the timeline" message={error.message} onRetry={reload} />;
+    content = <ErrorState title="Couldn't load the timeline" message={error.message} onRetry={reload} />;
   } else if (!data) {
     content = (
       <ul aria-busy="true" aria-label="Loading the timeline" className="space-y-5 py-2">
@@ -139,7 +139,7 @@ export function CrmTimeline({ today, users, version }: TimelineProps) {
     );
   }
 
-  const select = `${fieldClass} h-9`;
+  const select = `${fieldClass} h-9 max-sm:w-full`;
   return (
     <div>
       <div className="flex flex-wrap gap-2">

@@ -2,11 +2,31 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
-import { CloseIcon, PinIcon } from "@/components/layout/icons";
+import { CloseIcon, PinIcon, SpinnerIcon } from "@/components/layout/icons";
 import { toApiError } from "@/lib/api";
 import { FOLLOW_UP_STATUSES, setLeadPinned, statusLabel, type FollowUpStatus, type Lead, type LeadStatus } from "./api";
+
+// A button's label while its action runs: a spinner, then the text ("Saving…"). The button disables itself.
+export function Busy({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <SpinnerIcon className="size-4" />
+      {children}
+    </>
+  );
+}
+
+// The page-level loader, shown while a page's required data loads so no page appears empty or half-rendered.
+export function PageLoading({ label = "Loading…" }: { label?: string }) {
+  return (
+    <div role="status" className="flex items-center justify-center gap-2 px-4 py-16 text-sm text-muted-foreground">
+      <SpinnerIcon className="size-4" />
+      {label}
+    </div>
+  );
+}
 
 // The CRM's controls: compact (36px) for a mouse. On touch screens (pointer-coarse) each one is at least 44px tall, and
 // fields use 16px text so phones don't zoom in when one is focused.
@@ -32,6 +52,12 @@ export const inputClass = `${fieldClass} h-9 w-full`;
 export const segmentedClass = "flex rounded-md border border-input bg-background p-0.5";
 export const segmentClass =
   "rounded px-3 py-1.5 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground pointer-coarse:py-2.5";
+
+// A page's sub-navigation (Reports, Settings): the current tab is underlined in the brand colour. The list scrolls
+// sideways on narrow screens rather than wrapping.
+export const tabListClass = "scrollbar-none -mx-1 flex gap-1 overflow-x-auto border-b border-border px-1";
+export const tabClass =
+  "-mb-px shrink-0 border-b-2 border-transparent px-3 py-2 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground aria-[current=page]:border-primary aria-[current=page]:text-foreground pointer-coarse:py-3";
 
 // Switches between a module's List and Pipeline views. `query` carries the search and filters both views share.
 export function ViewSwitch({ label, views, query = "" }: { label: string; views: { label: string; href: string }[]; query?: string }) {

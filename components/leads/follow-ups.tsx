@@ -17,7 +17,7 @@ import {
   type FollowUpDraft,
   type FollowUpErrors,
 } from "./lead-dialogs";
-import { inputClass, primaryButton, secondaryButton } from "./ui";
+import { Busy, inputClass, primaryButton, secondaryButton } from "./ui";
 
 type LeadChoice = Pick<Lead, "id" | "name" | "assigned_to">;
 
@@ -321,7 +321,7 @@ export function FollowUpDialog({ activity, lead: fixedLead, onClose, onSaved, on
           </button>
           {/* aria-disabled, not disabled, while saving: a disabled button would drop the keyboard focus. */}
           <button type="submit" aria-disabled={pending || undefined} className={`${primaryButton} aria-disabled:opacity-50`}>
-            {pending ? "Saving…" : activity ? "Save changes" : "Create follow-up"}
+            {pending ? <Busy>Saving…</Busy> : activity ? "Save changes" : "Create follow-up"}
           </button>
         </div>
       </form>

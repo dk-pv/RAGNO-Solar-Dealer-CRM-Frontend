@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useState, useSyncExternalStore, type FormEvent } from "react";
 
-import { inputClass, primaryButton } from "@/components/leads/ui";
+import { Busy, PageLoading, inputClass, primaryButton } from "@/components/leads/ui";
 import { PasswordInput } from "@/components/password-input";
 import { toApiError } from "@/lib/api";
 import { isSignedIn, signIn, subscribeToSession } from "@/lib/auth";
@@ -42,6 +42,9 @@ export function LoginForm() {
       setPending(false);
     }
   }
+
+  // Signed in (just now, or already): no form to fill in while the redirect above happens.
+  if (signedIn) return <PageLoading label="Opening the CRM…" />;
 
   return (
     <div className="w-full max-w-sm">
@@ -97,7 +100,7 @@ export function LoginForm() {
           </p>
         )}
         <button type="submit" disabled={pending} className={`${primaryButton} w-full`}>
-          {pending ? "Signing in…" : "Sign in"}
+          {pending ? <Busy>Signing in…</Busy> : "Sign in"}
         </button>
       </form>
 

@@ -67,6 +67,9 @@ export async function signIn(email: string, password: string) {
   if (response.status === 400 || response.status === 401) {
     throw new ApiError("The email or password is incorrect.", response.status);
   }
+  if (response.status === 429) {
+    throw new ApiError("Too many sign-in attempts. Wait a minute and try again.", response.status);
+  }
   if (!response.ok) throw new ApiError("Something went wrong on the server. Try again in a moment.", response.status);
   const { access, refresh } = await response.json();
   setSession(access, refresh);

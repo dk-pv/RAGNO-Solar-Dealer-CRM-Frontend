@@ -273,3 +273,12 @@ export function EyeOffIcon(props: IconProps) {
     </Icon>
   );
 }
+
+// A spinner for busy buttons and page loaders. It turns on its own (animate-spin); callers set the size.
+export function SpinnerIcon({ className = "size-4", ...props }: IconProps) {
+  return (
+    <Icon {...props} strokeWidth={2} className={`animate-spin motion-reduce:animate-none ${className}`}>
+      <path d="M12 3a9 9 0 1 0 9 9" />
+    </Icon>
+  );
+}

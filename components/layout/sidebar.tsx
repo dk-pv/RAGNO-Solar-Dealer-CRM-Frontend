@@ -111,6 +111,13 @@ export function SidebarPanel({ user, onLogout, collapsible = false, onClose }: S
 
       <nav aria-label="Main" className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-3">
         <ul className="space-y-0.5">
+          {/* Until the user has loaded (which decides their entries), placeholder rows keep the rail from looking empty. */}
+          {!user &&
+            Array.from({ length: 5 }, (_, index) => (
+              <li key={index} aria-hidden="true" className="flex h-9 items-center pl-3.75 pr-3">
+                <span className="block h-3.5 w-28 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
+              </li>
+            ))}
           {(user ? navigationFor(user) : []).map((item, index) => {
             if ("href" in item) {
               const active = item.href === activeHref;

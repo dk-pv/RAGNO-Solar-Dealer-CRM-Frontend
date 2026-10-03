@@ -5,7 +5,7 @@ import { useContext, useEffect, useId, useRef, useState, type FormEvent } from "
 import { CloseIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { Section, dialogClass } from "@/components/leads/lead-dialogs";
-import { ErrorState, ghostButton, iconButton, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
+import { Busy, ErrorState, ghostButton, iconButton, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
 import { apiRequest, toApiError, useApi } from "@/lib/api";
 import { moduleLabels, type Module, type Role } from "./users-page";
 
@@ -192,7 +192,7 @@ function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogP
             Cancel
           </button>
           <button type="submit" disabled={saving} className={primaryButton}>
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? <Busy>Saving…</Busy> : "Save changes"}
           </button>
         </div>
       </form>
