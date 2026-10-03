@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   CalendarIcon,
@@ -14,6 +14,7 @@ import {
   TrashIcon,
   WhatsAppIcon,
 } from "@/components/layout/icons";
+import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { toApiError, useApi } from "@/lib/api";
 import {
   convertBlocker,
@@ -58,6 +59,8 @@ export function LeadDetail({ id }: { id: number }) {
   const [converting, setConverting] = useState(false);
   const [noticeElement, notify] = useNotice();
   const router = useRouter();
+  // The Work module (Settings -> Roles & Access) opens the Works list, where the lead's Work is found by its number.
+  const canOpenWorks = useContext(CurrentUserContext)?.modules.includes("work") ?? false;
   const loaded = lead !== undefined;
 
   // The Follow-up / Activity action links to #activities, which exists only once the lead has loaded.
@@ -228,7 +231,14 @@ export function LeadDetail({ id }: { id: number }) {
           <section className="border-t border-border pt-6">
             <h2 className="text-sm font-semibold">Conversion</h2>
             {lead.work ? (
-              <p className="mt-2 text-sm">Converted to Work #{lead.work} for the installation.</p>
+              <>
+                <p className="mt-2 text-sm">Converted to Work #{lead.work} for the installation.</p>
+                {canOpenWorks && (
+                  <Link href={`/works?search=%23${lead.work}`} className={`${secondaryButton} mt-3 w-full`}>
+                    View Work #{lead.work}
+                  </Link>
+                )}
+              </>
             ) : (
               <>
                 <p className="mt-2 text-sm text-muted-foreground">

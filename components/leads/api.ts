@@ -63,8 +63,8 @@ export type Lead = {
   can_edit: boolean;
   can_delete: boolean;
   can_assign: boolean;
-  can_convert: boolean; // only for a Won lead, and only for someone who can change it
-  work?: number | null; // the Work created by the conversion; sent once the Works module links one
+  can_convert: boolean; // only for a Won lead not yet converted, and only for someone who can change it
+  work?: number | null; // the Work created by converting the lead; null until then
   created_by_name: string | null;
   created_at: string;
   updated_at: string;
@@ -154,8 +154,8 @@ export function changeLeadStatus(id: number, status: LeadStatus) {
   return apiRequest<Lead>(`/leads/${id}/status/`, { method: "POST", json: { status } });
 }
 
-// Creates the Work for a Won lead; the API refuses any other status (409) and never changes the status itself.
-// Until the Works module exists the API refuses every conversion (409) with a message, and nothing changes.
+// Creates the Work for a Won lead, once; the API refuses any other status and a second conversion (409), and never
+// changes the lead's status: it stays Won.
 export function convertLead(id: number) {
   return apiRequest<Lead>(`/leads/${id}/convert/`, { method: "POST" });
 }
@@ -199,6 +199,7 @@ export function statusBlocker(lead: Lead) {
 // Why this user can't convert the lead, or undefined when they can (the API decides can_convert and enforces it).
 export function convertBlocker(lead: Lead) {
   if (lead.can_convert) return undefined;
+  if (lead.work) return `Already converted to Work #${lead.work}.`;
   if (lead.status === "LOST") return "Lost leads can't be converted.";
   if (lead.status !== "WON") return "Only Won leads can be converted. Move the lead to Won first.";
   return "You can view this lead but not convert it.";
