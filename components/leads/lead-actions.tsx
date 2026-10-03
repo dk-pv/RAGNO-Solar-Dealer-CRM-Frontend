@@ -93,7 +93,7 @@ const MENU_WIDTH = 224; // w-56
 const LEAD_MENU_HEIGHT = 320;
 
 // The menu opens in the browser's top layer, outside any scrolling table or board, next to its button.
-export function placeMenu(button: HTMLElement, menuId: string) {
+export function placeMenu(button: HTMLElement, menuId: string, menuHeight = 240) {
   const menu = document.getElementById(menuId);
   if (!menu) return;
   const rect = button.getBoundingClientRect();
