@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useId, useState, type ChangeEvent, type ReactNode } from "react";
 
 import { FilterIcon, PlusIcon, SearchIcon } from "@/components/layout/icons";
 import { useApi } from "@/lib/api";
 import { LEAD_SOURCES, LEAD_STATUSES, type Assignee, type Plan } from "./api";
-import { fieldClass, inputClass, primaryButton, secondaryButton } from "./ui";
+import { ViewSwitch, fieldClass, inputClass, primaryButton, secondaryButton } from "./ui";
 
 export const FILTER_KEYS = ["status", "plan", "assigned_to", "source", "created_after", "created_before"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
@@ -62,7 +61,6 @@ type LeadsHeaderProps = { title: string; description?: string; onAdd: () => void
 
 // The heading of the Leads pages, with the List/Pipeline switch and Add Lead.
 export function LeadsHeader({ title, description = " ", onAdd }: LeadsHeaderProps) {
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   // Both views show the same leads, so switching keeps the search, filters and sort.
   const query = pickParams(searchParams, VIEW_KEYS).toString();
@@ -74,23 +72,7 @@ export function LeadsHeader({ title, description = " ", onAdd }: LeadsHeaderProp
         <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <nav aria-label="Leads view" className="flex rounded-md border border-input bg-background p-0.5">
-          {VIEWS.map((view) => {
-            const current = pathname === view.href;
-            return (
-              <Link
-                key={view.href}
-                href={query ? `${view.href}?${query}` : view.href}
-                aria-current={current ? "page" : undefined}
-                className={`rounded px-3 py-1.5 text-sm font-medium ${
-                  current ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {view.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <ViewSwitch label="Leads view" views={VIEWS} query={query} />
         <button type="button" onClick={onAdd} className={primaryButton}>
           <PlusIcon className="size-4" />
           Add Lead
@@ -155,7 +137,7 @@ export function SearchBox({ label, placeholder }: { label: string; placeholder: 
 
   return (
     <div className="relative w-full sm:w-72">
-      <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+      <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-faint" />
       <input
         type="search"
         value={searchText}
@@ -225,10 +207,10 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
         updateQuery(Object.fromEntries(FILTER_KEYS.map((key) => [key, draft[key] || null])));
         onDone();
       }}
-      className="mt-3 grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-3"
+      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-3"
     >
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Status</span>
+        <span className="mb-1.5 block font-medium text-label">Status</span>
         <select {...bind("status")}>
           <option value="">All statuses</option>
           {LEAD_STATUSES.map((status) => (
@@ -239,7 +221,7 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
         </select>
       </label>
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Plan</span>
+        <span className="mb-1.5 block font-medium text-label">Plan</span>
         <select {...bind("plan")}>
           <option value="">{plans.error ? "All plans (plans couldn't be loaded)" : "All plans"}</option>
           {plans.data?.map((plan) => (
@@ -250,7 +232,7 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
         </select>
       </label>
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Assigned staff</span>
+        <span className="mb-1.5 block font-medium text-label">Assigned staff</span>
         <select {...bind("assigned_to")}>
           <option value="">{assignees.error ? "Anyone (staff couldn't be loaded)" : "Anyone"}</option>
           {assignees.data?.map((person) => (
@@ -261,7 +243,7 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
         </select>
       </label>
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Lead source</span>
+        <span className="mb-1.5 block font-medium text-label">Lead source</span>
         <select {...bind("source")}>
           <option value="">All sources</option>
           {LEAD_SOURCES.map((source) => (
@@ -272,11 +254,11 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
         </select>
       </label>
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Created from</span>
+        <span className="mb-1.5 block font-medium text-label">Created from</span>
         <input type="date" max={draft.created_before || undefined} {...bind("created_after")} />
       </label>
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Created to</span>
+        <span className="mb-1.5 block font-medium text-label">Created to</span>
         <input type="date" min={draft.created_after || undefined} {...bind("created_before")} />
       </label>
       <div className="flex justify-end gap-2 sm:col-span-2 lg:col-span-3">

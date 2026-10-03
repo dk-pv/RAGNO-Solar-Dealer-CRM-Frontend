@@ -226,7 +226,7 @@ function FilterPanel({ id, searchParams, assignees, onDone }: FilterPanelProps) 
         updateQuery(Object.fromEntries(FILTER_KEYS.map((key) => [key, draft[key] || null])));
         onDone();
       }}
-      className="mt-3 grid gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-3"
+      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-3"
     >
       <label className="text-sm">
         <span className="mb-1.5 block font-medium text-label">Status</span>

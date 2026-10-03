@@ -5,7 +5,7 @@ import { useContext, useEffect, useId, useRef, useState, type FormEvent } from "
 import { CloseIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { Section, dialogClass } from "@/components/leads/lead-dialogs";
-import { ErrorState, iconButton, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
+import { ErrorState, ghostButton, iconButton, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
 import { apiRequest, toApiError, useApi } from "@/lib/api";
 import { moduleLabels, type Module, type Role } from "./users-page";
 
@@ -29,11 +29,11 @@ export function RolesPage() {
       </p>
 
       {roles.error ? (
-        <div className="mt-4 rounded-lg border border-border">
+        <div className="mt-4 rounded-lg border border-border bg-background">
           <ErrorState title="Couldn't load roles" message={roles.error.message} onRetry={roles.reload} />
         </div>
       ) : (
-        <div className="scrollbar-none relative mt-4 overflow-x-auto rounded-lg border border-border">
+        <div className="scrollbar-none relative mt-4 overflow-x-auto rounded-lg border border-border bg-background">
           <table aria-busy={roles.loading} className="w-full min-w-160 text-sm">
             <caption className="sr-only">Roles</caption>
             <thead>
@@ -71,7 +71,7 @@ export function RolesPage() {
                             onClick={() => setEditing(role)}
                             disabled={!modules.data}
                             aria-label={`Edit ${role.label} access`}
-                            className="rounded-md px-2 py-1 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                            className={ghostButton}
                           >
                             Edit access
                           </button>

@@ -45,6 +45,7 @@ import {
   iconButton,
   primaryButton,
   secondaryButton,
+  secondaryDangerButton,
   useNotice,
 } from "./ui";
 
@@ -78,7 +79,7 @@ export function LeadDetail({ id }: { id: number }) {
       <div>
         <BackLink />
         {error ? (
-          <div className="mt-4 rounded-lg border border-border">
+          <div className="mt-4 rounded-lg border border-border bg-background">
             {error.status === 404 ? (
               <ErrorState title="Lead not found" message="This lead doesn't exist, or you don't have access to it." />
             ) : (
@@ -158,7 +159,7 @@ export function LeadDetail({ id }: { id: number }) {
             Edit
           </button>
           {lead.can_delete && (
-            <button type="button" onClick={() => removeLead(lead)} className={`${secondaryButton} text-error`}>
+            <button type="button" onClick={() => removeLead(lead)} className={secondaryDangerButton}>
               <TrashIcon className="size-4" />
               Delete
             </button>
@@ -166,7 +167,7 @@ export function LeadDetail({ id }: { id: number }) {
         </div>
       </header>
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 space-y-8">
           <Details
             title="Customer"
@@ -212,7 +213,7 @@ export function LeadDetail({ id }: { id: number }) {
           />
         </div>
 
-        <aside className="space-y-6 lg:border-l lg:border-border lg:pl-6">
+        <aside className="order-first space-y-6 max-lg:border-b max-lg:border-border max-lg:pb-6 lg:order-none lg:border-l lg:border-border lg:pl-6">
           <section>
             <h2 className="text-sm font-semibold">Status</h2>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -307,7 +308,7 @@ export function Details({ title, items }: { title: string; items: [string, React
   return (
     <section>
       <h2 className="text-sm font-semibold">{title}</h2>
-      <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
         {items.map(([label, value]) => (
           <div key={label}>
             <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -369,7 +370,7 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
     content = <p className="mt-4 text-sm text-muted-foreground">Follow-ups aren&apos;t available yet.</p>;
   } else if (error) {
     content = (
-      <div className="mt-3 rounded-lg border border-border">
+      <div className="mt-3 rounded-lg border border-border bg-background">
         <ErrorState title="Couldn't load follow-ups" message={error.message} onRetry={reload} />
       </div>
     );
@@ -494,7 +495,7 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
           </button>
         )}
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border px-4 py-3 text-sm">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border bg-background px-4 py-3 text-sm">
         <CalendarIcon className="size-4 text-muted-foreground" />
         <span>
           Next follow-up:{" "}

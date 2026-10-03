@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { iconButton } from "@/components/leads/ui";
 import { BellIcon, LogoutIcon, MenuIcon, UserIcon, WhatsAppIcon } from "./icons";
 import type { ShellUser } from "./use-shell-session";
 
@@ -17,12 +18,11 @@ const WHATSAPP_NUMBER = toWhatsAppNumber(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER
 
 const ROLE_LABELS: Record<ShellUser["role"], string> = { ADMIN: "Admin", STAFF: "Staff" };
 
-const iconButtonClass =
-  "grid size-9 place-items-center rounded-md text-faint hover:bg-muted hover:text-label";
+const iconButtonClass = `${iconButton} size-9`;
 
 // Popovers sit in the browser's top layer, pinned under the navbar's right edge.
 const panelClass =
-  "fixed top-15 right-3 bottom-auto left-auto w-72 max-w-[calc(100vw-1.5rem)] rounded-md border border-border bg-background text-foreground shadow-md";
+  "fixed top-15 right-3 bottom-auto left-auto w-72 max-w-[calc(100vw-1.5rem)] rounded-md border border-border bg-background text-foreground shadow-lg";
 
 export function initials(name: string) {
   return name
@@ -93,7 +93,7 @@ export function Navbar({ user, onLogout, onOpenNavigation }: NavbarProps) {
             type="button"
             popoverTarget="account-menu"
             aria-label="Account"
-            className="grid size-9 place-items-center rounded-full hover:bg-muted"
+            className="grid size-9 place-items-center rounded-full transition-colors hover:bg-muted pointer-coarse:size-11"
           >
             <span className="grid size-8 place-items-center rounded-full bg-muted text-xs font-semibold text-foreground">
               {userInitials || <UserIcon className="size-4" />}
@@ -117,7 +117,7 @@ export function Navbar({ user, onLogout, onOpenNavigation }: NavbarProps) {
               type="button"
               onClick={onLogout ?? undefined}
               disabled={!onLogout}
-              className="flex h-9 w-full items-center gap-2.5 rounded px-3 text-sm enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-9 w-full items-center gap-2.5 rounded px-3 text-sm enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:h-11"
             >
               <LogoutIcon className="size-4" />
               Log out

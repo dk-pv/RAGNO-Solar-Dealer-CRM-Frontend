@@ -59,7 +59,7 @@ export function LeadsPage() {
   let content;
   if (error) {
     content = (
-      <div className="mt-4 rounded-lg border border-border">
+      <div className="mt-4 rounded-lg border border-border bg-background">
         {error.status === 404 && page > 1 ? (
           <ErrorState
             title="This page no longer exists"
@@ -79,7 +79,7 @@ export function LeadsPage() {
   } else if (data && data.count === 0 && !loading) {
     const filtered = Boolean(search) || activeFilters > 0;
     content = (
-      <div className="mt-4 rounded-lg border border-dashed border-border px-4 py-12 text-center">
+      <div className="mt-4 rounded-lg border border-dashed border-border-strong bg-background px-4 py-12 text-center">
         <p className="text-sm font-medium">{filtered ? "No leads match your search or filters." : "No leads yet."}</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {filtered ? "Try a different search, or clear the filters." : "Add a lead to start tracking it through the pipeline."}
@@ -105,7 +105,7 @@ export function LeadsPage() {
     const rows = data && data.results.length > 0 ? data.results : undefined;
     content = (
       <>
-        <div className="scrollbar-none mt-4 overflow-x-auto rounded-lg border border-border">
+        <div className="scrollbar-none mt-4 overflow-x-auto rounded-lg border border-border bg-background">
           <table
             aria-busy={loading}
             className={`w-full min-w-270 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
@@ -260,7 +260,7 @@ export function Pagination({ page, pageSize, count }: { page: number; pageSize: 
     updateQuery({ page: target > 1 ? String(target) : null });
     window.scrollTo({ top: 0 });
   };
-  const pageButton = "grid h-8 min-w-8 place-items-center rounded-md px-2 text-sm tabular-nums";
+  const pageButton = "grid h-8 min-w-8 place-items-center rounded-md px-2 text-sm tabular-nums transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11";
 
   return (
     <nav aria-label="Pagination" className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">

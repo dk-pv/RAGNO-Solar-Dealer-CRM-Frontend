@@ -285,7 +285,7 @@ export function FollowUpDialog({ activity, lead: fixedLead, onClose, onSaved, on
             {formError}
           </p>
         )}
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Lead" id={`${formId}-lead`} required={!activity && !fixedLead} error={errors.lead} wide>
             {activity || fixedLead ? (
               <p id={`${formId}-lead`} className="rounded-md border border-border bg-muted px-3 py-2 text-sm">

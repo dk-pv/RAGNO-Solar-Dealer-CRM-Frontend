@@ -133,7 +133,7 @@ export function Section({ title, children }: { title: string; children: ReactNod
   return (
     <fieldset>
       <legend className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{title}</legend>
-      <div className="mt-3 grid gap-4 sm:grid-cols-2">{children}</div>
+      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
     </fieldset>
   );
 }
@@ -619,7 +619,7 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
                 Add initial follow-up
               </label>
               {addFollowUp && (
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <FollowUpFields
                     idPrefix={`${formId}-follow-up`}
                     values={followUpValues}

@@ -9,7 +9,7 @@ import { initials } from "@/components/layout/navbar";
 import { formatDate, formatMoney, formatPhone, type Assignee, type Page, type Plan } from "@/components/leads/api";
 import { Pagination } from "@/components/leads/leads-page";
 import { updateQuery } from "@/components/leads/leads-toolbar";
-import { ErrorState, inputClass, fieldClass, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
+import { ErrorState, ViewSwitch, inputClass, fieldClass, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
 import { toApiError, useApi } from "@/lib/api";
 import { WORK_STAGES, stageFor, today, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
 import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
@@ -21,6 +21,12 @@ const QUERY_KEYS = ["search", ...FILTER_KEYS, "ordering", "page", "page_size"];
 const DEFAULT_ORDERING = "-created_at";
 const DEFAULT_PAGE_SIZE = 25; // the API's default page size
 const COLUMN_COUNT = 13;
+
+// The List and Pipeline show the same Works; both headers switch between them.
+export const WORK_VIEWS = [
+  { label: "List", href: "/works" },
+  { label: "Pipeline", href: "/works/pipeline" },
+];
 
 // Must match the backend's Work orderings.
 const SORT_OPTIONS = [
@@ -92,7 +98,7 @@ export function WorksPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           {filtered
             ? "Try a different search, or clear the filters."
-            : "A Work is created when a Superhot lead is converted. It appears here straight away."}
+            : "A Work is created when a Won lead is converted. It appears here straight away."}
         </p>
         {filtered ? (
           <button type="button" onClick={clearSearchAndFilters} className={`${secondaryButton} mt-4`}>
@@ -177,9 +183,7 @@ export function WorksPage() {
             {data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "work" : "works"}` : " "}
           </p>
         </div>
-        <Link href="/works/pipeline" className={primaryButton}>
-          Open pipeline
-        </Link>
+        <ViewSwitch label="Works view" views={WORK_VIEWS} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -430,7 +434,7 @@ function FilterPanel({ id, searchParams, assignees, onDone }: FilterPanelProps) 
         updateQuery(Object.fromEntries(FILTER_KEYS.map((key) => [key, draft[key] || null])));
         onDone();
       }}
-      className="mt-3 grid gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-3"
+      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-3"
     >
       <label className="text-sm">
         <span className="mb-1.5 block font-medium text-label">Stage</span>

@@ -110,7 +110,7 @@ export function LeadReport() {
               ]
             }
           />
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel title="Leads created over time" description="Select a column to see those leads.">
               {data ? <TrendChart {...data.trend} series={[{ key: "created", label: "Created", color: "bg-primary/60" }]} /> : <Skeleton lines={6} />}
             </Panel>

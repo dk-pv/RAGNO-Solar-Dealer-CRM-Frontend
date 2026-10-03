@@ -30,6 +30,8 @@ import {
   inputClass,
   primaryButton,
   secondaryButton,
+  segmentClass,
+  segmentedClass,
   useNotice,
 } from "./ui";
 
@@ -116,7 +118,7 @@ export function LeadActivitiesPage() {
   let content;
   if (error) {
     content = (
-      <div className="mt-4 rounded-lg border border-border">
+      <div className="mt-4 rounded-lg border border-border bg-background">
         {error.status === 404 && page > 1 ? (
           <ErrorState
             title="This page no longer exists"
@@ -125,14 +127,14 @@ export function LeadActivitiesPage() {
             retryLabel="Go to the first page"
           />
         ) : (
-          <ErrorState title="Unable to load follow-ups." message={error.message} onRetry={reload} retryLabel="Retry" />
+          <ErrorState title="Unable to load follow-ups" message={error.message} onRetry={reload} />
         )}
       </div>
     );
   } else if (data && data.count === 0 && !loading) {
     const narrowed = Boolean(search || status) || activeFilters > 0;
     content = (
-      <div className="mt-4 rounded-lg border border-dashed border-border px-4 py-12 text-center">
+      <div className="mt-4 rounded-lg border border-dashed border-border-strong bg-background px-4 py-12 text-center">
         <p className="text-sm font-medium">{narrowed ? "No follow-ups match your search." : "No follow-ups found."}</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {narrowed
@@ -152,7 +154,7 @@ export function LeadActivitiesPage() {
     const rows = data && data.results.length > 0 ? data.results : undefined;
     content = (
       <>
-        <div className="scrollbar-none mt-4 overflow-x-auto rounded-lg border border-border">
+        <div className="scrollbar-none mt-4 overflow-x-auto rounded-lg border border-border bg-background">
           <table
             aria-busy={loading}
             className={`w-full min-w-240 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
@@ -221,16 +223,14 @@ export function LeadActivitiesPage() {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="Status" className="flex rounded-md border border-input bg-background p-0.5">
+        <div role="group" aria-label="Status" className={segmentedClass}>
           {STATUS_TABS.map((tab) => (
             <button
               key={tab.value}
               type="button"
               aria-pressed={status === tab.value}
               onClick={() => updateQuery({ status: tab.value || null })}
-              className={`rounded px-3 py-1.5 text-sm font-medium ${
-                status === tab.value ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={segmentClass}
             >
               {tab.label}
             </button>
@@ -366,7 +366,7 @@ function FollowUpRow({ activity, busy, onComplete, onEdit, onDelete }: FollowUpR
                 // aria-disabled, not disabled, while saving: a disabled button would drop the keyboard focus.
                 aria-disabled={busy || undefined}
                 aria-label={`Mark complete: ${heading(activity)} (${activity.lead_name})`}
-                className={`${secondaryButton} h-8 px-2.5 whitespace-nowrap aria-disabled:opacity-50`}
+                className={`${secondaryButton} px-2.5 aria-disabled:opacity-50`}
               >
                 Mark complete
               </button>
@@ -463,10 +463,10 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
         updateQuery(Object.fromEntries(FILTER_KEYS.map((key) => [key, draft[key] || null])));
         onDone();
       }}
-      className="mt-3 grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-4"
+      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-4"
     >
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Type</span>
+        <span className="mb-1.5 block font-medium text-label">Type</span>
         <select {...bind("type")}>
           <option value="">All types</option>
           {ACTIVITY_TYPES.map((type) => (
@@ -477,7 +477,7 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
         </select>
       </label>
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Assigned staff</span>
+        <span className="mb-1.5 block font-medium text-label">Assigned staff</span>
         <select {...bind("assigned_to")}>
           <option value="">{assignees.error ? "Anyone (staff couldn't be loaded)" : "Anyone"}</option>
           {assignees.data?.map((person) => (
@@ -488,11 +488,11 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
         </select>
       </label>
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Due from</span>
+        <span className="mb-1.5 block font-medium text-label">Due from</span>
         <input type="date" max={draft.due_before || undefined} {...bind("due_after")} />
       </label>
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium">Due to</span>
+        <span className="mb-1.5 block font-medium text-label">Due to</span>
         <input type="date" min={draft.due_after || undefined} {...bind("due_before")} />
       </label>
       <div className="flex justify-end gap-2 sm:col-span-2 lg:col-span-4">

@@ -11,16 +11,26 @@ import { CurrentUserContext, useShellSession } from "./use-shell-session";
 
 export function AppShell({ children }: { children: ReactNode }) {
   // One session read for the whole shell, so the sidebar and the account menu share the same logout.
-  const { signedIn, user, userError, reloadUser, logout } = useShellSession();
+  const { signedIn, user, userError, reloadUser, logout: endSession } = useShellSession();
   const router = useRouter();
   const pathname = usePathname();
   const drawerRef = useRef<HTMLDialogElement>(null);
+  const loggedOut = useRef(false);
   const closeDrawer = () => drawerRef.current?.close();
+  const logout =
+    endSession &&
+    (() => {
+      loggedOut.current = true;
+      endSession();
+    });
 
-  // Signed out (never signed in, logged out, or the session expired): go to the sign-in page and come back after.
-  // This only guides people; the API checks the token on every request.
+  // Signed out (never signed in, or the session expired): go to the sign-in page and come back after. Logging out
+  // starts afresh, so the next sign-in lands on the default page. This only guides people; the API checks the token
+  // on every request.
   useEffect(() => {
-    if (signedIn === false) router.replace(`/login?next=${encodeURIComponent(pathname + window.location.search)}`);
+    if (signedIn === false) {
+      router.replace(loggedOut.current ? "/login" : `/login?next=${encodeURIComponent(pathname + window.location.search)}`);
+    }
   }, [signedIn, pathname, router]);
 
   // A page renders once the user is known, and only if they can open its module, so a staff member without access

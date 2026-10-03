@@ -10,6 +10,8 @@ import { Field, Section, dialogClass } from "@/components/leads/lead-dialogs";
 import {
   ErrorState,
   destructiveButton,
+  ghostButton,
+  ghostDangerButton,
   iconButton,
   inputClass,
   primaryButton,
@@ -46,7 +48,6 @@ const ROLE_LABELS: Record<User["role"], string> = { ADMIN: "Admin", STAFF: "Staf
 const badgeClass = "inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset";
 const activeBadge = "bg-success-soft text-success ring-success-border";
 const inactiveBadge = "bg-neutral-soft text-neutral ring-neutral-border";
-const rowButton = "rounded-md px-2 py-1 text-sm font-medium hover:bg-muted";
 
 export function UsersPage() {
   const me = useContext(CurrentUserContext);
@@ -62,7 +63,7 @@ export function UsersPage() {
   let content;
   if (error) {
     content = (
-      <div className="mt-4 rounded-lg border border-border">
+      <div className="mt-4 rounded-lg border border-border bg-background">
         {error.status === 404 && page > 1 ? (
           <ErrorState
             title="This page no longer exists"
@@ -79,7 +80,7 @@ export function UsersPage() {
     const rows = data?.results;
     content = (
       <>
-        <div className="scrollbar-none relative mt-4 overflow-x-auto rounded-lg border border-border">
+        <div className="scrollbar-none relative mt-4 overflow-x-auto rounded-lg border border-border bg-background">
           <table aria-busy={loading} className={`w-full min-w-200 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}>
             <caption className="sr-only">Users</caption>
             <thead>
@@ -132,7 +133,7 @@ export function UsersPage() {
                                 type="button"
                                 onClick={() => setDialog({ mode: "edit", user })}
                                 aria-label={`Edit ${user.name}`}
-                                className={rowButton}
+                                className={ghostButton}
                               >
                                 Edit
                               </button>
@@ -140,7 +141,7 @@ export function UsersPage() {
                                 type="button"
                                 onClick={() => setDialog({ mode: "status", user })}
                                 aria-label={`${user.is_active ? "Deactivate" : "Activate"} ${user.name}`}
-                                className={rowButton}
+                                className={ghostButton}
                               >
                                 {user.is_active ? "Deactivate" : "Activate"}
                               </button>
@@ -149,7 +150,7 @@ export function UsersPage() {
                                   type="button"
                                   onClick={() => setDialog({ mode: "delete", user })}
                                   aria-label={`Delete ${user.name}`}
-                                  className={`${rowButton} text-error`}
+                                  className={ghostDangerButton}
                                 >
                                   Delete
                                 </button>
@@ -174,7 +175,7 @@ export function UsersPage() {
         </div>
 
         {data && data.count <= 1 && (
-          <div className="mt-4 rounded-lg border border-dashed border-border px-4 py-10 text-center">
+          <div className="mt-4 rounded-lg border border-dashed border-border-strong bg-background px-4 py-10 text-center">
             <p className="text-sm font-medium">No other users yet.</p>
             <p className="mt-1 text-sm text-muted-foreground">Add users and choose the role each of them has.</p>
             {isAdmin && (

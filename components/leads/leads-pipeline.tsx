@@ -168,7 +168,7 @@ export function LeadsPipeline() {
   let content;
   if (unknownStatus) {
     content = (
-      <div className="mt-4 rounded-lg border border-border">
+      <div className="mt-4 rounded-lg border border-border bg-background">
         <ErrorState
           title="Unable to load leads"
           message={`"${statusFilter}" isn't a Lead status.`}
@@ -179,7 +179,7 @@ export function LeadsPipeline() {
     );
   } else if (error) {
     content = (
-      <div className="mt-4 rounded-lg border border-border">
+      <div className="mt-4 rounded-lg border border-border bg-background">
         <ErrorState title="Unable to load leads" message={error.message} onRetry={reload} />
       </div>
     );

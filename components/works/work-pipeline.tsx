@@ -6,10 +6,11 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarIcon, ChevronLeftIcon, MapPinIcon, PhoneIcon, SearchIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
 import { formatDate, formatMoney, formatPhone, type Assignee, type Page, type Plan } from "@/components/leads/api";
-import { ErrorState, fieldClass, iconButton, inputClass, secondaryButton, useNotice } from "@/components/leads/ui";
+import { ErrorState, ViewSwitch, fieldClass, iconButton, inputClass, secondaryButton, useNotice } from "@/components/leads/ui";
 import { toApiError, useApi } from "@/lib/api";
 import { WORK_STAGES, stageFor, today, updateWork, type StageSummary, type Work, type WorkStage } from "./api";
 import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
+import { WORK_VIEWS } from "./works-page";
 
 type Stage = (typeof WORK_STAGES)[number];
 
@@ -150,11 +151,14 @@ export function WorkPipeline() {
             Track confirmed solar installation work through each execution stage.
           </p>
         </div>
-        {totalWorks !== undefined && (
-          <p className="text-sm text-muted-foreground tabular-nums">
-            {totalWorks.toLocaleString("en-IN")} {totalWorks === 1 ? "work" : "works"}
-          </p>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {totalWorks !== undefined && (
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {totalWorks.toLocaleString("en-IN")} {totalWorks === 1 ? "work" : "works"}
+            </p>
+          )}
+          <ViewSwitch label="Works view" views={WORK_VIEWS} />
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

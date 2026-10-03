@@ -522,7 +522,7 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
           </button>
         </div>
 
-        <div className="grid gap-4 overflow-y-auto px-5 py-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 overflow-y-auto px-5 py-5 sm:grid-cols-2">
           {formError && (
             <p role="alert" className="rounded-md border border-error-border bg-error-soft px-3 py-2 text-sm text-error sm:col-span-2">
               {formError}

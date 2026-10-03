@@ -115,7 +115,7 @@ export function WorkDetail({ id }: { id: number }) {
         </div>
       </header>
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 space-y-8">
           <Details
             title="Customer"
@@ -150,7 +150,7 @@ export function WorkDetail({ id }: { id: number }) {
           />
         </div>
 
-        <aside className="space-y-6 lg:border-l lg:border-border lg:pl-6">
+        <aside className="order-first space-y-6 max-lg:border-b max-lg:border-border max-lg:pb-6 lg:order-none lg:border-l lg:border-border lg:pl-6">
           <section>
             <h2 className="text-sm font-semibold">Pipeline</h2>
             <dl className="mt-3 space-y-3 text-sm">

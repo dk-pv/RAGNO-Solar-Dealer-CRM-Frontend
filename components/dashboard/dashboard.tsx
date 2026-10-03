@@ -16,7 +16,7 @@ import { canOpen } from "@/components/layout/navigation";
 import { CurrentUserContext, type ShellUser } from "@/components/layout/use-shell-session";
 import { formatDate, formatMoney, type Assignee } from "@/components/leads/api";
 import { useLeadActions } from "@/components/leads/lead-actions";
-import { ErrorState, StatusBadge, secondaryButton, useNotice } from "@/components/leads/ui";
+import { ErrorState, StatusBadge, secondaryButton, segmentClass, segmentedClass, useNotice } from "@/components/leads/ui";
 import { stageFor, type StageSummary } from "@/components/works/api";
 import { ActivityStatusBadge } from "@/components/works/work-activities";
 import { useApi, type ApiError } from "@/lib/api";
@@ -84,7 +84,7 @@ export function Dashboard() {
         <>
           <SummaryCards summary={summary} onFollowUps={(bucket) => showFollowUps(bucket, false)} />
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <FollowUpsPanel
               view={followUps}
               onView={setFollowUps}
@@ -97,12 +97,12 @@ export function Dashboard() {
             <MyWork summary={summary} me={me} onFollowUps={(bucket) => showFollowUps(bucket, true)} />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {canLeads && <LeadOverview summary={summary} onAdd={leadActions.add} />}
             {canWorks && <WorkOverview stages={stages} />}
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             <Panel
               title="CRM Timeline"
               description="What happened, who did it and exactly when (India Standard Time)."
@@ -289,8 +289,6 @@ function FollowUpsPanel({ view, onView, counts, today, version, links, className
   if (version) query.set("v", String(version));
   const { data, error, loading, reload } = useApi<{ count: number; results: FollowUp[] }>(`/dashboard/follow-ups/?${query}`);
   const current = FOLLOW_UP_BUCKETS.find((item) => item.value === bucket)!;
-  const toggle = (pressed: boolean) =>
-    `rounded px-2.5 py-1 text-xs font-medium ${pressed ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`;
 
   let content;
   if (error) {
@@ -340,11 +338,11 @@ function FollowUpsPanel({ view, onView, counts, today, version, links, className
       description="Pending activities on Works and the next follow-up scheduled on open leads."
       className={className}
       action={
-        <div role="group" aria-label="Whose follow-ups" className="flex rounded-md bg-muted p-0.5">
-          <button type="button" aria-pressed={!mine} onClick={() => onView({ bucket, mine: false })} className={toggle(!mine)}>
+        <div role="group" aria-label="Whose follow-ups" className={segmentedClass}>
+          <button type="button" aria-pressed={!mine} onClick={() => onView({ bucket, mine: false })} className={segmentClass}>
             Everyone
           </button>
-          <button type="button" aria-pressed={mine} onClick={() => onView({ bucket, mine: true })} className={toggle(mine)}>
+          <button type="button" aria-pressed={mine} onClick={() => onView({ bucket, mine: true })} className={segmentClass}>
             Assigned to me
           </button>
         </div>
@@ -360,7 +358,7 @@ function FollowUpsPanel({ view, onView, counts, today, version, links, className
               type="button"
               aria-pressed={pressed}
               onClick={() => onView({ bucket: item.value, mine })}
-              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium whitespace-nowrap ${
+              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors pointer-coarse:py-2.5 ${
                 pressed ? "border-primary bg-primary-softer text-primary-strong" : "border-border text-secondary-foreground hover:bg-muted"
               }`}
             >

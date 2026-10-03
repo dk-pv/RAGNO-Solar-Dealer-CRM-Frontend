@@ -1,24 +1,56 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { CloseIcon, PinIcon } from "@/components/layout/icons";
 import { toApiError } from "@/lib/api";
 import { FOLLOW_UP_STATUSES, setLeadPinned, statusLabel, type FollowUpStatus, type Lead, type LeadStatus } from "./api";
 
-export const primaryButton =
-  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-3.5 text-sm font-medium text-white hover:bg-primary-hover active:bg-primary-active disabled:cursor-not-allowed disabled:opacity-50";
-export const secondaryButton =
-  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium text-label hover:border-border-strong hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50";
-export const destructiveButton =
-  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive px-3.5 text-sm font-medium text-white hover:bg-destructive-hover disabled:cursor-not-allowed disabled:opacity-50";
+// The CRM's controls: compact (36px) for a mouse. On touch screens (pointer-coarse) each one is at least 44px tall, and
+// fields use 16px text so phones don't zoom in when one is focused.
+const touchTarget = "pointer-coarse:min-h-11";
+const buttonBase = `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${touchTarget}`;
+const outlineBase = `${buttonBase} h-9 border border-input bg-background px-3 hover:border-border-strong hover:bg-muted`;
+// Low-emphasis actions in table rows, such as Edit.
+const ghostBase = `${buttonBase} h-8 px-2 hover:bg-muted`;
+export const primaryButton = `${buttonBase} h-9 bg-primary px-3.5 text-white hover:bg-primary-hover active:bg-primary-active`;
+export const secondaryButton = `${outlineBase} text-label`;
+export const destructiveButton = `${buttonBase} h-9 bg-destructive px-3.5 text-white hover:bg-destructive-hover`;
+export const ghostButton = `${ghostBase} text-label`;
+// A delete that sits among other secondary or ghost actions: the same shape, in the error colour.
+export const secondaryDangerButton = `${outlineBase} text-error`;
+export const ghostDangerButton = `${ghostBase} text-error`;
 // Callers add the size (size-8 or size-9).
-export const iconButton =
-  "grid shrink-0 place-items-center rounded-md text-faint hover:bg-muted hover:text-label disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50";
+export const iconButton = `grid shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-muted hover:text-label disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 ${touchTarget} pointer-coarse:min-w-11`;
 // Inputs and selects without a size; inputClass adds the usual full-width size.
-export const fieldClass =
-  "min-w-0 rounded-md border border-input bg-field px-3 text-sm text-foreground placeholder:text-placeholder enabled:hover:border-input-hover focus:border-primary focus:ring-3 focus:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-disabled-surface disabled:text-disabled aria-[invalid=true]:border-error";
+export const fieldClass = `min-w-0 rounded-md border border-input bg-field px-3 text-sm text-foreground placeholder:text-placeholder enabled:hover:border-input-hover focus:border-primary focus:ring-3 focus:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-disabled-surface disabled:text-disabled aria-[invalid=true]:border-error ${touchTarget} pointer-coarse:text-base`;
 export const inputClass = `${fieldClass} h-9 w-full`;
+
+// A group of toggle buttons or view links; the pressed or current one is filled.
+export const segmentedClass = "flex rounded-md border border-input bg-background p-0.5";
+export const segmentClass =
+  "rounded px-3 py-1.5 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground pointer-coarse:py-2.5";
+
+// Switches between a module's List and Pipeline views. `query` carries the search and filters both views share.
+export function ViewSwitch({ label, views, query = "" }: { label: string; views: { label: string; href: string }[]; query?: string }) {
+  const pathname = usePathname();
+  return (
+    <nav aria-label={label} className={segmentedClass}>
+      {views.map((view) => (
+        <Link
+          key={view.href}
+          href={query ? `${view.href}?${query}` : view.href}
+          aria-current={pathname === view.href ? "page" : undefined}
+          className={segmentClass}
+        >
+          {view.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
 
 // Colour carries meaning only: neutral, information, attention, high priority, success, negative.
 const STATUS_STYLES: Record<LeadStatus, string> = {

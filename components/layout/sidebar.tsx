@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useId, useRef, useSyncExternalStore } from "react";
 
+import { iconButton } from "@/components/leads/ui";
 import { ChevronLeftIcon, CloseIcon, LogoutIcon } from "./icons";
 import { activeHrefFor, navigationFor } from "./navigation";
 import type { ShellUser } from "./use-shell-session";
@@ -52,7 +53,7 @@ const RESTORE_SCRIPT = `try{if(localStorage.getItem(${JSON.stringify(STORAGE_KEY
 const fadeClass = "transition-opacity duration-200 motion-reduce:transition-none sidebar-collapsed:opacity-0";
 
 const itemClass =
-  "flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md pl-3.75 pr-3 text-sm text-secondary-foreground transition-colors hover:bg-muted hover:text-label aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong";
+  "flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md pl-3.75 pr-3 text-sm pointer-coarse:h-11 text-secondary-foreground transition-colors hover:bg-muted hover:text-label aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong";
 
 // Flyouts and tooltips sit just past the sidebar's right edge, beside the element they belong to.
 function besideRail(anchor: HTMLElement) {
@@ -101,7 +102,7 @@ export function SidebarPanel({ user, onLogout, collapsible = false, onClose }: S
             type="button"
             onClick={onClose}
             aria-label="Close navigation"
-            className="ml-auto grid size-9 shrink-0 place-items-center rounded-md text-faint hover:bg-muted hover:text-label"
+            className={`${iconButton} ml-auto size-9`}
           >
             <CloseIcon />
           </button>
@@ -191,7 +192,7 @@ export function SidebarPanel({ user, onLogout, collapsible = false, onClose }: S
                           href={child.href}
                           onClick={onClose}
                           aria-current={child.href === activeHref ? "page" : undefined}
-                          className="flex h-8 items-center whitespace-nowrap rounded-r-md border-l-2 border-border pl-4.75 text-sm text-secondary-foreground transition-colors hover:bg-muted hover:text-label aria-[current=page]:border-brand aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong"
+                          className="flex h-8 items-center whitespace-nowrap rounded-r-md border-l-2 pointer-coarse:h-11 border-border pl-4.75 text-sm text-secondary-foreground transition-colors hover:bg-muted hover:text-label aria-[current=page]:border-brand aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong"
                         >
                           {child.label}
                         </Link>
@@ -211,7 +212,7 @@ export function SidebarPanel({ user, onLogout, collapsible = false, onClose }: S
           onClick={onLogout ?? undefined}
           disabled={!onLogout}
           data-tooltip="Log out"
-          className="flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md border border-input pl-3.5 text-sm text-label transition-colors enabled:hover:border-border-strong enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md border border-input pl-3.5 pointer-coarse:h-11 text-sm text-label transition-colors enabled:hover:border-border-strong enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
           <LogoutIcon className="size-4.5 shrink-0" />
           <span className={fadeClass}>Log out</span>

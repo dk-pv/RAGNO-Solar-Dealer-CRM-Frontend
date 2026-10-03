@@ -104,7 +104,7 @@ export function placeMenu(button: HTMLElement, menuId: string, menuHeight = 240)
 }
 
 export const menuItemClass =
-  "flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent";
+  "flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent pointer-coarse:py-3";
 
 const READ_ONLY = "You can view this lead but not change it";
 
