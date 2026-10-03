@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useContext, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { CalendarIcon, ChevronLeftIcon, CloseIcon, MapPinIcon, PhoneIcon, SearchIcon } from "@/components/layout/icons";
+import { CalendarIcon, ChevronLeftIcon, MapPinIcon, PhoneIcon, SearchIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
-import { CurrentUserContext } from "@/components/layout/use-shell-session";
-import { formatDate, formatMoney, formatPhone, telHref, type Assignee, type Page, type Plan } from "@/components/leads/api";
-import { Field, Section, dialogClass } from "@/components/leads/lead-dialogs";
-import { ErrorState, fieldClass, iconButton, inputClass, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
-import { toApiError, useApi, type ApiError } from "@/lib/api";
-import { WORK_STAGES, stageFor, updateWork, type StageSummary, type Work, type WorkChanges, type WorkStage } from "./api";
+import { formatDate, formatMoney, formatPhone, type Assignee, type Page, type Plan } from "@/components/leads/api";
+import { ErrorState, fieldClass, iconButton, inputClass, secondaryButton, useNotice } from "@/components/leads/ui";
+import { toApiError, useApi } from "@/lib/api";
+import { WORK_STAGES, stageFor, today, updateWork, type StageSummary, type Work, type WorkStage } from "./api";
+import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
 
 type Stage = (typeof WORK_STAGES)[number];
 
@@ -27,10 +26,8 @@ const SORT_OPTIONS = [
   { value: "customer_name", label: "Customer name" },
 ];
 
-// Today in the CRM's time zone (YYYY-MM-DD), to mark overdue Works.
-const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
-
-export const isOverdue = (work: Work) => work.due_date !== null && work.stage !== "COMPLETED" && work.due_date < today();
+// What a card drag carries. Columns accept only this, so a card dropped on a text field doesn't type anything into it.
+const WORK_DRAG_TYPE = "application/x-ragno-work";
 
 // A move shown on the board at once. `settled` is the column versions that reload with the saved move: once a column
 // has loaded that version, its own data shows the move and the override is no longer needed.
@@ -52,7 +49,6 @@ export function WorkPipeline() {
   const [moves, setMoves] = useState<Record<number, Move>>({});
   const [dragged, setDragged] = useState<Work>();
   const [dropTarget, setDropTarget] = useState<WorkStage>();
-  const [openWork, setOpenWork] = useState<Work>();
   const [noticeElement, notify] = useNotice();
   const boardRef = useRef<HTMLDivElement>(null);
   const autoScroll = useRef({ speed: 0, frame: 0 });
@@ -82,6 +78,16 @@ export function WorkPipeline() {
     summary.reload();
     return next;
   }
+
+  // After an edit, a new activity or a pin, the columns the Work was and is in reload with it.
+  const actions = useWorkActions(
+    notify,
+    (before, after) => {
+      setMoves((current) => without(current, after.id));
+      refresh(before.stage, after.stage);
+    },
+    assignees,
+  );
 
   // The card moves at once; the backend then validates and saves the move. If it refuses, the card goes back.
   async function move(work: Work, to: WorkStage) {
@@ -261,7 +267,7 @@ export function WorkPipeline() {
                 draggedId={dragged?.id}
                 canDrop={dragged !== undefined && dragged.stage !== stage.value}
                 isDropTarget={dropTarget === stage.value}
-                onOpen={setOpenWork}
+                actions={actions}
                 onDragStart={setDragged}
                 onDragEnd={endDrag}
                 onDragOverStage={setDropTarget}
@@ -275,18 +281,7 @@ export function WorkPipeline() {
         </div>
       )}
 
-      {openWork && (
-        <WorkDialog
-          work={openWork}
-          assignees={assignees}
-          onClose={() => setOpenWork(undefined)}
-          onSaved={(before, after) => {
-            notify({ text: `Saved changes to ${after.customer_name}.` });
-            setMoves((current) => without(current, after.id));
-            refresh(before.stage, after.stage);
-          }}
-        />
-      )}
+      {actions.dialogs}
       {noticeElement}
     </div>
   );
@@ -302,7 +297,7 @@ type StageColumnProps = {
   draggedId?: number;
   canDrop: boolean;
   isDropTarget: boolean;
-  onOpen: (work: Work) => void;
+  actions: WorkActions;
   onDragStart: (work: Work) => void;
   onDragEnd: () => void;
   onDragOverStage: (stage: WorkStage | undefined) => void;
@@ -319,7 +314,7 @@ function StageColumn({
   draggedId,
   canDrop,
   isDropTarget,
-  onOpen,
+  actions,
   onDragStart,
   onDragEnd,
   onDragOverStage,
@@ -359,7 +354,7 @@ function StageColumn({
     <section
       aria-label={stage.label}
       onDragOver={(event) => {
-        if (!canDrop) return;
+        if (!canDrop || !event.dataTransfer.types.includes(WORK_DRAG_TYPE)) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
         onDragOverStage(stage.value);
@@ -414,7 +409,7 @@ function StageColumn({
                 work={work}
                 saving={moves.some((move) => move.saving && move.work.id === work.id)}
                 dragging={draggedId === work.id}
-                onOpen={onOpen}
+                actions={actions}
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
               />
@@ -461,57 +456,103 @@ type WorkCardProps = {
   work: Work;
   saving: boolean;
   dragging: boolean;
-  onOpen: (work: Work) => void;
+  actions: WorkActions;
   onDragStart: (work: Work) => void;
   onDragEnd: () => void;
 };
 
-function WorkCard({ work, saving, dragging, onOpen, onDragStart, onDragEnd }: WorkCardProps) {
+// The whole card opens the Work (its customer name is a link stretched over the card); the pin, the menu and the
+// activities link sit above it, as on the lead cards.
+function WorkCard({ work, saving, dragging, actions, onDragStart, onDragEnd }: WorkCardProps) {
   const stage = stageFor(work.stage);
   const location = [work.area, work.district].filter(Boolean).join(", ");
   const overdue = isOverdue(work);
+  const followUpOverdue = work.next_activity_due !== null && work.next_activity_due < today();
 
   return (
-    <button
-      type="button"
+    <div
       draggable={!saving}
       onDragStart={(event) => {
+        // A drag that starts inside the open menu is a slipped click, not a move; one from the card closes the menu.
+        const menu = event.currentTarget.querySelector<HTMLElement>(":popover-open");
+        if (menu?.contains(document.elementFromPoint(event.clientX, event.clientY))) {
+          event.preventDefault();
+          return;
+        }
+        menu?.hidePopover();
         event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", String(work.id));
+        event.dataTransfer.setData(WORK_DRAG_TYPE, String(work.id));
         onDragStart(work);
       }}
       onDragEnd={onDragEnd}
-      onClick={() => onOpen(work)}
       aria-busy={saving || undefined}
-      aria-label={`${work.customer_name}, Work #${work.id}. Open details`}
-      className={`block w-full cursor-grab rounded-md border border-border bg-background p-3 text-left text-sm shadow-xs transition-[opacity,border-color] hover:border-border-strong active:cursor-grabbing ${
+      className={`group relative cursor-grab rounded-md border border-border bg-background p-3 text-sm shadow-xs transition-[opacity,border-color] hover:border-border-strong active:cursor-grabbing ${
         dragging ? "opacity-40" : saving ? "opacity-70" : ""
       }`}
     >
-      <span className="flex items-start justify-between gap-2">
-        <span className="min-w-0 truncate font-medium text-foreground">{work.customer_name}</span>
-        <span className="shrink-0 text-xs text-faint tabular-nums">#{work.id}</span>
-      </span>
-      <span className="mt-1 flex items-center gap-1.5 text-xs text-secondary-foreground">
-        <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${stage.dot}`} />
-        {saving ? "Saving…" : stage.label}
-      </span>
+      <div className="flex items-start gap-1">
+        <Link
+          href={`/works/${work.id}`}
+          draggable={false}
+          className="min-w-0 flex-1 truncate font-medium text-foreground after:absolute after:inset-0 after:rounded-md"
+        >
+          {work.customer_name}
+        </Link>
+        {/* Unpinned cards show a faint pin until hovered, so the pinned ones stand out. */}
+        <WorkPinButton
+          work={work}
+          actions={actions}
+          className="relative z-1 -my-1 size-7 opacity-40 group-hover:opacity-100 focus-visible:opacity-100 aria-pressed:opacity-100"
+        />
+        <div className="relative z-1 -my-1.5 -mr-1.5">
+          <WorkMenu work={work} actions={actions} />
+        </div>
+      </div>
+      <p className="mt-0.5 flex items-center justify-between gap-2 text-xs text-secondary-foreground">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${stage.dot}`} />
+          {saving ? "Saving…" : stage.label}
+        </span>
+        <span className="shrink-0 text-faint tabular-nums">#{work.id}</span>
+      </p>
 
-      <span className="mt-2.5 block text-xs text-muted-foreground">{work.plan_name} plan</span>
-      <span className="block font-semibold text-foreground tabular-nums">{formatMoney(work.amount)}</span>
+      <p className="mt-2.5 text-xs text-muted-foreground">{work.plan_name} plan</p>
+      <p className="font-semibold text-foreground tabular-nums">{formatMoney(work.amount)}</p>
 
-      <span className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <PhoneIcon className="size-3.5 shrink-0 text-faint" />
         <span className="tabular-nums">{formatPhone(work)}</span>
-      </span>
+      </p>
       {location && (
-        <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
           <MapPinIcon className="size-3.5 shrink-0 text-faint" />
           <span className="truncate">{location}</span>
-        </span>
+        </p>
       )}
 
-      <span className="mt-2.5 flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-muted-foreground">
+      {work.activity_count > 0 && (
+        <Link
+          href={`/works/${work.id}#activities`}
+          draggable={false}
+          className={`relative z-1 mt-2 flex w-fit max-w-full items-center gap-1.5 rounded text-xs underline-offset-2 hover:underline ${
+            work.pending_activity_count > 0 && followUpOverdue ? "font-medium text-error" : "text-secondary-foreground"
+          }`}
+        >
+          <CalendarIcon className="size-3.5 shrink-0" />
+          <span className="truncate">
+            <span className="sr-only">Activities: </span>
+            {work.pending_activity_count > 0
+              ? `${work.pending_activity_count} pending · ${
+                  work.next_activity_due
+                    ? `${followUpOverdue ? "overdue" : "next"} ${formatDate(work.next_activity_due)}`
+                    : "no date set"
+                }`
+              : `${work.activity_count} ${work.activity_count === 1 ? "activity" : "activities"} · all done`}
+          </span>
+        </Link>
+      )}
+
+      <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-muted-foreground">
         {work.assigned_to_name ? (
           <span className="flex min-w-0 items-center gap-1.5">
             <span
@@ -520,7 +561,10 @@ function WorkCard({ work, saving, dragging, onOpen, onDragStart, onDragEnd }: Wo
             >
               {initials(work.assigned_to_name)}
             </span>
-            <span className="truncate">{work.assigned_to_name}</span>
+            <span className="truncate">
+              <span className="sr-only">Assigned to </span>
+              {work.assigned_to_name}
+            </span>
           </span>
         ) : (
           <span>Unassigned</span>
@@ -529,193 +573,7 @@ function WorkCard({ work, saving, dragging, onOpen, onDragStart, onDragEnd }: Wo
           <CalendarIcon className="size-3.5" />
           {work.due_date ? `${overdue ? "Overdue" : "Due"} ${formatDate(work.due_date)}` : `Added ${formatDate(work.created_at)}`}
         </span>
-      </span>
-    </button>
-  );
-}
-
-type WorkDialogProps = {
-  work: Work;
-  assignees: { data?: Assignee[]; error?: ApiError };
-  onClose: () => void;
-  onSaved: (before: Work, after: Work) => void;
-};
-
-// A Work's details, and where its stage, assignee and due date change (also the keyboard and touch way to move it).
-export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formId = useId();
-  const [stage, setStage] = useState<WorkStage>(work.stage);
-  const [assignedTo, setAssignedTo] = useState(work.assigned_to ? String(work.assigned_to) : "");
-  const [dueDate, setDueDate] = useState(work.due_date ?? "");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string>();
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    dialogRef.current?.showModal();
-  }, []);
-
-  const me = useContext(CurrentUserContext);
-  // The lead's page needs the Leads module.
-  const canOpenLeads = me?.role === "ADMIN" || me?.modules.includes("leads");
-  const close = () => dialogRef.current?.close();
-  const fieldId = (field: string) => `${formId}-${field}`;
-  const location = [work.area, work.district, work.state, work.pin_code].filter(Boolean).join(", ");
-  // Someone no longer active stays visible on a Work that already has them.
-  const keepAssignee =
-    work.assigned_to && !assignees.data?.some((person) => person.id === work.assigned_to)
-      ? { id: work.assigned_to, name: work.assigned_to_name ?? `User #${work.assigned_to}` }
-      : undefined;
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const changes: WorkChanges = {};
-    if (stage !== work.stage) changes.stage = stage;
-    const assignee = assignedTo ? Number(assignedTo) : null;
-    if (assignee !== work.assigned_to) changes.assigned_to = assignee;
-    const due = dueDate || null;
-    if (due !== work.due_date) changes.due_date = due;
-    if (Object.keys(changes).length === 0) {
-      close();
-      return;
-    }
-
-    setSaving(true);
-    setFormError(undefined);
-    try {
-      onSaved(work, await updateWork(work.id, changes));
-      close();
-    } catch (error) {
-      const apiError = toApiError(error);
-      setErrors(apiError.fields);
-      setFormError(apiError.message);
-      setSaving(false);
-    }
-  }
-
-  return (
-    <dialog
-      ref={dialogRef}
-      onClose={onClose}
-      aria-labelledby={`${formId}-title`}
-      className={`${dialogClass} max-h-[calc(100dvh-2rem)] max-w-xl overflow-hidden p-0`}
-    >
-      <form noValidate onSubmit={submit} className="flex max-h-[calc(100dvh-2rem)] flex-col">
-        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
-          <div className="min-w-0">
-            <h2 id={`${formId}-title`} className="truncate text-base font-semibold">
-              {work.customer_name}
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Work #{work.id} · from{" "}
-              {canOpenLeads ? (
-                <Link href={`/leads/${work.lead}`} className="font-medium text-link underline underline-offset-2 hover:text-link-hover">
-                  Lead #{work.lead}
-                </Link>
-              ) : (
-                `Lead #${work.lead}`
-              )}
-            </p>
-          </div>
-          <button type="button" onClick={close} aria-label="Close" className={`${iconButton} -mr-2 size-9`}>
-            <CloseIcon className="size-4.5" />
-          </button>
-        </div>
-
-        <div className="space-y-6 overflow-y-auto px-5 py-5">
-          {formError && (
-            <p role="alert" className="rounded-md border border-error-border bg-error-soft px-3 py-2 text-sm text-error">
-              {formError}
-            </p>
-          )}
-
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-md bg-page px-4 py-3 text-sm">
-            <dt className="text-muted-foreground">Plan</dt>
-            <dd>{work.plan_name}</dd>
-            <dt className="text-muted-foreground">Confirmed amount</dt>
-            <dd>
-              <span className="font-semibold tabular-nums">{formatMoney(work.amount)}</span>
-              <span className="block text-xs text-muted-foreground">Fixed at conversion. Plan price changes don&apos;t affect it.</span>
-            </dd>
-            <dt className="text-muted-foreground">Phone</dt>
-            <dd>
-              <a href={telHref(work)} className="text-link tabular-nums hover:text-link-hover">
-                {formatPhone(work)}
-              </a>
-            </dd>
-            {work.email && (
-              <>
-                <dt className="text-muted-foreground">Email</dt>
-                <dd className="truncate">{work.email}</dd>
-              </>
-            )}
-            {location && (
-              <>
-                <dt className="text-muted-foreground">Location</dt>
-                <dd>{location}</dd>
-              </>
-            )}
-            <dt className="text-muted-foreground">Added</dt>
-            <dd>{formatDate(work.created_at)}</dd>
-          </dl>
-
-          <Section title="Pipeline">
-            <Field label="Stage" id={fieldId("stage")} error={errors.stage}>
-              <select
-                id={fieldId("stage")}
-                value={stage}
-                onChange={(event) => setStage(event.target.value as WorkStage)}
-                className={inputClass}
-              >
-                {WORK_STAGES.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field
-              label="Assigned staff"
-              id={fieldId("assigned_to")}
-              error={errors.assigned_to}
-              hint={assignees.error && `Staff couldn't be loaded: ${assignees.error.message}`}
-            >
-              <select
-                id={fieldId("assigned_to")}
-                value={assignedTo}
-                onChange={(event) => setAssignedTo(event.target.value)}
-                className={inputClass}
-              >
-                <option value="">Unassigned</option>
-                {[...(assignees.data ?? []), ...(keepAssignee ? [keepAssignee] : [])].map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Due date" id={fieldId("due_date")} error={errors.due_date}>
-              <input
-                id={fieldId("due_date")}
-                type="date"
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-                className={inputClass}
-              />
-            </Field>
-          </Section>
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-          <button type="button" onClick={close} className={secondaryButton}>
-            Cancel
-          </button>
-          <button type="submit" disabled={saving} className={primaryButton}>
-            {saving ? "Saving…" : "Save changes"}
-          </button>
-        </div>
-      </form>
-    </dialog>
+      </div>
+    </div>
   );
 }
