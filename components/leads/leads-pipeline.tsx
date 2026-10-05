@@ -2,25 +2,38 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { CalendarIcon } from "@/components/layout/icons";
-import { initials } from "@/components/layout/navbar";
-import { apiRequest, toApiError, type ApiError } from "@/lib/api";
+import { CalendarIcon, EyeIcon, MapPinIcon, PhoneIcon, PlusIcon } from "@/components/layout/icons";
+import {
+  Board,
+  BoardColumn,
+  BoardEmpty,
+  BoardScrollButtons,
+  BoardSkeleton,
+  CardAssignee,
+  PipelineSwitch,
+  boardCardClass,
+  useBoardScroll,
+} from "@/components/pipeline";
+import { apiRequest, toApiError, useApi, type ApiError } from "@/lib/api";
 import {
   LEAD_STATUSES,
   changeLeadStatus,
   formatDate,
   formatMoney,
   formatPhone,
+  sourceLabel,
   statusLabel,
+  today,
   type Lead,
   type LeadStatus,
   type Page,
+  type StatusSummary,
 } from "./api";
-import { LeadMenu, useLeadActions, type LeadActions } from "./lead-actions";
+import { LeadMenu, menuItemClass, useLeadActions, type LeadActions } from "./lead-actions";
 import { LeadsHeader, LeadsToolbar, SORT_OPTIONS, VIEW_KEYS, pickParams, updateQuery } from "./leads-toolbar";
-import { ErrorState, PinButton, StatusBadge, useNotice } from "./ui";
+import { ErrorState, PinButton, STATUS_DOTS, STATUS_STYLES, secondaryButton, useNotice } from "./ui";
 
 const FIRST_CARDS = 25; // the cards a column loads at first; "Show more" adds as many again
 const MAX_CARDS = 100; // the API's largest page
@@ -34,43 +47,46 @@ const LEAD_DRAG_TYPE = "application/x-ragno-lead";
 // Every card in a column has the same status, so sorting by status means nothing here.
 const PIPELINE_SORT_OPTIONS = SORT_OPTIONS.filter((option) => option.value !== "status");
 
-type Sizes = Record<LeadStatus, number>;
-// Each column's first page of leads, or null for a column the Status filter leaves out.
-type Board = Record<LeadStatus, Page<Lead> | null>;
+// The Lead Pipeline's stages, in order: New, Initial Contact, Hot, Superhot, Won. Lost is an outcome, not a stage: a
+// lead marked Lost leaves the board. The lane at the board's end counts the lost leads, takes a card dropped on it and
+// links to them in the list; it holds no cards.
+const STAGES: LeadStatus[] = LEAD_STATUSES.map((status) => status.value).filter((status) => status !== "LOST");
+
+type Sizes = Partial<Record<LeadStatus, number>>;
+// Each stage's first page of leads, or null for a stage the Status filter leaves out.
+type BoardData = Partial<Record<LeadStatus, Page<Lead> | null>>;
 // A drag-and-drop move, shown at once and kept on screen until a board loaded after the API saved it arrives.
 type Move = { lead: Lead; from: LeadStatus; to: LeadStatus; saved?: boolean };
 type Column = { status: LeadStatus; page: Page<Lead> | null | undefined; leads: Lead[]; count: number };
-// Where the focus goes once the board has settled after a change: the lead's card, or the heading of the column it went
-// to when the board doesn't show the card (deleted, filtered out, beyond the loaded cards) or there is no lead.
+// Where the focus goes once the board has settled after a change: the lead's card, or the heading of the column (or the
+// Lost lane) it went to when the board doesn't show the card (lost, deleted, filtered out, beyond the loaded cards).
 type FocusTarget = { id?: number; status: LeadStatus };
 
 // The focus is moved only if it was lost (the focused card or button left the page), never taken from elsewhere.
 const focusLost = () => !document.activeElement || document.activeElement === document.body;
 
-const FIRST_SIZES = Object.fromEntries(LEAD_STATUSES.map(({ value }) => [value, FIRST_CARDS])) as Sizes;
-
-// Loads every column through the leads list API, one request per status, sent together with the page's search, filters
+// Loads every stage through the leads list API, one request per status, sent together with the page's search, filters
 // and sort. The last board stays on screen while the next one loads, and a newer load cancels the older one.
 function usePipeline(query: string, sizes: Sizes) {
   const [version, setVersion] = useState(0);
   const key = `${version} ${query} ${JSON.stringify(sizes)}`;
-  const [result, setResult] = useState<{ key?: string; board?: Board; error?: ApiError }>({});
+  const [result, setResult] = useState<{ key?: string; board?: BoardData; error?: ApiError }>({});
 
   useEffect(() => {
     const controller = new AbortController();
     const onlyStatus = new URLSearchParams(query).get("status");
     Promise.all(
-      LEAD_STATUSES.map(({ value }) => {
-        if (onlyStatus && onlyStatus !== value) return null;
+      STAGES.map((status) => {
+        if (onlyStatus && onlyStatus !== status) return null;
         const params = new URLSearchParams(query);
-        params.set("status", value);
-        params.set("page_size", String(sizes[value]));
+        params.set("status", status);
+        params.set("page_size", String(sizes[status] ?? FIRST_CARDS));
         return apiRequest<Page<Lead>>(`/leads/?${params}`, { signal: controller.signal });
       }),
     ).then(
       (pages) => {
         if (controller.signal.aborted) return;
-        setResult({ key, board: Object.fromEntries(LEAD_STATUSES.map(({ value }, i) => [value, pages[i]])) as Board });
+        setResult({ key, board: Object.fromEntries(STAGES.map((status, i) => [status, pages[i]])) as BoardData });
       },
       (error: unknown) => {
         if (!controller.signal.aborted) setResult((previous) => ({ key, board: previous.board, error: toApiError(error) }));
@@ -87,24 +103,34 @@ function usePipeline(query: string, sizes: Sizes) {
   };
 }
 
-// The Lead Pipeline: one column per Lead status, with the same leads, search, filters and actions as the list.
-// Dragging a card to another column changes the lead's status through the API, like Update Status does.
+// The Lead Pipeline: one column per stage, with the same leads, search, filters and actions as the list. Dragging a card
+// to another column changes the lead's status through the status API, like Update Status does; the API applies the
+// pipeline's rules. Reaching Won never creates a Work: Convert to Work, on the card's menu, does that.
 export function LeadsPipeline() {
   const searchParams = useSearchParams();
   const query = pickParams(searchParams, VIEW_KEYS).toString();
   const statusFilter = searchParams.get("status") || null;
   const unknownStatus = statusFilter !== null && !LEAD_STATUSES.some(({ value }) => value === statusFilter);
-  const [sizes, setSizes] = useState(FIRST_SIZES);
+  const [sizes, setSizes] = useState<Sizes>({});
   const { board, error, loading, reload } = usePipeline(query, sizes);
+  // Each status's count and total amount under the same search and filters: the column headers and the Lost lane.
+  const summary = useApi<StatusSummary[]>(unknownStatus ? null : query ? `/leads/summary/?${query}` : "/leads/summary/");
   const [noticeElement, notify] = useNotice();
   const [dragged, setDragged] = useState<{ id: number; status: LeadStatus }>();
   const [move, setMove] = useState<Move>();
   const [moveBoard, setMoveBoard] = useState(board);
   const [focusTarget, setFocusTarget] = useState<FocusTarget>();
+  const { boardRef, scrollBoard, scrollWhileDragging, stopScrolling } = useBoardScroll();
+  const reloadSummary = summary.reload;
+
+  function refresh() {
+    reload();
+    reloadSummary();
+  }
   // After any change to a lead (from its menu, its pin or a drop) the board reloads, and the focus follows the lead.
   const changed = (lead?: Lead) => {
     if (lead) setFocusTarget({ id: lead.id, status: lead.status });
-    reload();
+    refresh();
   };
   const actions = useLeadActions(notify, changed);
   const showError = (text: string) => notify({ text, error: true });
@@ -130,25 +156,26 @@ export function LeadsPipeline() {
       setFocusTarget({ id: lead.id, status: lead.status });
       showError(`Couldn't move ${lead.name} to ${statusLabel(to)}. ${toApiError(err).message}`);
     }
-    reload();
+    refresh();
   }
 
-  const columns: Column[] = LEAD_STATUSES.map(({ value }) => {
-    const page = board?.[value];
+  const totals = new Map((summary.data ?? []).map((row) => [row.status, row]));
+  const columns: Column[] = STAGES.map((status) => {
+    const page = board?.[status];
     let leads = page?.results ?? [];
     let count = page?.count ?? 0;
-    if (move?.from === value) {
+    if (move?.from === status) {
       leads = leads.filter((lead) => lead.id !== move.lead.id);
       count -= 1;
     }
-    if (move?.to === value) {
+    if (move?.to === status) {
       leads = [move.lead, ...leads.filter((lead) => lead.id !== move.lead.id)];
       count += 1;
     }
-    return { status: value, page, leads, count };
+    return { status, page, leads, count };
   });
   const shown = columns.flatMap((column) => column.leads);
-  const total = board ? columns.reduce((sum, column) => sum + column.count, 0) : undefined;
+  const inPipeline = board ? columns.reduce((sum, column) => sum + column.count, 0) : undefined;
 
   // The dragged card is looked up on the current board, so a drop uses the lead as the API last sent it. If a reload or
   // an error took the card off the board or into another column mid-drag, its dragend never comes: the drag is over.
@@ -160,10 +187,23 @@ export function LeadsPipeline() {
     focusReady?.id !== undefined && shown.some((lead) => lead.id === focusReady.id) ? focusReady.id : undefined;
   const focusColumn = focusReady && focusCardId === undefined ? focusReady.status : undefined;
 
-  function drop(status: LeadStatus) {
+  function endDrag() {
+    stopScrolling();
     setDragged(undefined);
-    if (dragging && !move && dragging.allowed_transitions.includes(status)) moveLead(dragging, status);
   }
+
+  function drop(status: LeadStatus) {
+    const lead = dragging;
+    endDrag();
+    if (lead && !move && lead.allowed_transitions.includes(status)) moveLead(lead, status);
+  }
+
+  // The list, narrowed to one status, keeping the board's search and filters.
+  const listHref = (status: LeadStatus) => {
+    const listQuery = new URLSearchParams(query);
+    listQuery.set("status", status);
+    return `/leads?${listQuery}`;
+  };
 
   let content;
   if (unknownStatus) {
@@ -180,68 +220,82 @@ export function LeadsPipeline() {
   } else if (error) {
     content = (
       <div className="mt-4 rounded-lg border border-border bg-background">
-        <ErrorState title="Couldn't load leads" message={error.message} onRetry={reload} />
+        <ErrorState title="Couldn't load leads" message={error.message} onRetry={refresh} />
       </div>
     );
   } else {
-    // Dimmed while a newer search, filter or sort loads, so the old board isn't mistaken for the results.
-    const refreshing = loading && board ? "opacity-60" : "";
+    const lost = totals.get("LOST")?.count;
     content = (
-      <>
-        <PipelineSummary columns={columns} total={total} className={refreshing} />
-        {/* The board scrolls sideways only (wheel, Shift + wheel, trackpad, touch) and shows no scrollbar. The columns grow
-            with their cards, so the page is the one vertical scroll. relative: absolutely positioned content
-            (screen-reader text) stays inside the board, not the page. */}
-        <div
-          aria-busy={loading}
-          className={`relative mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 transition-opacity [scrollbar-width:none] motion-reduce:transition-none md:snap-none [&::-webkit-scrollbar]:hidden ${refreshing}`}
-        >
-          {columns.map((column) => {
-            const listQuery = new URLSearchParams(query);
-            listQuery.set("status", column.status);
-            return (
-              <PipelineColumn
-                key={column.status}
-                column={column}
-                listHref={`/leads?${listQuery}`}
-                canShowMore={sizes[column.status] < MAX_CARDS}
-                loading={loading}
-                dragging={dragging}
-                move={move}
-                focusCardId={focusCardId}
-                focusHeading={focusColumn === column.status}
-                actions={actions}
-                onDragStart={(lead) => setDragged({ id: lead.id, status: lead.status })}
-                onDragEnd={() => setDragged(undefined)}
-                onDrop={drop}
-                onShowMore={() => {
-                  // The button may be gone after the load (all shown, or the cap reached): the focus then goes here.
-                  setFocusTarget({ status: column.status });
-                  setSizes((current) => ({
-                    ...current,
-                    [column.status]: Math.min(current[column.status] + FIRST_CARDS, MAX_CARDS),
-                  }));
-                }}
-                onFocused={() => setFocusTarget(undefined)}
-                onChanged={changed}
-                onError={showError}
-              />
-            );
-          })}
-        </div>
-      </>
+      <Board
+        boardRef={boardRef}
+        dragging={dragged !== undefined}
+        refreshing={loading && board !== undefined}
+        busy={loading}
+        onDragOver={(event) => {
+          if (dragged) scrollWhileDragging(event.clientX);
+        }}
+      >
+        {columns.map((column) => {
+          const total = totals.get(column.status)?.total_amount;
+          return (
+            <PipelineColumn
+              key={column.status}
+              column={column}
+              amount={column.page === null || total === undefined ? undefined : formatMoney(total)}
+              listHref={listHref(column.status)}
+              canShowMore={(sizes[column.status] ?? FIRST_CARDS) < MAX_CARDS}
+              loading={loading}
+              dragging={dragging}
+              move={move}
+              focusCardId={focusCardId}
+              focusHeading={focusColumn === column.status}
+              actions={actions}
+              onDragStart={(lead) => setDragged({ id: lead.id, status: lead.status })}
+              onDragEnd={endDrag}
+              onDrop={drop}
+              onShowMore={() => {
+                // The button may be gone after the load (all shown, or the cap reached): the focus then goes here.
+                setFocusTarget({ status: column.status });
+                setSizes((current) => ({
+                  ...current,
+                  [column.status]: Math.min((current[column.status] ?? FIRST_CARDS) + FIRST_CARDS, MAX_CARDS),
+                }));
+              }}
+              onFocused={() => setFocusTarget(undefined)}
+              onChanged={changed}
+              onError={showError}
+            />
+          );
+        })}
+        <LostLane
+          // The count reloads once a move is saved; until then it counts the move still saving.
+          count={lost === undefined ? undefined : lost + (move?.to === "LOST" && !move.saved ? 1 : 0)}
+          listHref={listHref("LOST")}
+          dragging={dragging}
+          focusHeading={focusColumn === "LOST"}
+          onFocused={() => setFocusTarget(undefined)}
+          onDrop={() => drop("LOST")}
+        />
+      </Board>
     );
   }
 
+  const hint = "Drag a card to another stage to update its status.";
   return (
-    // While the pipeline is open, and only then, the page also scrolls without showing its scrollbar.
-    <div className="[:root:has(&)]:[scrollbar-width:none] [:root:has(&)::-webkit-scrollbar]:hidden">
+    <div>
       <LeadsHeader
         title="Lead Pipeline"
-        description="Drag a card to another stage to update its status."
+        description={
+          inPipeline === undefined
+            ? hint
+            : `${inPipeline.toLocaleString("en-IN")} ${inPipeline === 1 ? "lead" : "leads"} in the pipeline. ${hint}`
+        }
         onAdd={actions.add}
       />
-      <LeadsToolbar sortOptions={PIPELINE_SORT_OPTIONS} />
+      <PipelineSwitch />
+      <LeadsToolbar sortOptions={PIPELINE_SORT_OPTIONS}>
+        <BoardScrollButtons onScroll={scrollBoard} />
+      </LeadsToolbar>
       {content}
       {actions.dialogs}
       {noticeElement}
@@ -249,38 +303,9 @@ export function LeadsPipeline() {
   );
 }
 
-// How many leads match, in all and in each stage the Status filter leaves on the board.
-function PipelineSummary({ columns, total, className }: { columns: Column[]; total?: number; className: string }) {
-  const value = (count: number) =>
-    total === undefined ? (
-      <span className="block h-4 w-6 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
-    ) : (
-      count.toLocaleString("en-IN")
-    );
-  const item = "flex items-center gap-2 rounded-md border border-border bg-background py-1 pr-3 pl-1.5";
-
-  return (
-    <dl className={`mt-4 flex flex-wrap gap-2 text-sm transition-opacity motion-reduce:transition-none ${className}`}>
-      <div className={item}>
-        <dt className="pl-1 text-muted-foreground">Total leads</dt>
-        <dd className="font-semibold tabular-nums">{value(total ?? 0)}</dd>
-      </div>
-      {columns
-        .filter((column) => column.page !== null)
-        .map((column) => (
-          <div key={column.status} className={item}>
-            <dt>
-              <StatusBadge status={column.status} />
-            </dt>
-            <dd className="font-semibold tabular-nums">{value(column.count)}</dd>
-          </div>
-        ))}
-    </dl>
-  );
-}
-
 type PipelineColumnProps = {
   column: Column;
+  amount?: string;
   listHref: string;
   canShowMore: boolean;
   loading: boolean;
@@ -299,11 +324,10 @@ type PipelineColumnProps = {
 };
 
 function PipelineColumn(props: PipelineColumnProps) {
-  const { column, listHref, canShowMore, loading, dragging, move, focusCardId, focusHeading, onDrop, onShowMore } = props;
+  const { column, amount, listHref, canShowMore, loading, dragging, move, focusCardId, focusHeading, onDrop, onShowMore } = props;
   const { actions, onDragStart, onDragEnd, onFocused, onChanged, onError } = props;
   const cardProps = { actions, onDragStart, onDragEnd, onFocused, onChanged, onError };
   const { status, page, leads, count } = column;
-  const titleId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [over, setOver] = useState(false);
 
@@ -314,46 +338,54 @@ function PipelineColumn(props: PipelineColumnProps) {
   }, [focusHeading, onFocused]);
   // Only the moves the API allows for the dragged lead; the API checks the move again when it is dropped.
   const canDrop = Boolean(dragging && page && dragging.allowed_transitions.includes(status));
-  const dimmed = dragging && !canDrop && dragging.status !== status;
+  const dimmed = Boolean(dragging && !canDrop && dragging.status !== status);
   if (over && !dragging) setOver(false);
+  const more = page ? page.count - page.results.length : 0;
 
   let body;
-  if (page === undefined) {
-    body = Array.from({ length: 3 }, (_, i) => (
-      <div key={i} className="space-y-2 rounded-md border border-border bg-background p-3">
-        <span className="block h-3.5 w-3/4 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
-        <span className="block h-3 w-1/2 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
-        <span className="block h-3 w-2/3 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
-      </div>
+  if (page === undefined) body = <BoardSkeleton />;
+  else if (page === null) body = <BoardEmpty>Hidden by the Status filter.</BoardEmpty>;
+  else if (leads.length === 0) body = canDrop && over ? null : <BoardEmpty>No leads in this stage.</BoardEmpty>;
+  else {
+    body = leads.map((lead) => (
+      <PipelineCard
+        key={lead.id}
+        lead={lead}
+        saving={move?.lead.id === lead.id && !move.saved}
+        canDrag={!move && lead.allowed_transitions.length > 0}
+        focused={lead.id === focusCardId}
+        {...cardProps}
+      />
     ));
-  } else if (page === null) {
-    body = <p className="px-1 py-6 text-center text-sm text-muted-foreground">Hidden by the Status filter.</p>;
-  } else if (leads.length === 0) {
-    body = (
-      <p className="rounded-md border border-dashed border-border-strong px-3 py-6 text-center text-sm text-muted-foreground">
-        No leads in this stage
-      </p>
-    );
-  } else {
-    body = (
-      <ol className="flex flex-col gap-2">
-        {leads.map((lead) => (
-          <PipelineCard
-            key={lead.id}
-            lead={lead}
-            saving={move?.lead.id === lead.id && !move.saved}
-            canDrag={!move && lead.allowed_transitions.length > 0}
-            focused={lead.id === focusCardId}
-            {...cardProps}
-          />
-        ))}
-      </ol>
-    );
   }
 
   return (
-    <section
-      aria-labelledby={titleId}
+    <BoardColumn
+      title={statusLabel(status)}
+      tone={{ dot: STATUS_DOTS[status], header: STATUS_STYLES[status] }}
+      count={page ? count : undefined}
+      countNoun={count === 1 ? "lead" : "leads"}
+      amount={amount}
+      // A new lead always starts as New (the API sets it), so that stage is where one is added.
+      add={status === "NEW" ? { label: "Add lead", onClick: actions.add } : undefined}
+      menu={
+        <>
+          <Link href={listHref} className={menuItemClass}>
+            <EyeIcon className="size-4 text-muted-foreground" />
+            View in the list
+          </Link>
+          {more > 0 && canShowMore && (
+            <button type="button" onClick={onShowMore} className={menuItemClass}>
+              <PlusIcon className="size-4 text-muted-foreground" />
+              Show more leads
+            </button>
+          )}
+        </>
+      }
+      drop={canDrop ? (over ? "over" : "available") : undefined}
+      dimmed={dimmed}
+      busy={loading}
+      headingRef={headingRef}
       onDragOver={(event) => {
         if (!canDrop || !event.dataTransfer.types.includes(LEAD_DRAG_TYPE)) return;
         event.preventDefault();
@@ -368,44 +400,97 @@ function PipelineColumn(props: PipelineColumnProps) {
         setOver(false);
         if (event.dataTransfer.types.includes(LEAD_DRAG_TYPE)) onDrop(status);
       }}
-      className={`flex w-[min(18rem,85vw)] shrink-0 snap-start flex-col rounded-lg border bg-muted transition-[opacity,border-color,background-color] motion-reduce:transition-none ${
-        canDrop ? (over ? "border-primary bg-primary-softer" : "border-dashed border-primary") : "border-border"
-      } ${dimmed ? "opacity-50" : ""}`}
+      footer={
+        page &&
+        more > 0 && (
+          <p className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-3 py-2 text-xs text-muted-foreground">
+            <span className="tabular-nums">
+              Showing {page.results.length.toLocaleString("en-IN")} of {page.count.toLocaleString("en-IN")}
+            </span>
+            {canShowMore ? (
+              // aria-disabled, not disabled, while loading: a disabled button would drop the keyboard focus.
+              <button
+                type="button"
+                onClick={() => {
+                  if (!loading) onShowMore();
+                }}
+                aria-disabled={loading || undefined}
+                className="font-medium text-foreground underline-offset-2 hover:underline aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              >
+                Show more
+              </button>
+            ) : (
+              <Link href={listHref} className="font-medium text-foreground underline-offset-2 hover:underline">
+                View all in the list
+              </Link>
+            )}
+          </p>
+        )
+      }
     >
-      <h2 id={titleId} ref={headingRef} tabIndex={-1} className="flex items-center gap-2 px-3 pt-3 pb-2">
-        <StatusBadge status={status} />
-        <span className="text-sm font-medium text-muted-foreground tabular-nums">
-          {page ? count.toLocaleString("en-IN") : ""}
-          <span className="sr-only">
-            {page === undefined ? " loading" : page === null ? " hidden by the Status filter" : count === 1 ? " lead" : " leads"}
-          </span>
+      {body}
+    </BoardColumn>
+  );
+}
+
+type LostLaneProps = {
+  count?: number;
+  listHref: string;
+  dragging?: Lead;
+  focusHeading: boolean;
+  onFocused: () => void;
+  onDrop: () => void;
+};
+
+// Lost, apart from the pipeline's stages: how many leads were lost, where to see them, and where a card is dropped to
+// mark its lead Lost (the card's Update Status does the same from the keyboard or on a touch screen). No cards live here.
+function LostLane({ count, listHref, dragging, focusHeading, onFocused, onDrop }: LostLaneProps) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [over, setOver] = useState(false);
+
+  useEffect(() => {
+    if (!focusHeading) return;
+    if (focusLost()) headingRef.current?.focus();
+    onFocused();
+  }, [focusHeading, onFocused]);
+  const canDrop = Boolean(dragging?.allowed_transitions.includes("LOST"));
+  if (over && !dragging) setOver(false);
+
+  return (
+    <section
+      aria-label="Lost leads"
+      onDragOver={(event) => {
+        if (!canDrop || !event.dataTransfer.types.includes(LEAD_DRAG_TYPE)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        setOver(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setOver(false);
+        if (event.dataTransfer.types.includes(LEAD_DRAG_TYPE)) onDrop();
+      }}
+      className={`flex w-48 shrink-0 snap-start flex-col self-start rounded-lg border bg-background p-3 transition-colors motion-reduce:transition-none ${
+        canDrop ? (over ? "border-error bg-error-soft ring-3 ring-error-border" : "border-dashed border-error") : "border-dashed border-border-strong"
+      }`}
+    >
+      <h2 ref={headingRef} tabIndex={-1} className="flex items-center gap-2 text-sm font-semibold">
+        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${STATUS_DOTS.LOST}`} />
+        <span className="flex-1">Lost</span>
+        <span className="rounded-md bg-muted px-1.5 text-xs leading-5 font-medium tabular-nums">
+          {count === undefined ? "–" : count.toLocaleString("en-IN")}
+          <span className="sr-only"> {count === 1 ? "lead" : "leads"}</span>
         </span>
       </h2>
-      <div className="min-h-40 flex-1 px-2 pb-2">{body}</div>
-      {page && page.count > page.results.length && (
-        <p className="flex items-center justify-between gap-2 border-t border-border px-3 py-2 text-xs text-muted-foreground">
-          <span className="tabular-nums">
-            Showing {page.results.length.toLocaleString("en-IN")} of {page.count.toLocaleString("en-IN")}
-          </span>
-          {canShowMore ? (
-            // aria-disabled, not disabled, while loading: a disabled button would drop the keyboard focus.
-            <button
-              type="button"
-              onClick={() => {
-                if (!loading) onShowMore();
-              }}
-              aria-disabled={loading || undefined}
-              className="font-medium text-foreground underline-offset-2 hover:underline aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-            >
-              Show more
-            </button>
-          ) : (
-            <Link href={listHref} className="font-medium text-foreground underline-offset-2 hover:underline">
-              View all in the list
-            </Link>
-          )}
-        </p>
-      )}
+      <p className="mt-2 text-xs text-muted-foreground">
+        {canDrop ? "Drop the card here to mark the lead Lost." : "Lost leads leave the pipeline. Drag a card here, or use Update Status on the card."}
+      </p>
+      <Link href={listHref} className={`${secondaryButton} mt-3 w-full`}>
+        View lost leads
+      </Link>
     </section>
   );
 }
@@ -423,10 +508,13 @@ type PipelineCardProps = {
   onError: (message: string) => void;
 };
 
-// The whole card opens the lead (its name is a link stretched over the card); the pin and the menu sit above it.
+// The whole card opens the lead (its name is a link stretched over the card); the pin and the menu sit above it, as on
+// the Work cards.
 function PipelineCard(props: PipelineCardProps) {
   const { lead, saving, canDrag, focused, actions, onDragStart, onDragEnd, onFocused, onChanged, onError } = props;
   const location = [lead.area, lead.district].filter(Boolean).join(", ");
+  // A follow-up date that has passed on a lead still open in the pipeline.
+  const overdue = lead.next_follow_up !== null && lead.next_follow_up < today() && lead.allowed_transitions.length > 0;
   const linkRef = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
@@ -436,7 +524,7 @@ function PipelineCard(props: PipelineCardProps) {
   }, [focused, onFocused]);
 
   return (
-    <li
+    <div
       draggable={canDrag}
       onDragStart={(event) => {
         // Text selected on a card that can't move can still be dragged; that drag isn't a card move.
@@ -457,19 +545,18 @@ function PipelineCard(props: PipelineCardProps) {
       }}
       onDragEnd={onDragEnd}
       aria-busy={saving || undefined}
-      className={`group relative rounded-md border border-border bg-background p-3 text-sm shadow-xs hover:border-border-strong ${
-        saving ? "opacity-60" : ""
-      }`}
+      className={`${boardCardClass} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""} ${saving ? "opacity-60" : ""}`}
     >
       <div className="flex items-start gap-1">
         <Link
           ref={linkRef}
           href={`/leads/${lead.id}`}
           draggable={false}
-          className="min-w-0 flex-1 truncate font-medium after:absolute after:inset-0 after:rounded-md"
+          className="min-w-0 flex-1 truncate font-medium text-foreground after:absolute after:inset-0 after:rounded-md"
         >
           {lead.name}
         </Link>
+        {/* Unpinned cards show a faint pin until hovered, so the pinned ones stand out. */}
         <PinButton
           lead={lead}
           onChanged={() => onChanged(lead)}
@@ -480,39 +567,34 @@ function PipelineCard(props: PipelineCardProps) {
           <LeadMenu lead={lead} actions={actions} withView />
         </div>
       </div>
-      <p className="mt-0.5 text-muted-foreground tabular-nums">{formatPhone(lead)}</p>
-      {location && <p className="truncate text-muted-foreground">{location}</p>}
-      <p className="mt-2 flex items-baseline justify-between gap-2">
-        <span>{lead.plan_name ?? "No plan"}</span>
-        <span className="font-medium tabular-nums">{formatMoney(lead.amount)}</span>
+      <p className="mt-0.5 flex items-center justify-between gap-2 text-xs text-secondary-foreground">
+        <span className="min-w-0 truncate">{saving ? "Saving…" : lead.source ? sourceLabel(lead.source) : "Lead"}</span>
+        <span className="shrink-0 text-faint tabular-nums">#{lead.id}</span>
       </p>
-      <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-muted-foreground">
-        {lead.assigned_to_name ? (
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span
-              aria-hidden="true"
-              className="grid size-5 shrink-0 place-items-center rounded-full bg-background text-[9px] font-semibold text-foreground ring-1 ring-border"
-            >
-              {initials(lead.assigned_to_name)}
-            </span>
-            <span className="truncate">
-              <span className="sr-only">Assigned to </span>
-              {lead.assigned_to_name}
-            </span>
-          </span>
-        ) : (
-          <span>Unassigned</span>
-        )}
-        {lead.next_follow_up && (
-          <span className="flex shrink-0 items-center gap-1" title="Next follow-up">
-            <CalendarIcon className="size-3.5" />
-            <span className="sr-only">Next follow-up </span>
-            {formatDate(lead.next_follow_up)}
-          </span>
-        )}
+
+      <p className="mt-2.5 text-xs text-muted-foreground">{lead.plan_name ? `${lead.plan_name} plan` : "No plan"}</p>
+      <p className="font-semibold text-foreground tabular-nums">{formatMoney(lead.amount)}</p>
+
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <PhoneIcon className="size-3.5 shrink-0 text-faint" />
+        <span className="tabular-nums">{formatPhone(lead)}</span>
+      </p>
+      {location && (
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <MapPinIcon className="size-3.5 shrink-0 text-faint" />
+          <span className="truncate">{location}</span>
+        </p>
+      )}
+
+      <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-muted-foreground">
+        <CardAssignee name={lead.assigned_to_name} />
+        <span className={`flex shrink-0 items-center gap-1 ${overdue ? "font-medium text-error" : ""}`}>
+          <CalendarIcon className="size-3.5" />
+          {lead.next_follow_up
+            ? `${overdue ? "Overdue" : "Follow-up"} ${formatDate(lead.next_follow_up)}`
+            : `Added ${formatDate(lead.created_at)}`}
+        </span>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">Added {formatDate(lead.created_at)}</p>
-      {saving && <p className="mt-1 text-xs text-muted-foreground">Saving…</p>}
-    </li>
+    </div>
   );
 }

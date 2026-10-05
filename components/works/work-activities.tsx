@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
-import { CloseIcon, ConvertIcon, EyeIcon, MoreIcon, PencilIcon, PlusIcon } from "@/components/layout/icons";
+import { EyeIcon, MoreIcon, PencilIcon, PlusIcon } from "@/components/layout/icons";
 import {
   ACTIVITY_NOT_YOURS,
   ACTIVITY_TYPES,
@@ -14,8 +14,9 @@ import {
   type Page,
 } from "@/components/leads/api";
 import { menuItemClass, placeMenu } from "@/components/leads/lead-actions";
-import { Field, dialogClass } from "@/components/leads/lead-dialogs";
-import { Busy, ErrorState, iconButton, inputClass, primaryButton, secondaryButton, tableAreaClass } from "@/components/leads/ui";
+import { Field, FormDialog } from "@/components/leads/lead-dialogs";
+import { Busy, ErrorState, FollowUpBadge, iconButton, inputClass, secondaryButton, tableAreaClass } from "@/components/leads/ui";
+import { SkeletonRows } from "@/components/table";
 import { toApiError, useApi, type ApiError } from "@/lib/api";
 import {
   ACTIVITY_STATUSES,
@@ -32,20 +33,20 @@ const PAGE_SIZE = 25;
 type Assignees = { data?: Assignee[]; error?: ApiError };
 type Notify = (notice: { text: string; error?: boolean }) => void;
 
-const STATUS_STYLES: Record<ActivityStatus, string> = {
-  PENDING: "bg-warning-soft text-warning ring-warning-border",
-  COMPLETED: "bg-success-soft text-success ring-success-border",
-};
+// An activity's Pending or Completed badge: the one the lead follow-ups wear, under the name the Dashboard and Reports
+// know it by.
+export { FollowUpBadge as ActivityStatusBadge };
 
-export function ActivityStatusBadge({ status }: { status: ActivityStatus }) {
-  return (
-    <span
-      className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${STATUS_STYLES[status]}`}
-    >
-      {ACTIVITY_STATUSES.find((item) => item.value === status)?.label ?? status}
-    </span>
-  );
-}
+// The columns of the Work Activities page that its Columns menu can hide. The Work, the activity and the row's actions
+// always show.
+export const WORK_ACTIVITY_COLUMNS = [
+  { key: "customer", label: "Customer" },
+  { key: "assigned", label: "Assigned to" },
+  { key: "due", label: "Due date" },
+  { key: "status", label: "Status" },
+  { key: "created", label: "Created" },
+] as const;
+export type WorkActivityColumn = (typeof WORK_ACTIVITY_COLUMNS)[number]["key"];
 
 // Each Work's own soft accent, picked from its ID, so the same Work has the same colour on every page and every visit:
 // a light wash over its rows, a stronger left edge and the dot on its badge. It identifies the Work only: never its
@@ -110,95 +111,108 @@ type WorkActivityTableProps = {
   loading: boolean;
   // false on a Work's own page, where every row is that Work's.
   showWork: boolean;
+  /** Which optional columns show (the Columns menu of the Work Activities page); all of them unless given. */
+  shows?: (column: WorkActivityColumn) => boolean;
   completingId?: number;
   onEdit: (activity: WorkActivity) => void;
   onComplete: (activity: WorkActivity) => void;
 };
 
-// Work activities as a table, one row each. A Work's rows share its colour (the row wash, the left edge and the badge's
-// dot); where several Works are listed, a stronger line marks where the next Work's activities start.
-export function WorkActivityTable({ rows, loading, showWork, completingId, onEdit, onComplete }: WorkActivityTableProps) {
-  const columns = showWork ? 8 : 6;
+// Work activities as a table, one row each, with the same row actions as the lead follow-ups: Mark complete, and a menu.
+// A Work's rows share its colour (the row wash, the left edge and the badge's dot); where several Works are listed, a
+// stronger line marks where the next Work's activities start.
+export function WorkActivityTable({ rows, loading, showWork, shows = () => true, completingId, onEdit, onComplete }: WorkActivityTableProps) {
+  const optional = WORK_ACTIVITY_COLUMNS.filter((column) => (column.key === "customer" ? showWork : true) && shows(column.key));
+  const hidden = optional.length < WORK_ACTIVITY_COLUMNS.length - (showWork ? 0 : 1);
+  // Always shown: the Work (where several are listed), the activity and the actions.
+  const columnCount = optional.length + (showWork ? 3 : 2);
 
   return (
     <div className={`${tableAreaClass} relative`}>
       <table
         aria-busy={loading}
-        className={`w-full text-sm transition-opacity ${showWork ? "min-w-280" : "min-w-200"} ${loading && rows ? "opacity-60" : ""}`}
+        // With columns hidden the table is as wide as what's left needs, no wider.
+        className={`w-full text-sm transition-opacity ${hidden ? "min-w-max" : showWork ? "min-w-280" : "min-w-210"} ${
+          loading && rows ? "opacity-60" : ""
+        }`}
       >
         <caption className="sr-only">Work activities</caption>
         <thead>
           <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
             {showWork && (
-              <>
-                <th scope="col" className="sticky left-0 z-1 bg-page px-3 py-2.5">
-                  Work
-                </th>
-                <th scope="col" className="px-3 py-2.5">Customer</th>
-              </>
+              <th scope="col" className="sticky left-0 z-1 bg-page px-3 py-2.5">
+                Work
+              </th>
             )}
+            {showWork && shows("customer") && <th scope="col" className="px-3 py-2.5">Customer</th>}
             <th scope="col" className="px-3 py-2.5">Activity / Follow-up</th>
-            <th scope="col" className="px-3 py-2.5">Assigned to</th>
-            <th scope="col" className="px-3 py-2.5">Due date</th>
-            <th scope="col" className="px-3 py-2.5">Status</th>
-            <th scope="col" className="px-3 py-2.5">Created</th>
-            <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
+            {shows("assigned") && <th scope="col" className="px-3 py-2.5">Assigned to</th>}
+            {shows("due") && <th scope="col" className="px-3 py-2.5">Due date</th>}
+            {shows("status") && <th scope="col" className="px-3 py-2.5">Status</th>}
+            {shows("created") && <th scope="col" className="px-3 py-2.5">Created</th>}
+            {/* The actions stay in view beside a wide table; on a phone they would cover it, so there they scroll with it. */}
+            <th scope="col" className="z-1 bg-page px-3 py-2.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0">
               <span className="sr-only">Actions</span>
             </th>
           </tr>
         </thead>
         <tbody>
-          {rows
-            ? rows.map((activity, index) => {
-                const work = activity.work_summary;
-                const color = workColor(work.id);
-                const overdue = isOverdue(activity);
-                const nextWork = showWork && index > 0 && rows[index - 1].work !== activity.work;
-                return (
-                  <tr
-                    key={activity.id}
-                    className={`group border-b border-border last:border-0 ${color.row} ${
-                      nextWork ? "border-t-2 border-t-border-strong" : ""
-                    }`}
-                  >
-                    {showWork && (
-                      <>
-                        {/* Sticky cells need an opaque background: the same wash as the row. */}
-                        <th scope="row" className={`sticky left-0 z-1 px-3 py-2 text-left font-normal ${color.cell} ${color.edge}`}>
-                          <Link
-                            href={`/works/${work.id}`}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-background px-1.5 py-0.5 text-xs font-medium whitespace-nowrap text-foreground ring-1 ring-border hover:underline"
-                          >
-                            <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${color.dot}`} />
-                            Work #{work.id}
-                          </Link>
-                          <span className="mt-1 block text-xs whitespace-nowrap text-muted-foreground">
-                            {work.plan_name} · {stageFor(work.stage).label}
-                          </span>
-                        </th>
-                        <td className="px-3 py-2">
-                          <span className="block max-w-48 truncate font-medium">{work.customer_name}</span>
-                          <span className="block text-xs whitespace-nowrap text-muted-foreground tabular-nums">
-                            {formatPhone(work)}
-                          </span>
-                        </td>
-                      </>
-                    )}
-                    <td className={`px-3 py-2 ${showWork ? "" : color.edge}`}>
-                      <span className="block font-medium whitespace-nowrap">{activity.type_display}</span>
-                      <span title={activity.description} className="line-clamp-2 max-w-80 text-xs break-words text-muted-foreground">
-                        {activity.description}
+          {rows ? (
+            rows.map((activity, index) => {
+              const work = activity.work_summary;
+              const color = workColor(work.id);
+              const overdue = isOverdue(activity);
+              const nextWork = showWork && index > 0 && rows[index - 1].work !== activity.work;
+              const completing = completingId === activity.id;
+              const label = `${activity.type_display} for ${work.customer_name}`;
+              return (
+                <tr
+                  key={activity.id}
+                  className={`group border-b border-border last:border-0 ${color.row} ${
+                    nextWork ? "border-t-2 border-t-border-strong" : ""
+                  }`}
+                >
+                  {showWork && (
+                    // Sticky cells need an opaque background: the same wash as the row.
+                    <th scope="row" className={`sticky left-0 z-1 px-3 py-2 text-left font-normal ${color.cell} ${color.edge}`}>
+                      <Link
+                        href={`/works/${work.id}`}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-background px-1.5 py-0.5 text-xs font-medium whitespace-nowrap text-foreground ring-1 ring-border hover:underline"
+                      >
+                        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${color.dot}`} />
+                        Work #{work.id}
+                      </Link>
+                      <span className="mt-1 block text-xs whitespace-nowrap text-muted-foreground">
+                        {work.plan_name} · {stageFor(work.stage).label}
                       </span>
+                    </th>
+                  )}
+                  {showWork && shows("customer") && (
+                    <td className="px-3 py-2">
+                      <span className="block max-w-48 truncate font-medium">{work.customer_name}</span>
+                      <span className="block text-xs whitespace-nowrap text-muted-foreground tabular-nums">{formatPhone(work)}</span>
                     </td>
+                  )}
+                  <td className={`px-3 py-2 ${showWork ? "" : color.edge}`}>
+                    <span className="block font-medium whitespace-nowrap">{activity.type_display}</span>
+                    <span title={activity.description} className="line-clamp-2 max-w-80 text-xs break-words text-muted-foreground">
+                      {activity.description}
+                    </span>
+                  </td>
+                  {shows("assigned") && (
                     <td className="px-3 py-2 whitespace-nowrap">
                       {activity.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>}
                     </td>
+                  )}
+                  {shows("due") && (
                     <td className={`px-3 py-2 whitespace-nowrap ${overdue ? "font-medium text-error" : ""}`}>
                       {activity.due_date ? formatDate(activity.due_date) : <span className="text-muted-foreground">—</span>}
                       {overdue && <span className="block text-xs">Overdue</span>}
                     </td>
+                  )}
+                  {shows("status") && (
                     <td className="px-3 py-2 whitespace-nowrap">
-                      <ActivityStatusBadge status={activity.status} />
+                      <FollowUpBadge status={activity.status} />
                       {activity.completed_at && (
                         <span className="mt-1 block text-xs text-muted-foreground">
                           {formatDate(activity.completed_at)}
@@ -206,60 +220,65 @@ export function WorkActivityTable({ rows, loading, showWork, completingId, onEdi
                         </span>
                       )}
                     </td>
+                  )}
+                  {shows("created") && (
                     <td className="px-3 py-2 whitespace-nowrap">
                       {formatDate(activity.created_at)}
                       {activity.created_by_name && (
                         <span className="block text-xs text-muted-foreground">by {activity.created_by_name}</span>
                       )}
                     </td>
-                    <td className={`sticky right-0 z-1 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] ${color.cell}`}>
-                      <ActivityMenu
-                        activity={activity}
-                        withWork={showWork}
-                        completing={completingId === activity.id}
-                        onEdit={() => onEdit(activity)}
-                        onComplete={() => onComplete(activity)}
-                      />
-                    </td>
-                  </tr>
-                );
-              })
-            : Array.from({ length: 6 }, (_, row) => (
-                <tr key={row} className="border-b border-border last:border-0">
-                  {Array.from({ length: columns }, (_, cell) => (
-                    <td key={cell} className="px-3 py-3.5">
-                      <span className="block h-3 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
-                    </td>
-                  ))}
+                  )}
+                  <td className={`z-1 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0 ${color.cell}`}>
+                    <div className="flex items-center justify-end gap-1">
+                      {activity.status === "PENDING" ? (
+                        // Only the staff member it is assigned to, or an admin, completes it: anyone else is told why
+                        // on pressing it (aria-disabled, not disabled: a disabled button can't be reached or explain
+                        // itself). The API refuses them too.
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!completing) onComplete(activity);
+                          }}
+                          title={activity.can_update_status ? undefined : ACTIVITY_NOT_YOURS}
+                          aria-disabled={completing || !activity.can_update_status || undefined}
+                          aria-label={`Mark complete: ${label}`}
+                          className={`${secondaryButton} px-2.5 aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
+                        >
+                          {completing ? <Busy>Completing…</Busy> : "Mark complete"}
+                        </button>
+                      ) : (
+                        <span className="px-2.5 text-xs whitespace-nowrap text-muted-foreground">Completed</span>
+                      )}
+                      <ActivityMenu activity={activity} label={label} withWork={showWork} onEdit={() => onEdit(activity)} />
+                    </div>
+                  </td>
                 </tr>
-              ))}
+              );
+            })
+          ) : (
+            <SkeletonRows columns={columnCount} rows={6} />
+          )}
         </tbody>
       </table>
     </div>
   );
 }
 
-type ActivityMenuProps = {
-  activity: WorkActivity;
-  withWork: boolean;
-  completing: boolean;
-  onEdit: () => void;
-  onComplete: () => void;
-};
+type ActivityMenuProps = { activity: WorkActivity; label: string; withWork: boolean; onEdit: () => void };
 
 // The row's three-dot menu, as on the Works and leads tables. Everything here is part of the Work module, which the API
-// checks on every request.
-function ActivityMenu({ activity, withWork, completing, onEdit, onComplete }: ActivityMenuProps) {
+// checks on every request. (Completing is the button beside it; a completed activity is reopened from Edit.)
+function ActivityMenu({ activity, label, withWork, onEdit }: ActivityMenuProps) {
   const menuId = useId();
   const hide = () => document.getElementById(menuId)?.hidePopover();
-  const label = `${activity.type_display} for ${activity.work_summary.customer_name}`;
 
   return (
     <>
       <button
         type="button"
         popoverTarget={menuId}
-        onClick={(event) => placeMenu(event.currentTarget, menuId)}
+        onClick={(event) => placeMenu(event.currentTarget, menuId, 110)}
         aria-label={`Actions for ${label}`}
         className={`${iconButton} size-8`}
       >
@@ -281,24 +300,6 @@ function ActivityMenu({ activity, withWork, completing, onEdit, onComplete }: Ac
           <PencilIcon className="size-4 text-muted-foreground" />
           Edit
         </button>
-        {activity.status === "PENDING" && (
-          // Only the staff member it is assigned to, or an admin, completes it: anyone else is told why on choosing
-          // it (aria-disabled keeps the item reachable; the API refuses them too).
-          <button
-            type="button"
-            onClick={() => {
-              if (completing) return;
-              hide();
-              onComplete();
-            }}
-            aria-disabled={completing || !activity.can_update_status || undefined}
-            title={activity.can_update_status ? undefined : ACTIVITY_NOT_YOURS}
-            className={`${menuItemClass} aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
-          >
-            <ConvertIcon className="size-4 text-success" />
-            {completing ? "Completing…" : "Mark completed"}
-          </button>
-        )}
         {withWork && (
           <Link href={`/works/${activity.work}`} className={menuItemClass}>
             <EyeIcon className="size-4 text-muted-foreground" />
@@ -376,7 +377,7 @@ export function WorkActivities({ work, assignees, notify, onAdd, onChanged }: Wo
   if (error) {
     content = (
       <div className="rounded-lg border border-border bg-background">
-        <ErrorState title="Couldn't load activities" message="Something went wrong while loading them." onRetry={reload} />
+        <ErrorState title="Couldn't load activities" message={error.message} onRetry={reload} />
       </div>
     );
   } else if (data?.count === 0) {
@@ -464,11 +465,6 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
   const [formError, setFormError] = useState<string>();
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    dialogRef.current?.showModal();
-  }, []);
-
-  const close = () => dialogRef.current?.close();
   const fieldId = (field: string) => `${formId}-${field}`;
   // Someone no longer active stays visible on an activity that already has them.
   const keepAssignee =
@@ -478,6 +474,7 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     const missing: Record<string, string> = {};
     if (!target) missing.work = "Choose the Work this activity is for.";
     if (!description.trim()) missing.description = "Describe the follow-up or what happened.";
@@ -499,7 +496,7 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
         ...(activity && status === activity.status ? {} : { status }),
       };
       onSaved(await saveWorkActivity(input, activity ? { id: activity.id } : { work: target.id }));
-      close();
+      dialogRef.current?.close();
     } catch (error) {
       const apiError = toApiError(error);
       setErrors(apiError.fields);
@@ -509,124 +506,97 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
   }
 
   return (
-    <dialog
+    <FormDialog
       ref={dialogRef}
+      title={activity ? "Edit activity" : "Add follow-up / activity"}
+      subtitle={work && `Work #${work.id} · ${work.customer_name}`}
+      busy={saving}
+      error={formError}
+      submitLabel={activity ? "Save changes" : "Save activity"}
+      busyLabel="Saving…"
+      onSubmit={submit}
       onClose={onClose}
-      aria-labelledby={`${formId}-title`}
-      className={`${dialogClass} max-h-[calc(100dvh-2rem)] max-w-lg overflow-hidden p-0`}
     >
-      <form noValidate onSubmit={submit} className="flex max-h-[calc(100dvh-2rem)] flex-col">
-        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
-          <div className="min-w-0">
-            <h2 id={`${formId}-title`} className="text-base font-semibold">
-              {activity ? "Edit activity" : "Add follow-up / activity"}
-            </h2>
-            {work && (
-              <p className="mt-1 truncate text-xs text-muted-foreground">
-                Work #{work.id} · {work.customer_name}
-              </p>
-            )}
-          </div>
-          <button type="button" onClick={close} aria-label="Close" className={`${iconButton} -mr-2 size-9`}>
-            <CloseIcon className="size-4.5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 overflow-y-auto px-5 py-5 sm:grid-cols-2">
-          {formError && (
-            <p role="alert" className="rounded-md border border-error-border bg-error-soft px-3 py-2 text-sm text-error sm:col-span-2">
-              {formError}
-            </p>
-          )}
-          {!work && <WorkPicker fieldId={fieldId} picked={pickedWork} onPick={setPickedWork} error={errors.work} />}
-          <Field label="Activity type" id={fieldId("type")} error={errors.type} required>
-            <select
-              id={fieldId("type")}
-              value={type}
-              onChange={(event) => setType(event.target.value as ActivityType)}
-              className={inputClass}
-            >
-              {ACTIVITY_TYPES.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field
-            label="Status"
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {!work && <WorkPicker fieldId={fieldId} picked={pickedWork} onPick={setPickedWork} error={errors.work} />}
+        <Field label="Activity type" id={fieldId("type")} error={errors.type} required>
+          <select
+            id={fieldId("type")}
+            value={type}
+            onChange={(event) => setType(event.target.value as ActivityType)}
+            className={inputClass}
+          >
+            {ACTIVITY_TYPES.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field
+          label="Status"
+          id={fieldId("status")}
+          error={errors.status}
+          hint={activity && !activity.can_update_status ? ACTIVITY_NOT_YOURS : undefined}
+        >
+          <select
             id={fieldId("status")}
-            error={errors.status}
-            hint={activity && !activity.can_update_status ? ACTIVITY_NOT_YOURS : undefined}
+            value={status}
+            onChange={(event) => setStatus(event.target.value as ActivityStatus)}
+            // Only the assignee or an admin changes it; the API refuses anyone else.
+            disabled={activity !== undefined && !activity.can_update_status}
+            className={inputClass}
           >
-            <select
-              id={fieldId("status")}
-              value={status}
-              onChange={(event) => setStatus(event.target.value as ActivityStatus)}
-              // Only the assignee or an admin changes it; the API refuses anyone else.
-              disabled={activity !== undefined && !activity.can_update_status}
-              className={inputClass}
-            >
-              {ACTIVITY_STATUSES.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Description" id={fieldId("description")} error={errors.description} required wide>
-            <textarea
-              id={fieldId("description")}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={3}
-              placeholder="What needs doing, or what happened"
-              aria-invalid={errors.description ? true : undefined}
-              aria-describedby={errors.description ? `${fieldId("description")}-error` : undefined}
-              className={`${inputClass} h-auto py-2`}
-            />
-          </Field>
-          <Field
-            label="Assigned staff"
+            {ACTIVITY_STATUSES.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Description" id={fieldId("description")} error={errors.description} required wide>
+          <textarea
+            id={fieldId("description")}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            rows={3}
+            placeholder="What needs doing, or what happened"
+            aria-invalid={errors.description ? true : undefined}
+            aria-describedby={errors.description ? `${fieldId("description")}-error` : undefined}
+            className={`${inputClass} h-auto py-2`}
+          />
+        </Field>
+        <Field
+          label="Assigned staff"
+          id={fieldId("assigned_to")}
+          error={errors.assigned_to}
+          hint={assignees.error && `Staff couldn't be loaded: ${assignees.error.message}`}
+        >
+          <select
             id={fieldId("assigned_to")}
-            error={errors.assigned_to}
-            hint={assignees.error && `Staff couldn't be loaded: ${assignees.error.message}`}
+            value={assignedTo}
+            onChange={(event) => setAssignedTo(event.target.value)}
+            className={inputClass}
           >
-            <select
-              id={fieldId("assigned_to")}
-              value={assignedTo}
-              onChange={(event) => setAssignedTo(event.target.value)}
-              className={inputClass}
-            >
-              <option value="">Unassigned</option>
-              {[...(assignees.data ?? []), ...(keepAssignee ? [keepAssignee] : [])].map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Due date" id={fieldId("due_date")} error={errors.due_date}>
-            <input
-              id={fieldId("due_date")}
-              type="date"
-              value={dueDate}
-              onChange={(event) => setDueDate(event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-          <button type="button" onClick={close} className={secondaryButton}>
-            Cancel
-          </button>
-          <button type="submit" disabled={saving} className={primaryButton}>
-            {saving ? <Busy>Saving…</Busy> : activity ? "Save changes" : "Save activity"}
-          </button>
-        </div>
-      </form>
-    </dialog>
+            <option value="">Unassigned</option>
+            {[...(assignees.data ?? []), ...(keepAssignee ? [keepAssignee] : [])].map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Due date" id={fieldId("due_date")} error={errors.due_date}>
+          <input
+            id={fieldId("due_date")}
+            type="date"
+            value={dueDate}
+            onChange={(event) => setDueDate(event.target.value)}
+            className={inputClass}
+          />
+        </Field>
+      </div>
+    </FormDialog>
   );
 }
 

@@ -14,7 +14,7 @@ import {
   TrashIcon,
   WhatsAppIcon,
 } from "@/components/layout/icons";
-import { toApiError } from "@/lib/api";
+import { ActionDialog } from "@/components/selection";
 import { convertBlocker, deleteLead, statusBlocker, statusLabel, telHref, whatsappHref, type Lead } from "./api";
 import { ConvertDialog, LeadFormDialog, StatusDialog } from "./lead-dialogs";
 import { iconButton } from "./ui";
@@ -29,20 +29,26 @@ export function useLeadActions(notify: Notify, onChanged: (lead?: Lead) => void)
   const [formLead, setFormLead] = useState<Lead | null>(); // null: a new lead; undefined: the form is closed
   const [statusTarget, setStatusTarget] = useState<Lead>();
   const [convertTarget, setConvertTarget] = useState<Lead>();
-
-  async function remove(lead: Lead) {
-    if (!window.confirm(`Delete ${lead.name}? The lead and its activities are removed for good.`)) return;
-    try {
-      await deleteLead(lead.id);
-      notify({ text: `Deleted ${lead.name}.` });
-      onChanged(lead);
-    } catch (err) {
-      notify({ text: toApiError(err).message, error: true });
-    }
-  }
+  const [deleteTarget, setDeleteTarget] = useState<Lead>();
 
   const dialogs = (
     <>
+      {deleteTarget && (
+        <ActionDialog
+          destructive
+          title={`Delete ${deleteTarget.name}?`}
+          description="The lead and its activities are removed for good."
+          confirmLabel="Delete lead"
+          pendingLabel="Deleting…"
+          onConfirm={async () => {
+            await deleteLead(deleteTarget.id);
+            notify({ text: `Deleted ${deleteTarget.name}.` });
+            onChanged(deleteTarget);
+          }}
+          onClose={() => setDeleteTarget(undefined)}
+          onError={(text) => notify({ text, error: true })}
+        />
+      )}
       {formLead !== undefined && (
         <LeadFormDialog
           lead={formLead}
@@ -83,7 +89,7 @@ export function useLeadActions(notify: Notify, onChanged: (lead?: Lead) => void)
     edit: (lead: Lead) => setFormLead(lead),
     updateStatus: (lead: Lead) => setStatusTarget(lead),
     convert: (lead: Lead) => setConvertTarget(lead),
-    remove,
+    remove: (lead: Lead) => setDeleteTarget(lead),
   };
 }
 

@@ -166,6 +166,16 @@ export function DownloadIcon(props: IconProps) {
   );
 }
 
+// A table's columns: the button that chooses which ones are shown.
+export function ColumnsIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M9.2 4.5v15M14.8 4.5v15" />
+    </Icon>
+  );
+}
+
 // Pass fill="currentColor" for the pinned (filled) state.
 export function PinIcon(props: IconProps) {
   return (

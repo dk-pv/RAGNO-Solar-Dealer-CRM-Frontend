@@ -90,6 +90,10 @@ export type LeadInput = { initial_follow_up?: ActivityInput } & Pick<
   | "notes"
 >;
 
+// GET /api/leads/summary/: every status with its number of leads and their total amount, for the list's search and
+// filters (the Lead Pipeline's column headers). Staff get their own leads' numbers.
+export type StatusSummary = { status: LeadStatus; label: string; count: number; total_amount: string };
+
 // GET /api/plans/. The amount is the plan's current default price, configured by an admin in Settings.
 export type Plan = { id: number; name: string; amount: string; is_active: boolean };
 // GET /api/leads/assignees/: the active users a lead can be assigned to.

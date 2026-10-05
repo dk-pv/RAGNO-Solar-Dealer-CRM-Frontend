@@ -6,7 +6,7 @@ import { useEffect, useId, useState, type ChangeEvent, type ReactNode } from "re
 import { FilterIcon, PlusIcon, SearchIcon } from "@/components/layout/icons";
 import { useApi } from "@/lib/api";
 import { LEAD_SOURCES, LEAD_STATUSES, type Assignee, type Plan } from "./api";
-import { ViewSwitch, fieldClass, inputClass, primaryButton, secondaryButton } from "./ui";
+import { PageHeader, ViewSwitch, fieldClass, inputClass, primaryButton, secondaryButton, segmentClass, segmentedClass } from "./ui";
 
 export const FILTER_KEYS = ["status", "plan", "assigned_to", "source", "created_after", "created_before"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
@@ -60,26 +60,19 @@ const VIEWS = [
 type LeadsHeaderProps = { title: string; description?: string; onAdd: () => void };
 
 // The heading of the Leads pages, with the List/Pipeline switch and Add Lead.
-export function LeadsHeader({ title, description = " ", onAdd }: LeadsHeaderProps) {
+export function LeadsHeader({ title, description, onAdd }: LeadsHeaderProps) {
   const searchParams = useSearchParams();
   // Both views show the same leads, so switching keeps the search, filters and sort.
   const query = pickParams(searchParams, VIEW_KEYS).toString();
 
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="text-xl font-semibold">{title}</h1>
-        {/* min-h-5: the line is reserved while the count loads, so the title doesn't move when it arrives. */}
-        <p className="mt-0.5 min-h-5 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <ViewSwitch label="Leads view" views={VIEWS} query={query} />
-        <button type="button" onClick={onAdd} className={primaryButton}>
-          <PlusIcon className="size-4" />
-          Add Lead
-        </button>
-      </div>
-    </div>
+    <PageHeader title={title} description={description}>
+      <ViewSwitch label="Leads view" views={VIEWS} query={query} />
+      <button type="button" onClick={onAdd} className={primaryButton}>
+        <PlusIcon className="size-4" />
+        Add Lead
+      </button>
+    </PageHeader>
   );
 }
 
@@ -109,7 +102,29 @@ export function LeadsToolbar({ sortOptions = SORT_OPTIONS, children }: LeadsTool
   );
 }
 
-// The URL's ?search=, typed into a search box. Shared by the Leads pages and Lead Activities.
+// The toolbar pieces below are shared by every list and board: the Leads and Works pages and both Activities pages.
+
+// The URL's ?status=, as a row of toggles: All, then each status. Both Activities pages narrow their list with it.
+export function StatusTabs({ statuses }: { statuses: readonly { value: string; label: string }[] }) {
+  const status = useSearchParams().get("status") ?? "";
+  return (
+    <div role="group" aria-label="Status" className={segmentedClass}>
+      {[{ value: "", label: "All" }, ...statuses].map((tab) => (
+        <button
+          key={tab.value}
+          type="button"
+          aria-pressed={status === tab.value}
+          onClick={() => updateQuery({ status: tab.value || null })}
+          className={segmentClass}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// The URL's ?search=, typed into a search box.
 export function SearchBox({ label, placeholder }: { label: string; placeholder: string }) {
   const searchParams = useSearchParams();
   const search = searchParams.get("search") ?? "";

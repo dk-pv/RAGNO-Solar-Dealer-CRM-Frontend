@@ -18,7 +18,6 @@ import {
   iconButton,
   inputClass,
   messageAreaClass,
-  paginationFooterClass,
   primaryButton,
   secondaryButton,
   tableAreaClass,
@@ -26,6 +25,7 @@ import {
   useNotice,
 } from "@/components/leads/ui";
 import { PasswordInput } from "@/components/password-input";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/table";
 import { apiRequest, toApiError, useApi, type ApiError } from "@/lib/api";
 
 // GET /api/users/. Passwords are write-only: the API never sends them.
@@ -195,17 +195,8 @@ export function UsersPage() {
           </div>
         )}
 
-        {data && (data.previous || data.next) && (
-          <nav aria-label="Pagination" className={`${paginationFooterClass} justify-end`}>
-            <button type="button" onClick={() => setPage(page - 1)} disabled={!data.previous} className={secondaryButton}>
-              Previous
-            </button>
-            <span className="px-1 text-muted-foreground tabular-nums">Page {page}</span>
-            <button type="button" onClick={() => setPage(page + 1)} disabled={!data.next} className={secondaryButton}>
-              Next
-            </button>
-          </nav>
-        )}
+        {/* The page is this list's own state (Settings keeps nothing in the URL), at the API's page size. */}
+        <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} count={data?.count} loading={loading} onPage={setPage} />
       </>
     );
   }

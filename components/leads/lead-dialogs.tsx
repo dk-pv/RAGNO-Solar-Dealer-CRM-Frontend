@@ -1,6 +1,16 @@
 "use client";
 
-import { useContext, useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import {
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import { CloseIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
@@ -29,6 +39,112 @@ import { Busy, FollowUpBadge, StatusBadge, fieldClass, iconButton, inputClass, p
 // Callers add the padding and width.
 export const dialogClass =
   "m-auto w-[calc(100%-2rem)] rounded-lg border border-border bg-background text-foreground shadow-lg backdrop:bg-foreground/30";
+
+type FormDialogProps = {
+  /** The dialog element, for a form that closes it itself once its save is done. */
+  ref?: RefObject<HTMLDialogElement | null>;
+  title: string;
+  subtitle?: ReactNode;
+  /** The dialog's largest width (a max-w-* class). */
+  width?: string;
+  /** The form is saving: it can't be dismissed or sent again, and the button shows `busyLabel`. */
+  busy: boolean;
+  /** The form's own error, above the fields. */
+  error?: string;
+  submitLabel: string;
+  busyLabel: string;
+  submitDisabled?: boolean;
+  /** At the left of the footer, such as a Clear button. */
+  footerStart?: ReactNode;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onClose: () => void;
+  /** The fields. */
+  children: ReactNode;
+};
+
+// The CRM's form dialog, the same frame for every form that uses it (both activity forms, the WhatsApp message): a
+// title bar with Close, the fields, which scroll when the form is taller than the screen, and a footer with Cancel and
+// the save button. It opens itself, fits a phone screen, and while saving it can't be dismissed.
+export function FormDialog({
+  ref,
+  title,
+  subtitle,
+  width = "max-w-lg",
+  busy,
+  error,
+  submitLabel,
+  busyLabel,
+  submitDisabled,
+  footerStart,
+  onSubmit,
+  onClose,
+  children,
+}: FormDialogProps) {
+  const ownRef = useRef<HTMLDialogElement>(null);
+  const dialogRef = ref ?? ownRef;
+  const titleId = useId();
+
+  useEffect(() => {
+    dialogRef.current?.showModal();
+  }, [dialogRef]);
+
+  const close = () => {
+    if (!busy) dialogRef.current?.close();
+  };
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      onCancel={(event) => {
+        if (busy) event.preventDefault(); // Escape
+      }}
+      aria-labelledby={titleId}
+      className={`${dialogClass} max-h-[calc(100dvh-2rem)] ${width} overflow-hidden p-0`}
+    >
+      <form
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!busy) onSubmit(event);
+        }}
+        className="flex max-h-[calc(100dvh-2rem)] flex-col"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-base font-semibold">
+              {title}
+            </h2>
+            {subtitle && <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div>}
+          </div>
+          <button type="button" onClick={close} aria-label="Close" aria-disabled={busy || undefined} className={`${iconButton} -mr-2 size-9`}>
+            <CloseIcon className="size-4.5" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto px-5 py-5">
+          {error && (
+            <p role="alert" className="mb-4 rounded-md border border-error-border bg-error-soft px-3 py-2 text-sm text-error">
+              {error}
+            </p>
+          )}
+          {children}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-3">
+          {footerStart && <div className="mr-auto">{footerStart}</div>}
+          <button type="button" onClick={close} aria-disabled={busy || undefined} className={`${secondaryButton} aria-disabled:opacity-50`}>
+            Cancel
+          </button>
+          {/* aria-disabled, not disabled, while saving: a disabled button would drop the keyboard focus. */}
+          <button type="submit" disabled={submitDisabled} aria-disabled={busy || undefined} className={`${primaryButton} aria-disabled:opacity-50`}>
+            {busy ? <Busy>{busyLabel}</Busy> : submitLabel}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
 
 type FormValues = {
   name: string;

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ComponentType, type ReactNode } from "react";
 
-import { CloseIcon } from "@/components/layout/icons";
+import { CloseIcon, SpinnerIcon, type IconProps } from "@/components/layout/icons";
 import { dialogClass } from "@/components/leads/lead-dialogs";
-import { Busy, destructiveButton, ghostButton, iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
+import { Busy, destructiveButton, iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
 import { toApiError } from "@/lib/api";
 
 // ---- Selecting rows ----
@@ -84,20 +84,82 @@ export function SelectionAnnouncement({ count }: { count: number }) {
   );
 }
 
-// The bar shown while rows are selected: the count, the page's bulk actions and Clear.
-export function BulkBar({ count, onClear, children }: { count: number; onClear: () => void; children: ReactNode }) {
+type BulkActionBarProps = {
+  count: number;
+  onClear: () => void;
+  /** A bulk action is running: the actions wait and the bar shows it. */
+  busy?: boolean;
+  /** The list's <BulkAction>s. Leave out an action the user has no permission for. */
+  children: ReactNode;
+};
+
+// The one bulk action bar, for every list with row selection. Render it only while rows are selected, as the list
+// shell's `bulkBar`: it sits at the bottom of the list, above the pagination, and rides the bottom of the window while
+// a long list scrolls. Sticky, not fixed: it belongs to the list's own column, so it never covers the sidebar or leaves
+// the content area, on a phone or a wide screen. On narrow screens the actions show their icons only (with their names
+// as tooltips and for screen readers), so the bar always fits.
+export function BulkActionBar({ count, onClear, busy = false, children }: BulkActionBarProps) {
+  const divider = <span aria-hidden="true" className="h-5 w-px shrink-0 bg-border" />;
   return (
-    <section
-      aria-label="Bulk actions"
-      className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary-soft bg-primary-softer px-3 py-2 text-sm"
+    <div className="pointer-events-none sticky bottom-3 z-5 mt-3 flex justify-center">
+      <section
+        aria-label="Bulk actions"
+        aria-busy={busy}
+        className="pointer-events-auto flex max-w-full items-center gap-1 rounded-xl border border-border-strong bg-background p-1.5 shadow-lg"
+      >
+        <p className="flex items-center gap-2 pr-1.5 pl-1 text-sm font-medium whitespace-nowrap">
+          <span className="grid h-6 min-w-6 place-items-center rounded-md bg-primary px-1.5 text-xs font-semibold text-white tabular-nums">
+            {busy ? <SpinnerIcon className="size-3.5" /> : count.toLocaleString("en-IN")}
+          </span>{" "}
+          <span>{busy ? "Working…" : "selected"}</span>
+        </p>
+        {divider}
+        <fieldset disabled={busy} className="flex min-w-0 items-center gap-0.5">
+          {children}
+        </fieldset>
+        {divider}
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={busy}
+          aria-label="Clear selection"
+          title="Clear selection"
+          className={`${iconButton} size-9`}
+        >
+          <CloseIcon className="size-4" />
+        </button>
+      </section>
+    </div>
+  );
+}
+
+type BulkActionProps = {
+  icon: ComponentType<IconProps>;
+  label: string;
+  onClick: () => void;
+  /** It can't apply to what is selected; `title` then says why. */
+  disabled?: boolean;
+  title?: string;
+  /** A destructive action, in the error colour. Confirm it in a dialog before running it. */
+  danger?: boolean;
+};
+
+// One action of the bar: its icon and name. The name is the tooltip too, and all a narrow screen shows.
+export function BulkAction({ icon: Icon, label, onClick, disabled, title, danger }: BulkActionProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={title ?? label}
+      className={`inline-flex h-9 min-w-9 shrink-0 items-center justify-center gap-2 rounded-md px-2.5 text-sm font-medium whitespace-nowrap transition-colors enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11 pointer-coarse:min-w-11 ${
+        danger ? "text-error" : "text-label"
+      }`}
     >
-      <p className="mr-1 font-medium whitespace-nowrap tabular-nums">{count.toLocaleString("en-IN")} selected</p>
-      <div className="flex flex-wrap items-center gap-2">{children}</div>
-      <button type="button" onClick={onClear} className={`${ghostButton} ml-auto`}>
-        <CloseIcon className="size-4" />
-        Clear
-      </button>
-    </section>
+      <Icon className="size-4 shrink-0" />
+      <span className="max-sm:sr-only">{label}</span>
+    </button>
   );
 }
 

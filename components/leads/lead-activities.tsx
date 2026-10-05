@@ -7,6 +7,8 @@ import { useContext, useId, useRef, useState, type ChangeEvent } from "react";
 import { EyeIcon, MoreIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
+import { ActionDialog } from "@/components/selection";
+import { ColumnsButton, DEFAULT_PAGE_SIZE, EmptyState, ListShell, SkeletonRows, useColumns, type Columns } from "@/components/table";
 import { toApiError, useApi } from "@/lib/api";
 import {
   ACTIVITY_NOT_YOURS,
@@ -23,31 +25,14 @@ import {
 } from "./api";
 import { FollowUpDialog } from "./follow-ups";
 import { menuItemClass, placeMenu } from "./lead-actions";
-import { Pagination } from "./leads-page";
-import { FilterToggle, SearchBox, SortSelect, pickParams, updateQuery } from "./leads-toolbar";
-import {
-  Busy,
-  ErrorState,
-  FollowUpBadge,
-  emptyAreaClass,
-  fillClass,
-  iconButton,
-  inputClass,
-  messageAreaClass,
-  primaryButton,
-  secondaryButton,
-  segmentClass,
-  segmentedClass,
-  tableAreaClass,
-  useNotice,
-} from "./ui";
+import { FilterToggle, SearchBox, SortSelect, StatusTabs, pickParams, updateQuery } from "./leads-toolbar";
+import { Busy, FollowUpBadge, PageHeader, fillClass, iconButton, inputClass, primaryButton, secondaryButton, useNotice } from "./ui";
 
 const FILTER_KEYS = ["type", "assigned_to", "due_after", "due_before"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 // The URL query and the API query use the same names.
 const QUERY_KEYS = ["search", "status", ...FILTER_KEYS, "ordering", "page", "page_size"];
 const DEFAULT_ORDERING = "-created_at";
-const DEFAULT_PAGE_SIZE = 25; // the API's default page size
 const SORT_OPTIONS = [
   { value: "-created_at", label: "Newest first" },
   { value: "created_at", label: "Oldest first" },
@@ -56,8 +41,17 @@ const SORT_OPTIONS = [
   { value: "status", label: "Pending first" },
   { value: "-status", label: "Completed first" },
 ];
-const STATUS_TABS = [{ value: "", label: "All" }, ...FOLLOW_UP_STATUSES];
-const COLUMN_COUNT = 8;
+
+// The columns the Columns menu can hide. The lead, the follow-up's heading and the row's actions always show.
+const COLUMNS = [
+  { key: "type", label: "Type" },
+  { key: "assigned", label: "Assigned staff" },
+  { key: "due", label: "Due date" },
+  { key: "status", label: "Status" },
+  { key: "created", label: "Created" },
+] as const;
+type ColumnKey = (typeof COLUMNS)[number]["key"];
+const FIXED_COLUMNS = 3; // lead, heading, actions
 
 const heading = (activity: Activity) => activity.title || activity.type_display;
 
@@ -71,11 +65,13 @@ export function LeadActivitiesPage() {
   );
   const [noticeElement, notify] = useNotice();
   const [editing, setEditing] = useState<Activity | null>(); // null: a new follow-up; undefined: the dialog is closed
+  const [deleting, setDeleting] = useState<Activity>();
   const [busyId, setBusyId] = useState<number>();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [clears, setClears] = useState(0);
   const filterPanelId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const columns = useColumns("lead-activities", COLUMNS);
   // The API lists a staff member's own follow-ups first, then the rest in the chosen order; an admin's page is in the
   // chosen order alone.
   const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
@@ -85,7 +81,12 @@ export function LeadActivitiesPage() {
   const page = Number(searchParams.get("page")) || 1;
   const pageSize = Number(searchParams.get("page_size")) || DEFAULT_PAGE_SIZE;
   const activeFilters = FILTER_KEYS.filter((key) => searchParams.get(key)).length;
+  const narrowed = Boolean(search || status) || activeFilters > 0;
   const sorted = Boolean(searchParams.get("ordering")); // a change can then move the row to another page
+  const rows = data?.results ?? [];
+  const loaded = rows.length > 0;
+  const { shows } = columns;
+  const showError = (text: string) => notify({ text, error: true });
 
   // A row that leaves the list (completed while showing Pending, deleted) takes the focus with it: keep it on the page.
   const keepFocus = () => headingRef.current?.focus();
@@ -94,7 +95,7 @@ export function LeadActivitiesPage() {
   // completes it (the API refuses anyone else): the reason is shown rather than nothing happening.
   async function complete(activity: Activity) {
     if (!activity.can_update_status) {
-      notify({ text: ACTIVITY_NOT_YOURS, error: true });
+      showError(ACTIVITY_NOT_YOURS);
       return;
     }
     setBusyId(activity.id);
@@ -105,21 +106,9 @@ export function LeadActivitiesPage() {
       keepFocus();
       reload();
     } catch (err) {
-      notify({ text: toApiError(err).message, error: true });
+      showError(toApiError(err).message);
     } finally {
       setBusyId(undefined);
-    }
-  }
-
-  async function remove(activity: Activity) {
-    if (!window.confirm(`Delete the follow-up "${heading(activity)}" for ${activity.lead_name}?`)) return;
-    try {
-      await deleteActivity(activity.id);
-      notify({ text: `Deleted the follow-up for ${activity.lead_name}.` });
-      keepFocus();
-      reload();
-    } catch (err) {
-      notify({ text: toApiError(err).message, error: true });
     }
   }
 
@@ -130,127 +119,21 @@ export function LeadActivitiesPage() {
     keepFocus();
   }
 
-  let content;
-  if (error) {
-    content = (
-      <div className={`${messageAreaClass} mt-4`}>
-        {error.status === 404 && page > 1 ? (
-          <ErrorState
-            title="This page no longer exists"
-            message="There are fewer follow-ups than before."
-            onRetry={() => updateQuery({ page: null })}
-            retryLabel="Go to the first page"
-          />
-        ) : (
-          <ErrorState title="Couldn't load follow-ups" message={error.message} onRetry={reload} />
-        )}
-      </div>
-    );
-  } else if (data && data.count === 0 && !loading) {
-    const narrowed = Boolean(search || status) || activeFilters > 0;
-    content = (
-      <div className={`${emptyAreaClass} mt-4`}>
-        <p className="text-sm font-medium">{narrowed ? "No follow-ups match your search." : "No follow-ups found."}</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {narrowed
-            ? "Try a different search, or clear the filters."
-            : "Add one here, or from a lead's Follow-ups / Activities section."}
-        </p>
-        <button
-          type="button"
-          onClick={narrowed ? clearAll : () => setEditing(null)}
-          className={`${secondaryButton} mt-4`}
-        >
-          {narrowed ? "Clear search and filters" : "Add follow-up"}
-        </button>
-      </div>
-    );
-  } else {
-    const rows = data && data.results.length > 0 ? data.results : undefined;
-    content = (
-      <>
-        <div className={`${tableAreaClass} mt-4`}>
-          <table
-            aria-busy={loading}
-            className={`w-full min-w-240 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
-          >
-            <caption className="sr-only">Lead follow-ups</caption>
-            <thead>
-              <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
-                <th scope="col" className="sticky left-0 z-1 bg-page px-3 py-2.5">
-                  Lead
-                </th>
-                <th scope="col" className="px-3 py-2.5">Heading</th>
-                <th scope="col" className="px-3 py-2.5">Type</th>
-                <th scope="col" className="px-3 py-2.5">Assigned staff</th>
-                <th scope="col" className="px-3 py-2.5">Due date</th>
-                <th scope="col" className="px-3 py-2.5">Status</th>
-                <th scope="col" className="px-3 py-2.5">Created</th>
-                <th scope="col" className="sticky right-0 z-1 bg-page px-3 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows
-                ? rows.map((activity) => (
-                    <FollowUpRow
-                      key={activity.id}
-                      activity={activity}
-                      busy={busyId === activity.id}
-                      onComplete={complete}
-                      onEdit={setEditing}
-                      onDelete={remove}
-                    />
-                  ))
-                : Array.from({ length: 8 }, (_, row) => (
-                    <tr key={row} className="border-b border-border last:border-0">
-                      {Array.from({ length: COLUMN_COUNT }, (_, cell) => (
-                        <td key={cell} className="px-3 py-4">
-                          <span className="block h-3 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-            </tbody>
-          </table>
-        </div>
-        <Pagination page={page} pageSize={pageSize} count={data?.count} loading={loading} />
-      </>
-    );
-  }
-
   return (
     <div className={fillClass}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 ref={headingRef} tabIndex={-1} className="text-xl font-semibold">
-            Lead Activities
-          </h1>
-          <p className="mt-0.5 min-h-5 text-sm text-muted-foreground">
-            {data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "follow-up" : "follow-ups"}` : " "}
-          </p>
-        </div>
+      <PageHeader
+        title="Lead Activities"
+        titleRef={headingRef}
+        description={data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "follow-up" : "follow-ups"}` : undefined}
+      >
         <button type="button" onClick={() => setEditing(null)} className={primaryButton}>
           <PlusIcon className="size-4" />
           Add follow-up
         </button>
-      </div>
+      </PageHeader>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="Status" className={segmentedClass}>
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              type="button"
-              aria-pressed={status === tab.value}
-              onClick={() => updateQuery({ status: tab.value || null })}
-              className={segmentClass}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <StatusTabs statuses={FOLLOW_UP_STATUSES} />
         <SearchBox key={clears} label="Search follow-ups" placeholder="Search lead, phone, ID, heading or notes" />
         <FilterToggle
           open={filtersOpen}
@@ -259,6 +142,7 @@ export function LeadActivitiesPage() {
           active={activeFilters}
         />
         <SortSelect options={SORT_OPTIONS} defaultValue={DEFAULT_ORDERING} />
+        <ColumnsButton columns={columns} />
         {!isAdmin && <span className="text-xs text-muted-foreground">Yours come first</span>}
       </div>
       {filtersOpen && (
@@ -273,22 +157,105 @@ export function LeadActivitiesPage() {
         />
       )}
 
-      {content}
+      <ListShell
+        noun="follow-ups"
+        error={error}
+        onRetry={reload}
+        page={page}
+        pageSize={pageSize}
+        count={data?.count}
+        loading={loading}
+        empty={
+          narrowed ? (
+            <EmptyState title="No follow-ups match your search or filters." hint="Try a different search, or clear the filters.">
+              <button type="button" onClick={clearAll} className={secondaryButton}>
+                Clear search and filters
+              </button>
+            </EmptyState>
+          ) : (
+            <EmptyState title="No follow-ups yet." hint="Add one here, or from a lead's Follow-ups / Activities section.">
+              <button type="button" onClick={() => setEditing(null)} className={secondaryButton}>
+                Add follow-up
+              </button>
+            </EmptyState>
+          )
+        }
+      >
+        <table
+          aria-busy={loading}
+          // With columns hidden the table is as wide as what's left needs, no wider.
+          className={`w-full text-sm transition-opacity ${columns.hiddenCount > 0 ? "min-w-max" : "min-w-240"} ${loading && loaded ? "opacity-60" : ""}`}
+        >
+          <caption className="sr-only">Lead follow-ups</caption>
+          <thead>
+            <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
+              <th scope="col" className="sticky left-0 z-1 bg-page px-3 py-2.5">
+                Lead
+              </th>
+              <th scope="col" className="px-3 py-2.5">Heading</th>
+              {shows("type") && <th scope="col" className="px-3 py-2.5">Type</th>}
+              {shows("assigned") && <th scope="col" className="px-3 py-2.5">Assigned staff</th>}
+              {shows("due") && <th scope="col" className="px-3 py-2.5">Due date</th>}
+              {shows("status") && <th scope="col" className="px-3 py-2.5">Status</th>}
+              {shows("created") && <th scope="col" className="px-3 py-2.5">Created</th>}
+              {/* The actions stay in view beside a wide table; on a phone they would cover it, so there they scroll with it. */}
+              <th scope="col" className="z-1 bg-page px-3 py-2.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {loaded ? (
+              rows.map((activity) => (
+                <FollowUpRow
+                  key={activity.id}
+                  activity={activity}
+                  shows={shows}
+                  busy={busyId === activity.id}
+                  onComplete={complete}
+                  onEdit={setEditing}
+                  onDelete={setDeleting}
+                />
+              ))
+            ) : (
+              <SkeletonRows columns={FIXED_COLUMNS + COLUMNS.length - columns.hiddenCount} />
+            )}
+          </tbody>
+        </table>
+      </ListShell>
 
       {editing !== undefined && (
         <FollowUpDialog
           activity={editing ?? undefined}
           onClose={() => setEditing(undefined)}
-          onError={(text) => notify({ text, error: true })}
+          onError={showError}
           onSaved={(saved, stillOpen) => {
             notify({
               text: editing ? `Saved the follow-up for ${saved.lead_name}.` : `Added a follow-up for ${saved.lead_name}.`,
             });
             // An edit can take the row out of a searched or filtered view; the first follow-up replaces the empty state.
-            const narrowed = search || status || activeFilters > 0 || sorted;
-            if (stillOpen && ((editing && narrowed) || data?.count === 0)) keepFocus();
+            if (stillOpen && ((editing && (narrowed || sorted)) || data?.count === 0)) keepFocus();
             reload();
           }}
+        />
+      )}
+      {deleting && (
+        <ActionDialog
+          destructive
+          title="Delete this follow-up?"
+          description={`"${heading(deleting)}" for ${deleting.lead_name} will be removed for good.`}
+          confirmLabel="Delete"
+          pendingLabel="Deleting…"
+          onConfirm={async () => {
+            await deleteActivity(deleting.id);
+            notify({ text: `Deleted the follow-up for ${deleting.lead_name}.` });
+            reload();
+          }}
+          onClose={() => {
+            setDeleting(undefined);
+            keepFocus(); // the row, and the menu that opened this, may be gone
+          }}
+          onError={showError}
         />
       )}
       {noticeElement}
@@ -298,23 +265,24 @@ export function LeadActivitiesPage() {
 
 type FollowUpRowProps = {
   activity: Activity;
+  shows: Columns<ColumnKey>["shows"];
   busy: boolean;
   onComplete: (activity: Activity) => void;
   onEdit: (activity: Activity) => void;
   onDelete: (activity: Activity) => void;
 };
 
-function FollowUpRow({ activity, busy, onComplete, onEdit, onDelete }: FollowUpRowProps) {
+function FollowUpRow({ activity, shows, busy, onComplete, onEdit, onDelete }: FollowUpRowProps) {
   const overdue = isOverdue(activity);
   const pending = activity.status === "PENDING";
   const phone = formatPhone({ country_code: activity.lead_country_code, phone: activity.lead_phone });
   // The lead and the actions stay in view while the rest scrolls sideways on a narrow screen. Sticky cells need an
   // opaque background, so the row hover colour is the solid one.
-  const stickyCell = "sticky z-1 bg-background group-hover:bg-row-hover";
+  const stickyCell = "z-1 bg-background group-hover:bg-row-hover";
 
   return (
     <tr className="group border-b border-border align-top last:border-0 hover:bg-row-hover">
-      <th scope="row" className={`${stickyCell} left-0 px-3 py-2.5 text-left font-medium`}>
+      <th scope="row" className={`${stickyCell} sticky left-0 px-3 py-2.5 text-left font-medium`}>
         {/* Staff who only do the follow-up can't open someone else's lead. */}
         {activity.can_open_lead ? (
           <Link href={`/leads/${activity.lead}`} className="block max-w-52 truncate hover:underline">
@@ -335,42 +303,48 @@ function FollowUpRow({ activity, busy, onComplete, onEdit, onDelete }: FollowUpR
           <span className="mt-0.5 line-clamp-2 block max-w-72 text-xs text-muted-foreground">{activity.description}</span>
         )}
       </td>
-      <td className="min-w-28 px-3 py-2.5">{activity.type_display}</td>
-      <td className="px-3 py-2.5 whitespace-nowrap">
-        {activity.assigned_to_name ? (
-          <span className="flex items-center gap-2">
-            <span
-              aria-hidden="true"
-              className="grid size-6 place-items-center rounded-full bg-background text-[10px] font-semibold ring-1 ring-border"
-            >
-              {initials(activity.assigned_to_name)}
+      {shows("type") && <td className="min-w-28 px-3 py-2.5">{activity.type_display}</td>}
+      {shows("assigned") && (
+        <td className="px-3 py-2.5 whitespace-nowrap">
+          {activity.assigned_to_name ? (
+            <span className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="grid size-6 place-items-center rounded-full bg-background text-[10px] font-semibold ring-1 ring-border"
+              >
+                {initials(activity.assigned_to_name)}
+              </span>
+              {activity.assigned_to_name}
             </span>
-            {activity.assigned_to_name}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">Not assigned</span>
-        )}
-      </td>
-      <td className="px-3 py-2.5 whitespace-nowrap">
-        {activity.due_date ? (
-          <>
-            <span className={overdue ? "font-medium text-error" : undefined}>{formatDate(activity.due_date)}</span>
-            {overdue && <span className="block text-xs text-error">Overdue</span>}
-          </>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )}
-      </td>
-      <td className="px-3 py-2.5">
-        <FollowUpBadge status={activity.status} />
-      </td>
-      <td className="px-3 py-2.5 whitespace-nowrap">
-        {formatDate(activity.created_at)}
-        {activity.created_by_name && (
-          <span className="block text-xs text-muted-foreground">{activity.created_by_name}</span>
-        )}
-      </td>
-      <td className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)]`}>
+          ) : (
+            <span className="text-muted-foreground">Not assigned</span>
+          )}
+        </td>
+      )}
+      {shows("due") && (
+        <td className="px-3 py-2.5 whitespace-nowrap">
+          {activity.due_date ? (
+            <>
+              <span className={overdue ? "font-medium text-error" : undefined}>{formatDate(activity.due_date)}</span>
+              {overdue && <span className="block text-xs text-error">Overdue</span>}
+            </>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </td>
+      )}
+      {shows("status") && (
+        <td className="px-3 py-2.5">
+          <FollowUpBadge status={activity.status} />
+        </td>
+      )}
+      {shows("created") && (
+        <td className="px-3 py-2.5 whitespace-nowrap">
+          {formatDate(activity.created_at)}
+          {activity.created_by_name && <span className="block text-xs text-muted-foreground">{activity.created_by_name}</span>}
+        </td>
+      )}
+      <td className={`${stickyCell} px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0`}>
         <div className="flex items-center justify-end gap-1">
           {pending ? (
             activity.can_edit && (

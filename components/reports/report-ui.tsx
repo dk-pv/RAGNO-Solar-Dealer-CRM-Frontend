@@ -8,7 +8,7 @@ import { canOpen } from "@/components/layout/navigation";
 import { CurrentUserContext, type ShellUser } from "@/components/layout/use-shell-session";
 import { formatExact, formatShortDateTime, type LatestActivity } from "@/components/dashboard/api";
 import { formatDate, type Assignee } from "@/components/leads/api";
-import { Pagination } from "@/components/leads/leads-page";
+import { Pagination } from "@/components/table";
 import { updateQuery } from "@/components/leads/leads-toolbar";
 import { ErrorState, emptyAreaClass, fieldClass, secondaryButton, tableAreaClass } from "@/components/leads/ui";
 import { apiDownload, toApiError, useApi, type ApiError } from "@/lib/api";

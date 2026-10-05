@@ -9,7 +9,8 @@ import { initials } from "@/components/layout/navbar";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import {
   ActionDialog,
-  BulkBar,
+  BulkAction,
+  BulkActionBar,
   ChoiceDialog,
   RowCheckbox,
   SelectAllCheckbox,
@@ -18,6 +19,7 @@ import {
   useSelection,
   type BulkResult,
 } from "@/components/selection";
+import { ColumnsButton, DEFAULT_PAGE_SIZE, EmptyState, ListShell, SkeletonRows, useColumns, type Columns } from "@/components/table";
 import { toApiError, useApi } from "@/lib/api";
 import {
   LEAD_STATUSES,
@@ -36,35 +38,26 @@ import {
 } from "./api";
 import { LeadMenu, useLeadActions, type LeadActions } from "./lead-actions";
 import { FILTER_KEYS, LeadsHeader, LeadsToolbar, VIEW_KEYS, pickParams, updateQuery } from "./leads-toolbar";
-import {
-  Busy,
-  ErrorState,
-  PinButton,
-  STATUS_STYLES,
-  StatusBadge,
-  emptyAreaClass,
-  fieldClass,
-  fillClass,
-  iconButton,
-  messageAreaClass,
-  paginationFooterClass,
-  secondaryButton,
-  secondaryDangerButton,
-  tableAreaClass,
-  useNotice,
-} from "./ui";
+import { Busy, PinButton, STATUS_STYLES, StatusBadge, fillClass, secondaryButton, useNotice } from "./ui";
 
 // The URL query and the API query use the same names.
 const QUERY_KEYS = [...VIEW_KEYS, "page", "page_size"];
-const DEFAULT_PAGE_SIZE = 25; // the API's default page size
-const PAGE_SIZES = [10, 25, 50, 100];
-const COLUMN_COUNT = 12;
 
-type BulkAction = "status" | "convert" | "delete";
+// The columns the Columns menu can hide. The customer, and the row's selection, pin and actions, always show.
+const COLUMNS = [
+  { key: "phone", label: "Phone" },
+  { key: "location", label: "Location" },
+  { key: "plan", label: "Plan" },
+  { key: "amount", label: "Amount" },
+  { key: "status", label: "Status" },
+  { key: "assigned", label: "Assigned" },
+  { key: "created", label: "Created" },
+  { key: "follow_up", label: "Next follow-up" },
+] as const;
+type ColumnKey = (typeof COLUMNS)[number]["key"];
+const FIXED_COLUMNS = 4; // selection, pin, customer, actions
 
-// The Works list imports these from here.
-export { menuItemClass, placeMenu } from "./lead-actions";
-export { updateQuery } from "./leads-toolbar";
+type BulkActionName = "status" | "convert" | "delete";
 
 export function LeadsPage() {
   const searchParams = useSearchParams();
@@ -75,32 +68,39 @@ export function LeadsPage() {
   const [clears, setClears] = useState(0);
   const [noticeElement, notify] = useNotice();
   const actions = useLeadActions(notify, reload);
+  const columns = useColumns("leads", COLUMNS);
   // Exporting the whole customer list is admin-only on the API, so only admins are offered it.
   const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
-  const search = searchParams.get("search") ?? "";
   const page = Number(searchParams.get("page")) || 1;
   const pageSize = Number(searchParams.get("page_size")) || DEFAULT_PAGE_SIZE;
-  const activeFilters = FILTER_KEYS.filter((key) => searchParams.get(key)).length;
+  const filtered = Boolean(searchParams.get("search")) || FILTER_KEYS.some((key) => searchParams.get(key));
   const showError = (text: string) => notify({ text, error: true });
 
   // The rows selected on this page, for the bulk actions. A new search, filter, sort or page starts with none selected.
   const rows = data?.results ?? [];
   const selection = useSelection(rows.map((lead) => lead.id), query.toString());
   const selectedLeads = rows.filter((lead) => selection.isSelected(lead.id));
-  const [bulkAction, setBulkAction] = useState<BulkAction>();
-  // Offered when they could apply to at least one selected lead; the API decides lead by lead.
+  const [bulkAction, setBulkAction] = useState<BulkActionName>();
+  const [bulkRunning, setBulkRunning] = useState(false);
+  // What this user may do with the selection, from what the API says of each lead (can_edit, can_convert, can_delete).
+  // An action their role doesn't allow isn't offered at all; the API decides lead by lead and checks again.
   const canBulkChange = selectedLeads.some((lead) => lead.can_edit);
   const canBulkConvert = selectedLeads.some((lead) => lead.can_convert);
   const canBulkDelete = selectedLeads.some((lead) => lead.can_delete);
 
   // Runs a bulk action on the selected leads and reports what went through and what didn't. The selection is kept when
   // nothing went through, so the user can change it and try again.
-  async function runBulk(request: (ids: number[]) => Promise<BulkResult>, noun: string, past: string) {
-    const result = await request(selection.selected);
-    notify(describeBulkResult(result, noun, past));
-    if (result.succeeded.length > 0) selection.clear();
-    reload();
+  async function runBulk(request: (ids: number[]) => Promise<BulkResult>, past: string) {
+    setBulkRunning(true);
+    try {
+      const result = await request(selection.selected);
+      notify(describeBulkResult(result, "lead", past));
+      if (result.succeeded.length > 0) selection.clear();
+      reload();
+    } finally {
+      setBulkRunning(false);
+    }
   }
 
   async function exportCsv() {
@@ -118,144 +118,8 @@ export function LeadsPage() {
     }
   }
 
-  let content;
-  if (error) {
-    content = (
-      <div className={`${messageAreaClass} mt-4`}>
-        {error.status === 404 && page > 1 ? (
-          <ErrorState
-            title="This page no longer exists"
-            message="There are fewer leads than before."
-            onRetry={() => updateQuery({ page: null })}
-            retryLabel="Go to the first page"
-          />
-        ) : (
-          <ErrorState
-            title="Couldn't load leads"
-            message={error.status === 404 ? "The leads service isn't available on the server yet." : error.message}
-            onRetry={reload}
-          />
-        )}
-      </div>
-    );
-  } else if (data && data.count === 0 && !loading) {
-    const filtered = Boolean(search) || activeFilters > 0;
-    content = (
-      <div className={`${emptyAreaClass} mt-4`}>
-        <p className="text-sm font-medium">{filtered ? "No leads match your search or filters." : "No leads yet."}</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {filtered ? "Try a different search, or clear the filters." : "Add a lead to start tracking it through the pipeline."}
-        </p>
-        <button
-          type="button"
-          onClick={
-            filtered
-              ? () => {
-                  updateQuery(Object.fromEntries(["search", ...FILTER_KEYS].map((key) => [key, null])));
-                  // A fresh toolbar also drops a search still being typed (not yet in the URL).
-                  setClears((count) => count + 1);
-                }
-              : actions.add
-          }
-          className={`${secondaryButton} mt-4`}
-        >
-          {filtered ? "Clear search and filters" : "Add Lead"}
-        </button>
-      </div>
-    );
-  } else {
-    const loaded = rows.length > 0;
-    content = (
-      <>
-        <SelectionAnnouncement count={selection.count} />
-        {selection.count > 0 && (
-          <BulkBar count={selection.count} onClear={selection.clear}>
-            <button type="button" onClick={() => setBulkAction("status")} disabled={!canBulkChange} className={secondaryButton}>
-              <FlagIcon className="size-4" />
-              Update Status
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkAction("convert")}
-              disabled={!canBulkConvert}
-              title={canBulkConvert ? undefined : "Only Won leads that don't have a Work yet can be converted."}
-              className={secondaryButton}
-            >
-              <ConvertIcon className="size-4" />
-              Convert to Work
-            </button>
-            {canBulkDelete && (
-              <button type="button" onClick={() => setBulkAction("delete")} className={secondaryDangerButton}>
-                <TrashIcon className="size-4" />
-                Delete
-              </button>
-            )}
-          </BulkBar>
-        )}
-        <div className={`${tableAreaClass} ${selection.count > 0 ? "mt-3" : "mt-4"}`}>
-          <table
-            aria-busy={loading}
-            className={`w-full min-w-280 text-sm transition-opacity ${loading && loaded ? "opacity-60" : ""}`}
-          >
-            <caption className="sr-only">Leads</caption>
-            <thead>
-              <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
-                <th scope="col" className="w-10 px-3 py-2.5">
-                  <SelectAllCheckbox
-                    checked={selection.allSelected}
-                    indeterminate={selection.someSelected}
-                    onChange={selection.toggleAll}
-                    disabled={!loaded}
-                    label="Select all leads on this page"
-                  />
-                </th>
-                <th scope="col" className="w-11 px-3 py-2.5">
-                  <PinIcon className="size-3.5" />
-                  <span className="sr-only">Pinned</span>
-                </th>
-                <th scope="col" className="sticky left-0 z-1 bg-page px-3 py-2.5">
-                  Customer
-                </th>
-                <th scope="col" className="px-3 py-2.5">Phone</th>
-                <th scope="col" className="px-3 py-2.5">Location</th>
-                <th scope="col" className="px-3 py-2.5">Plan</th>
-                <th scope="col" className="px-3 py-2.5 text-right">Amount</th>
-                <th scope="col" className="px-3 py-2.5">Status</th>
-                <th scope="col" className="px-3 py-2.5">Assigned</th>
-                <th scope="col" className="px-3 py-2.5">Created</th>
-                <th scope="col" className="px-3 py-2.5">Next follow-up</th>
-                <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loaded ? (
-                rows.map((lead) => (
-                  <LeadRow
-                    key={lead.id}
-                    lead={lead}
-                    selected={selection.isSelected(lead.id)}
-                    onToggle={() => selection.toggle(lead.id)}
-                    actions={actions}
-                    onChanged={reload}
-                    onStatusChanged={(updated) => {
-                      notify({ text: `${updated.name} is now ${statusLabel(updated.status)}.` });
-                      reload();
-                    }}
-                    onError={showError}
-                  />
-                ))
-              ) : (
-                <SkeletonRows />
-              )}
-            </tbody>
-          </table>
-        </div>
-        <Pagination page={page} pageSize={pageSize} count={data?.count} loading={loading} />
-      </>
-    );
-  }
+  const loaded = rows.length > 0;
+  const { shows } = columns;
 
   // The bulk actions' confirmations. Each closes on success, shows the API's message on failure, and reports per lead.
   const count = selection.count;
@@ -270,7 +134,7 @@ export function LeadsPage() {
         options={LEAD_STATUSES}
         confirmLabel="Update Status"
         pendingLabel="Updating…"
-        onConfirm={(value) => runBulk((ids) => bulkChangeLeadStatus(ids, value as LeadStatus), "lead", "updated")}
+        onConfirm={(value) => runBulk((ids) => bulkChangeLeadStatus(ids, value as LeadStatus), "updated")}
         onClose={() => setBulkAction(undefined)}
         onError={showError}
       />
@@ -280,7 +144,7 @@ export function LeadsPage() {
         description="Only Won leads that don't have a Work yet are converted, each once; a Work is created for each with its plan and amount. Any other selected lead is left as it is and listed afterwards."
         confirmLabel="Convert to Work"
         pendingLabel="Converting…"
-        onConfirm={() => runBulk(bulkConvertLeads, "lead", "converted to Work")}
+        onConfirm={() => runBulk(bulkConvertLeads, "converted to Work")}
         onClose={() => setBulkAction(undefined)}
         onError={showError}
       />
@@ -291,7 +155,7 @@ export function LeadsPage() {
         description="This action will permanently remove these CRM records and related CRM activity data. A lead that has been converted keeps its Work and is not deleted."
         confirmLabel="Delete"
         pendingLabel="Deleting…"
-        onConfirm={() => runBulk(bulkDeleteLeads, "lead", "deleted")}
+        onConfirm={() => runBulk(bulkDeleteLeads, "deleted")}
         onClose={() => setBulkAction(undefined)}
         onError={showError}
       />
@@ -305,13 +169,126 @@ export function LeadsPage() {
         onAdd={actions.add}
       />
       <LeadsToolbar key={clears}>
+        <ColumnsButton columns={columns} />
         {isAdmin && (
           <button type="button" onClick={exportCsv} disabled={exporting} className={`${secondaryButton} sm:ml-auto`}>
             {exporting ? <Busy>Exporting…</Busy> : <><DownloadIcon className="size-4" />Export</>}
           </button>
         )}
       </LeadsToolbar>
-      {content}
+      <SelectionAnnouncement count={count} />
+
+      <ListShell
+        noun="leads"
+        error={error}
+        onRetry={reload}
+        page={page}
+        pageSize={pageSize}
+        count={data?.count}
+        loading={loading}
+        empty={
+          filtered ? (
+            <EmptyState title="No leads match your search or filters." hint="Try a different search, or clear the filters.">
+              <button
+                type="button"
+                onClick={() => {
+                  updateQuery(Object.fromEntries(["search", ...FILTER_KEYS].map((key) => [key, null])));
+                  // A fresh toolbar also drops a search still being typed (not yet in the URL).
+                  setClears((current) => current + 1);
+                }}
+                className={secondaryButton}
+              >
+                Clear search and filters
+              </button>
+            </EmptyState>
+          ) : (
+            <EmptyState title="No leads yet." hint="Add a lead to start tracking it through the pipeline.">
+              <button type="button" onClick={actions.add} className={secondaryButton}>
+                Add Lead
+              </button>
+            </EmptyState>
+          )
+        }
+        bulkBar={
+          count > 0 && (
+            <BulkActionBar count={count} onClear={selection.clear} busy={bulkRunning}>
+              {canBulkChange && <BulkAction icon={FlagIcon} label="Update Status" onClick={() => setBulkAction("status")} />}
+              {canBulkChange && (
+                <BulkAction
+                  icon={ConvertIcon}
+                  label="Convert to Work"
+                  onClick={() => setBulkAction("convert")}
+                  disabled={!canBulkConvert}
+                  title={canBulkConvert ? undefined : "Only Won leads that don't have a Work yet can be converted."}
+                />
+              )}
+              {canBulkDelete && <BulkAction icon={TrashIcon} label="Delete" danger onClick={() => setBulkAction("delete")} />}
+            </BulkActionBar>
+          )
+        }
+      >
+        <table
+          aria-busy={loading}
+          // With columns hidden the table is as wide as what's left needs, no wider.
+          className={`w-full text-sm transition-opacity ${columns.hiddenCount > 0 ? "min-w-max" : "min-w-280"} ${loading && loaded ? "opacity-60" : ""}`}
+        >
+          <caption className="sr-only">Leads</caption>
+          <thead>
+            <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
+              <th scope="col" className="w-10 px-3 py-2.5">
+                <SelectAllCheckbox
+                  checked={selection.allSelected}
+                  indeterminate={selection.someSelected}
+                  onChange={selection.toggleAll}
+                  disabled={!loaded}
+                  label="Select all leads on this page"
+                />
+              </th>
+              <th scope="col" className="w-11 px-3 py-2.5">
+                <PinIcon className="size-3.5" />
+                <span className="sr-only">Pinned</span>
+              </th>
+              <th scope="col" className="sticky left-0 z-1 bg-page px-3 py-2.5">
+                Customer
+              </th>
+              {shows("phone") && <th scope="col" className="px-3 py-2.5">Phone</th>}
+              {shows("location") && <th scope="col" className="px-3 py-2.5">Location</th>}
+              {shows("plan") && <th scope="col" className="px-3 py-2.5">Plan</th>}
+              {shows("amount") && <th scope="col" className="px-3 py-2.5 text-right">Amount</th>}
+              {shows("status") && <th scope="col" className="px-3 py-2.5">Status</th>}
+              {shows("assigned") && <th scope="col" className="px-3 py-2.5">Assigned</th>}
+              {shows("created") && <th scope="col" className="px-3 py-2.5">Created</th>}
+              {shows("follow_up") && <th scope="col" className="px-3 py-2.5">Next follow-up</th>}
+              <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {loaded ? (
+              rows.map((lead) => (
+                <LeadRow
+                  key={lead.id}
+                  lead={lead}
+                  shows={shows}
+                  selected={selection.isSelected(lead.id)}
+                  onToggle={() => selection.toggle(lead.id)}
+                  actions={actions}
+                  onChanged={reload}
+                  onStatusChanged={(updated) => {
+                    notify({ text: `${updated.name} is now ${statusLabel(updated.status)}.` });
+                    reload();
+                  }}
+                  onError={showError}
+                />
+              ))
+            ) : (
+              <SkeletonRows columns={FIXED_COLUMNS + COLUMNS.length - columns.hiddenCount} />
+            )}
+          </tbody>
+        </table>
+      </ListShell>
+
       {actions.dialogs}
       {bulkDialog}
       {noticeElement}
@@ -321,6 +298,7 @@ export function LeadsPage() {
 
 type LeadRowProps = {
   lead: Lead;
+  shows: Columns<ColumnKey>["shows"];
   selected: boolean;
   onToggle: () => void;
   actions: LeadActions;
@@ -329,7 +307,7 @@ type LeadRowProps = {
   onError: (message: string) => void;
 };
 
-function LeadRow({ lead, selected, onToggle, actions, onChanged, onStatusChanged, onError }: LeadRowProps) {
+function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatusChanged, onError }: LeadRowProps) {
   const location = [lead.area, lead.district].filter(Boolean).join(", ");
   // Sticky cells need an opaque background: the row's own colour (selected or not), and the solid hover colour.
   const stickyCell = `sticky z-1 ${selected ? "bg-primary-softer" : "bg-background"} group-hover:bg-row-hover`;
@@ -357,32 +335,38 @@ function LeadRow({ lead, selected, onToggle, actions, onChanged, onStatusChanged
           <StatusBadge status={lead.status} />
         </span>
       </th>
-      <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(lead)}</td>
-      <td className="px-3 py-2">
-        <span className="block max-w-48 truncate">{location || "—"}</span>
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">{lead.plan_name ?? "—"}</td>
-      <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatMoney(lead.amount)}</td>
-      <td className="px-3 py-2">
-        <InlineStatus lead={lead} onSaved={onStatusChanged} onError={onError} />
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">
-        {lead.assigned_to_name ? (
-          <span className="flex items-center gap-2">
-            <span
-              aria-hidden="true"
-              className="grid size-6 place-items-center rounded-full bg-background text-[10px] font-semibold ring-1 ring-border"
-            >
-              {initials(lead.assigned_to_name)}
+      {shows("phone") && <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(lead)}</td>}
+      {shows("location") && (
+        <td className="px-3 py-2">
+          <span className="block max-w-48 truncate">{location || "—"}</span>
+        </td>
+      )}
+      {shows("plan") && <td className="px-3 py-2 whitespace-nowrap">{lead.plan_name ?? "—"}</td>}
+      {shows("amount") && <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatMoney(lead.amount)}</td>}
+      {shows("status") && (
+        <td className="px-3 py-2">
+          <InlineStatus lead={lead} onSaved={onStatusChanged} onError={onError} />
+        </td>
+      )}
+      {shows("assigned") && (
+        <td className="px-3 py-2 whitespace-nowrap">
+          {lead.assigned_to_name ? (
+            <span className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="grid size-6 place-items-center rounded-full bg-background text-[10px] font-semibold ring-1 ring-border"
+              >
+                {initials(lead.assigned_to_name)}
+              </span>
+              {lead.assigned_to_name}
             </span>
-            {lead.assigned_to_name}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">Unassigned</span>
-        )}
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">{formatDate(lead.created_at)}</td>
-      <td className="px-3 py-2 whitespace-nowrap">{formatDate(lead.next_follow_up)}</td>
+          ) : (
+            <span className="text-muted-foreground">Unassigned</span>
+          )}
+        </td>
+      )}
+      {shows("created") && <td className="px-3 py-2 whitespace-nowrap">{formatDate(lead.created_at)}</td>}
+      {shows("follow_up") && <td className="px-3 py-2 whitespace-nowrap">{formatDate(lead.next_follow_up)}</td>}
       <td className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)]`}>
         <LeadMenu lead={lead} actions={actions} />
       </td>
@@ -443,127 +427,5 @@ function InlineStatus({ lead, onSaved, onError }: InlineStatusProps) {
         <ChevronLeftIcon className="pointer-events-none absolute top-1/2 right-1.5 size-3 -translate-y-1/2 -rotate-90 opacity-70" />
       )}
     </span>
-  );
-}
-
-function SkeletonRows() {
-  return Array.from({ length: 8 }, (_, row) => (
-    <tr key={row} className="border-b border-border last:border-0">
-      {Array.from({ length: COLUMN_COUNT }, (_, cell) => (
-        <td key={cell} className="px-3 py-3.5">
-          <span className="block h-3 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
-        </td>
-      ))}
-    </tr>
-  ));
-}
-
-// Page numbers to show: the first, the last and the current page with its neighbours; null marks a gap.
-function pageNumbers(current: number, total: number) {
-  const shown = [...new Set([1, current - 1, current, current + 1, total])]
-    .filter((n) => n >= 1 && n <= total)
-    .sort((a, b) => a - b);
-  return shown.flatMap((n, i) => (i > 0 && n - shown[i - 1] > 1 ? [null, n] : [n]));
-}
-
-type PaginationProps = {
-  page: number;
-  pageSize: number;
-  /** The server's total; undefined until the first response. */
-  count?: number;
-  /** A request is in flight. */
-  loading?: boolean;
-};
-
-// The footer of every paginated list. It is always rendered under the list and keeps its place and height while data
-// loads, so the page doesn't shift when the data arrives. The total is the server's: the summary and the page buttons
-// are placeholders until there is one for this request (the first load has none; while another page or a new search
-// loads, the total on hand belongs to the old request). One request at a time: the buttons do nothing meanwhile.
-export function Pagination({ page, pageSize, count, loading = false }: PaginationProps) {
-  const pages = Math.max(1, Math.ceil((count ?? 0) / pageSize));
-  const first = (page - 1) * pageSize + 1;
-  const last = Math.min(page * pageSize, count ?? 0);
-  const go = (target: number) => {
-    if (loading) return;
-    updateQuery({ page: target > 1 ? String(target) : null });
-    window.scrollTo({ top: 0 });
-  };
-  const pageButton = "grid h-8 min-w-8 place-items-center rounded-md px-2 text-sm tabular-nums transition-colors aria-disabled:cursor-wait pointer-coarse:min-h-11 pointer-coarse:min-w-11";
-  const placeholder = "block animate-pulse rounded bg-subtle motion-reduce:animate-none";
-
-  return (
-    <nav aria-label="Pagination" aria-busy={loading} className={`${paginationFooterClass} justify-between`}>
-      {count === undefined || loading ? (
-        <span aria-hidden="true" className={`${placeholder} h-4 w-40`} />
-      ) : (
-        <p className="text-muted-foreground tabular-nums">
-          Showing {first.toLocaleString("en-IN")}–{last.toLocaleString("en-IN")} of {count.toLocaleString("en-IN")}
-        </p>
-      )}
-      {count === undefined ? (
-        <span aria-hidden="true" className={`${placeholder} h-8 w-56 max-w-full pointer-coarse:h-11`} />
-      ) : (
-        <div className={`flex flex-wrap items-center gap-4 transition-opacity ${loading ? "opacity-60" : ""}`}>
-          <label className="flex items-center gap-2 text-muted-foreground">
-            Rows per page
-            <select
-              value={pageSize}
-              onChange={(event) =>
-                updateQuery({ page_size: Number(event.target.value) === DEFAULT_PAGE_SIZE ? null : event.target.value })
-              }
-              className={`${fieldClass} h-8 text-foreground`}
-            >
-              {PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => go(page - 1)}
-              disabled={page <= 1}
-              // aria-disabled, not disabled, while loading: a disabled button would drop the keyboard focus.
-              aria-disabled={loading || undefined}
-              aria-label="Previous page"
-              className={`${iconButton} size-8`}
-            >
-              <ChevronLeftIcon className="size-4" />
-            </button>
-            {pageNumbers(page, pages).map((n, i) =>
-              n === null ? (
-                <span key={`gap-${i}`} aria-hidden="true" className="px-1 text-muted-foreground">
-                  …
-                </span>
-              ) : (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => go(n)}
-                  aria-disabled={loading || undefined}
-                  aria-label={`Page ${n}`}
-                  aria-current={n === page ? "page" : undefined}
-                  className={`${pageButton} ${n === page ? "bg-primary font-medium text-white" : "hover:bg-muted"}`}
-                >
-                  {n}
-                </button>
-              ),
-            )}
-            <button
-              type="button"
-              onClick={() => go(page + 1)}
-              disabled={page >= pages}
-              aria-disabled={loading || undefined}
-              aria-label="Next page"
-              className={`${iconButton} size-8`}
-            >
-              <ChevronLeftIcon className="size-4 rotate-180" />
-            </button>
-          </div>
-        </div>
-      )}
-    </nav>
   );
 }

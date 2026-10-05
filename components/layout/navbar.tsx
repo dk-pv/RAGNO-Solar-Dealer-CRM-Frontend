@@ -1,21 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { iconButton } from "@/components/leads/ui";
 import { LogoutIcon, MenuIcon, UserIcon, WhatsAppIcon } from "./icons";
+import { canOpen } from "./navigation";
 import { NotificationsBell } from "./notifications";
 import type { ShellUser } from "./use-shell-session";
-
-// wa.me needs the full international number without "+". A 10-digit local number is an Indian
-// mobile, so it gets the 91 country code: 7994890820 -> 917994890820.
-function toWhatsAppNumber(value: string | undefined) {
-  const digits = (value ?? "").replace(/\D/g, "").replace(/^0+/, "");
-  return digits.length === 10 ? `91${digits}` : digits;
-}
-
-// Next.js inlines NEXT_PUBLIC_ values at build time.
-const WHATSAPP_NUMBER = toWhatsAppNumber(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER);
+import { WhatsAppDialog } from "./whatsapp";
 
 const ROLE_LABELS: Record<ShellUser["role"], string> = { ADMIN: "Admin", STAFF: "Staff" };
 
@@ -56,6 +48,7 @@ type NavbarProps = {
 
 export function Navbar({ user, onLogout, onOpenNavigation }: NavbarProps) {
   const userInitials = user ? initials(user.name) : "";
+  const [composing, setComposing] = useState(false);
 
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 lg:px-6">
@@ -65,17 +58,19 @@ export function Navbar({ user, onLogout, onOpenNavigation }: NavbarProps) {
       <span className="truncate text-sm font-semibold lg:hidden">Ragno Power System</span>
 
       <div className="ml-auto flex items-center gap-1">
-        {WHATSAPP_NUMBER && (
-          <Tooltip label="WhatsApp">
-            <a
-              href={`https://wa.me/${WHATSAPP_NUMBER}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="WhatsApp (opens in a new tab)"
+        {/* A WhatsApp message to a lead, on the lead's own number: for whoever has the Leads module (the form lists
+            only the leads the API lets them see). */}
+        {user && canOpen(user, { module: "leads" }) && (
+          <Tooltip label="WhatsApp a lead">
+            <button
+              type="button"
+              onClick={() => setComposing(true)}
+              aria-label="Send a WhatsApp message to a lead"
+              aria-haspopup="dialog"
               className={iconButtonClass}
             >
               <WhatsAppIcon />
-            </a>
+            </button>
           </Tooltip>
         )}
 
@@ -123,6 +118,7 @@ export function Navbar({ user, onLogout, onOpenNavigation }: NavbarProps) {
           </div>
         </div>
       </div>
+      {composing && <WhatsAppDialog onClose={() => setComposing(false)} />}
     </header>
   );
 }

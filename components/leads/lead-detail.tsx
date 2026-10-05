@@ -15,6 +15,7 @@ import {
   WhatsAppIcon,
 } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
+import { ActionDialog } from "@/components/selection";
 import { toApiError, useApi } from "@/lib/api";
 import {
   ACTIVITY_NOT_YOURS,
@@ -59,6 +60,7 @@ export function LeadDetail({ id }: { id: number }) {
   const [editing, setEditing] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [noticeElement, notify] = useNotice();
   const router = useRouter();
   // The Work module (Settings -> Roles & Access) opens the Works list, where the lead's Work is found by its number.
@@ -100,16 +102,6 @@ export function LeadDetail({ id }: { id: number }) {
 
   const whatsapp = whatsappHref(lead);
   const tel = telHref(lead);
-
-  async function removeLead(target: Lead) {
-    if (!window.confirm(`Delete ${target.name}? The lead and its activities are removed for good.`)) return;
-    try {
-      await deleteLead(target.id);
-      router.push("/leads");
-    } catch (err) {
-      notify({ text: toApiError(err).message, error: true });
-    }
-  }
 
   return (
     <div>
@@ -160,7 +152,7 @@ export function LeadDetail({ id }: { id: number }) {
             Edit
           </button>
           {lead.can_delete && (
-            <button type="button" onClick={() => removeLead(lead)} className={secondaryDangerButton}>
+            <button type="button" onClick={() => setDeleting(true)} className={secondaryDangerButton}>
               <TrashIcon className="size-4" />
               Delete
             </button>
@@ -291,6 +283,21 @@ export function LeadDetail({ id }: { id: number }) {
           }}
         />
       )}
+      {deleting && (
+        <ActionDialog
+          destructive
+          title={`Delete ${lead.name}?`}
+          description="The lead and its activities are removed for good."
+          confirmLabel="Delete lead"
+          pendingLabel="Deleting…"
+          onConfirm={async () => {
+            await deleteLead(lead.id);
+            router.push("/leads");
+          }}
+          onClose={() => setDeleting(false)}
+          onError={(text) => notify({ text, error: true })}
+        />
+      )}
       {noticeElement}
     </div>
   );
@@ -336,6 +343,7 @@ const linkButton =
 function Activities({ activities, lead, onScheduleFollowUp, notify }: ActivitiesProps) {
   const { data, error, loading, reload } = activities;
   const [dialog, setDialog] = useState<{ activity?: Activity }>(); // the open Add or Edit Follow-up dialog
+  const [deleting, setDeleting] = useState<Activity>();
   const [busyId, setBusyId] = useState<number>();
   const [actionError, setActionError] = useState<string>();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -352,18 +360,6 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
     } finally {
       setBusyId(undefined);
     }
-  }
-
-  function remove(activity: Activity) {
-    if (!window.confirm(`Delete the follow-up "${heading(activity)}"?`)) return;
-    run(
-      activity,
-      async () => {
-        await deleteActivity(activity.id);
-        headingRef.current?.focus();
-      },
-      "Follow-up deleted.",
-    );
   }
 
   let content;
@@ -470,7 +466,7 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
                   {activity.can_delete && (
                     <button
                       type="button"
-                      onClick={() => remove(activity)}
+                      onClick={() => setDeleting(activity)}
                       aria-label={`Delete follow-up: ${heading(activity)}`}
                       className="font-medium text-error underline-offset-2 hover:underline pointer-coarse:py-2"
                     >
@@ -538,8 +534,27 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
           }}
         />
       )}
+      {deleting && (
+        <ActionDialog
+          destructive
+          title="Delete this follow-up?"
+          description={`"${heading(deleting)}" will be removed for good.`}
+          confirmLabel="Delete"
+          pendingLabel="Deleting…"
+          onConfirm={async () => {
+            await deleteActivity(deleting.id);
+            reload();
+            notify("Follow-up deleted.");
+          }}
+          onClose={() => {
+            setDeleting(undefined);
+            headingRef.current?.focus(); // the row, and the button that opened this, may be gone
+          }}
+          onError={(text) => notify(text, true)}
+        />
+      )}
     </section>
   );
 }
 
-const heading = (activity: Activity) => activity.title || activity.type_display;
+const heading =(activity: Activity) => activity.title || activity.type_display;

@@ -8,8 +8,8 @@ import {
   FOLLOW_UP_FIELDS,
   Field,
   FollowUpFields,
+  FormDialog,
   StartsPending,
-  dialogClass,
   emptyFollowUp,
   followUpDraft,
   toFollowUpInput,
@@ -17,23 +17,24 @@ import {
   type FollowUpDraft,
   type FollowUpErrors,
 } from "./lead-dialogs";
-import { Busy, inputClass, primaryButton, secondaryButton } from "./ui";
+import { inputClass } from "./ui";
 
 type LeadChoice = Pick<Lead, "id" | "name" | "assigned_to">;
 
-// Finds a lead by name, phone or ID through the leads search, offering only leads this user can change.
-// A combobox: type to search, arrow keys to move, Enter to choose, Escape to close the list.
-function LeadPicker({
-  id,
-  value,
-  onChange,
-  error: fieldError,
-}: {
+type LeadPickerProps = {
   id: string;
-  value?: LeadChoice;
-  onChange: (lead?: LeadChoice) => void;
+  value?: Pick<Lead, "id" | "name">;
+  onChange: (lead?: Lead) => void;
   error?: string;
-}) {
+  /** Which of the leads found can be chosen (all of them unless given), and what to say when none can. */
+  selectable?: (lead: Lead) => boolean;
+  noneText?: string;
+};
+
+// Finds a lead by name, phone or ID through the leads search (a few matches at a time, never the whole list), among the
+// leads this user works with: the API lists no others. A combobox: type to search, arrow keys to move, Enter to choose,
+// Escape to close the list. The follow-up form and the WhatsApp message both choose their lead with it.
+export function LeadPicker({ id, value, onChange, error: fieldError, selectable, noneText = "No leads match." }: LeadPickerProps) {
   const listId = useId();
   const [text, setText] = useState("");
   const [term, setTerm] = useState("");
@@ -46,7 +47,7 @@ function LeadPicker({
   // Results for an older term (typed ahead of the pause, still on their way, or kept after a failed search) are never
   // offered.
   const stale = text.trim() !== term || loading || error !== undefined;
-  const options = stale ? [] : (data?.results ?? []).filter((lead) => lead.can_edit);
+  const options = stale ? [] : (data?.results ?? []).filter((lead) => selectable?.(lead) ?? true);
   const searching = open && text.trim() !== "";
   const showList = searching && options.length > 0;
 
@@ -57,7 +58,7 @@ function LeadPicker({
   }, [text]);
 
   function choose(lead: Lead) {
-    onChange({ id: lead.id, name: lead.name, assigned_to: lead.assigned_to });
+    onChange(lead);
     setText("");
     setTerm("");
     setOpen(false);
@@ -166,11 +167,7 @@ function LeadPicker({
           role="status"
           className="absolute z-10 mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground shadow-lg"
         >
-          {error && text.trim() === term
-            ? "Couldn't search leads. Press Enter to try again."
-            : stale
-              ? "Searching…"
-              : "No leads you can work on match."}
+          {error && text.trim() === term ? "Couldn't search leads. Press Enter to try again." : stale ? "Searching…" : noneText}
         </p>
       )}
     </div>
@@ -198,10 +195,6 @@ export function FollowUpDialog({ activity, lead: fixedLead, onClose, onSaved, on
   const [formError, setFormError] = useState<string>();
   const [pending, setPending] = useState(false);
 
-  useEffect(() => {
-    dialogRef.current?.showModal();
-  }, []);
-
   const options = assignees.data ?? [];
   // A new one starts with the lead's staff, when they can be chosen (an admin can't pick a deactivated user); staff can
   // assign a follow-up only to themselves, so their one choice is made for them.
@@ -213,10 +206,6 @@ export function FollowUpDialog({ activity, lead: fixedLead, onClose, onSaved, on
   // Whoever it's assigned to stays a choice when editing, even if this user couldn't pick them.
   const keepAssignee =
     activity?.assigned_to ? { id: activity.assigned_to, name: activity.assigned_to_name ?? `User #${activity.assigned_to}` } : undefined;
-  // Not while saving: the page reloads its list once the save is done, and the focus goes back to the page then.
-  const close = () => {
-    if (!pending) dialogRef.current?.close();
-  };
 
   function chooseLead(choice?: LeadChoice) {
     setLead(choice);
@@ -224,8 +213,6 @@ export function FollowUpDialog({ activity, lead: fixedLead, onClose, onSaved, on
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (pending) return;
     const form = event.currentTarget;
     const found: FollowUpErrors & { lead?: string } = validateFollowUp(draft);
     if (!activity && !lead) found.lead = "Choose the lead this follow-up is for.";
@@ -267,64 +254,48 @@ export function FollowUpDialog({ activity, lead: fixedLead, onClose, onSaved, on
   }
 
   return (
-    <dialog
+    <FormDialog
       ref={dialogRef}
+      title={activity ? "Edit follow-up" : "Add follow-up"}
+      busy={pending}
+      error={formError}
+      submitLabel={activity ? "Save changes" : "Create follow-up"}
+      busyLabel="Saving…"
+      onSubmit={submit}
       onClose={onClose}
-      onCancel={(event) => {
-        if (pending) event.preventDefault(); // Escape
-      }}
-      aria-labelledby={`${formId}-title`}
-      className={`${dialogClass} max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto p-5`}
     >
-      <form noValidate onSubmit={submit}>
-        <h2 id={`${formId}-title`} className="text-base font-semibold">
-          {activity ? "Edit follow-up" : "Add follow-up"}
-        </h2>
-        {formError && (
-          <p role="alert" className="mt-3 rounded-md border border-error-border bg-error-soft px-3 py-2 text-sm text-error">
-            {formError}
-          </p>
-        )}
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Lead" id={`${formId}-lead`} required={!activity && !fixedLead} error={errors.lead} wide>
-            {activity || fixedLead ? (
-              <p id={`${formId}-lead`} className="rounded-md border border-border bg-muted px-3 py-2 text-sm">
-                <span className="font-medium">{activity?.lead_name ?? fixedLead?.name}</span>
-                <span className="text-muted-foreground"> #{activity?.lead ?? fixedLead?.id}</span>
-              </p>
-            ) : (
-              <LeadPicker id={`${formId}-lead`} value={lead} onChange={chooseLead} error={errors.lead} />
-            )}
-          </Field>
-          <FollowUpFields
-            idPrefix={`${formId}-follow-up`}
-            values={draft}
-            errors={errors}
-            onChange={(field, value) => {
-              setValues((current) => ({ ...current, [field]: value }));
-              setErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
-            }}
-            assignees={assignees.data}
-            assigneesError={assignees.error?.message}
-            keepAssignee={keepAssignee}
-          />
-          {!activity && <StartsPending />}
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={close}
-            aria-disabled={pending || undefined}
-            className={`${secondaryButton} aria-disabled:opacity-50`}
-          >
-            Cancel
-          </button>
-          {/* aria-disabled, not disabled, while saving: a disabled button would drop the keyboard focus. */}
-          <button type="submit" aria-disabled={pending || undefined} className={`${primaryButton} aria-disabled:opacity-50`}>
-            {pending ? <Busy>Saving…</Busy> : activity ? "Save changes" : "Create follow-up"}
-          </button>
-        </div>
-      </form>
-    </dialog>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Lead" id={`${formId}-lead`} required={!activity && !fixedLead} error={errors.lead} wide>
+          {activity || fixedLead ? (
+            <p id={`${formId}-lead`} className="rounded-md border border-border bg-muted px-3 py-2 text-sm">
+              <span className="font-medium">{activity?.lead_name ?? fixedLead?.name}</span>
+              <span className="text-muted-foreground"> #{activity?.lead ?? fixedLead?.id}</span>
+            </p>
+          ) : (
+            <LeadPicker
+              id={`${formId}-lead`}
+              value={lead}
+              onChange={chooseLead}
+              error={errors.lead}
+              selectable={(found) => found.can_edit}
+              noneText="No leads you can work on match."
+            />
+          )}
+        </Field>
+        <FollowUpFields
+          idPrefix={`${formId}-follow-up`}
+          values={draft}
+          errors={errors}
+          onChange={(field, value) => {
+            setValues((current) => ({ ...current, [field]: value }));
+            setErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
+          }}
+          assignees={assignees.data}
+          assigneesError={assignees.error?.message}
+          keepAssignee={keepAssignee}
+        />
+        {!activity && <StartsPending />}
+      </div>
+    </FormDialog>
   );
 }

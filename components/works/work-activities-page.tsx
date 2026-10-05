@@ -1,34 +1,23 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useContext, useEffect, useId, useState, type ChangeEvent } from "react";
+import { useContext, useId, useState, type ChangeEvent } from "react";
 
-import { FilterIcon, PlusIcon, SearchIcon } from "@/components/layout/icons";
+import { PlusIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { ACTIVITY_TYPES, type Assignee, type Page } from "@/components/leads/api";
-import { Pagination } from "@/components/leads/leads-page";
-import { updateQuery } from "@/components/leads/leads-toolbar";
-import {
-  ErrorState,
-  emptyAreaClass,
-  fieldClass,
-  fillClass,
-  inputClass,
-  messageAreaClass,
-  primaryButton,
-  secondaryButton,
-  useNotice,
-} from "@/components/leads/ui";
+import { FilterToggle, SearchBox, SortSelect, StatusTabs, pickParams, updateQuery } from "@/components/leads/leads-toolbar";
+import { PageHeader, fillClass, inputClass, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
+import { ColumnsButton, DEFAULT_PAGE_SIZE, EmptyState, ListShell, useColumns } from "@/components/table";
 import { useApi } from "@/lib/api";
 import { ACTIVITY_STATUSES, type WorkActivity } from "./api";
-import { ActivityDialog, WorkActivityTable, useActivityRowActions } from "./work-activities";
+import { ActivityDialog, WORK_ACTIVITY_COLUMNS, WorkActivityTable, useActivityRowActions } from "./work-activities";
 
-const FILTER_KEYS = ["status", "type", "assigned_to", "due_after", "due_before"] as const;
+const FILTER_KEYS = ["type", "assigned_to", "due_after", "due_before"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 // The URL query and the API query use the same names.
-const QUERY_KEYS = ["search", ...FILTER_KEYS, "ordering", "page", "page_size"];
+const QUERY_KEYS = ["search", "status", ...FILTER_KEYS, "ordering", "page", "page_size"];
 const DEFAULT_ORDERING = "-work";
-const DEFAULT_PAGE_SIZE = 25; // the API's default page size
 
 // Must match the backend's Work activity orderings. All but due date keep each Work's activities together.
 const SORT_OPTIONS = [
@@ -38,14 +27,12 @@ const SORT_OPTIONS = [
   { value: "due_date", label: "Due date (soonest first)" },
 ];
 
-// Every Work's activities and follow-ups in one table, each Work's rows together and in the Work's own colour.
+// Work Activities: every Work's activities and follow-ups in one table, each Work's rows together and in the Work's own
+// colour. Built from the same pieces as Lead Activities: the status tabs, search, filters, sort, columns and paging,
+// all kept in the URL.
 export function WorkActivitiesPage() {
   const searchParams = useSearchParams();
-  const query = new URLSearchParams();
-  for (const key of QUERY_KEYS) {
-    const value = searchParams.get(key);
-    if (value) query.set(key, value);
-  }
+  const query = pickParams(searchParams, QUERY_KEYS);
   const { data, error, loading, reload } = useApi<Page<WorkActivity>>(
     query.toString() ? `/activities/works/?${query}` : "/activities/works/",
   );
@@ -53,156 +40,98 @@ export function WorkActivitiesPage() {
   const [noticeElement, notify] = useNotice();
   const rowActions = useActivityRowActions(notify, reload, assignees);
   const [adding, setAdding] = useState(false);
-
-  const search = searchParams.get("search") ?? "";
-  const [searchText, setSearchText] = useState(search);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [clears, setClears] = useState(0);
   const filterPanelId = useId();
+  const columns = useColumns("work-activities", WORK_ACTIVITY_COLUMNS);
   // The API lists a staff member's own activities first, then the rest in the chosen order (each Work's together);
   // an admin's page is in the chosen order alone.
   const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
-  // Search as the user types, once they pause.
-  useEffect(() => {
-    const next = searchText.trim();
-    if (next === search) return;
-    const timer = setTimeout(() => updateQuery({ search: next || null }), 300);
-    return () => clearTimeout(timer);
-  }, [searchText, search]);
-
   const page = Number(searchParams.get("page")) || 1;
   const pageSize = Number(searchParams.get("page_size")) || DEFAULT_PAGE_SIZE;
   const activeFilters = FILTER_KEYS.filter((key) => searchParams.get(key)).length;
-  const filtered = Boolean(search) || activeFilters > 0;
+  const narrowed = Boolean(searchParams.get("search") || searchParams.get("status")) || activeFilters > 0;
 
-  function clearSearchAndFilters() {
-    setSearchText("");
-    updateQuery(Object.fromEntries(["search", ...FILTER_KEYS].map((key) => [key, null])));
-  }
-
-  const addButton = (
-    <button type="button" onClick={() => setAdding(true)} className={primaryButton}>
-      <PlusIcon className="size-4" />
-      Add Activity
-    </button>
-  );
-
-  let content;
-  if (error) {
-    content = (
-      <div className={`${messageAreaClass} mt-4`}>
-        {error.status === 404 && page > 1 ? (
-          <ErrorState
-            title="This page no longer exists"
-            message="There are fewer activities than before."
-            onRetry={() => updateQuery({ page: null })}
-            retryLabel="Go to the first page"
-          />
-        ) : (
-          <ErrorState title="Couldn't load activities" message="Something went wrong while loading them." onRetry={reload} />
-        )}
-      </div>
-    );
-  } else if (data && data.count === 0 && !loading) {
-    content = (
-      <div className={`${emptyAreaClass} mt-4`}>
-        <p className="text-sm font-medium">{filtered ? "No activities match your search or filters." : "No activities found."}</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {filtered ? "Try a different search, or clear the filters." : "Add a follow-up to keep track of the next action on a Work."}
-        </p>
-        <div className="mt-4">
-          {filtered ? (
-            <button type="button" onClick={clearSearchAndFilters} className={secondaryButton}>
-              Clear search and filters
-            </button>
-          ) : (
-            addButton
-          )}
-        </div>
-      </div>
-    );
-  } else {
-    content = (
-      <>
-        <div className={`${fillClass} mt-4`}>
-          <WorkActivityTable
-            rows={data?.results}
-            loading={loading}
-            showWork
-            completingId={rowActions.completingId}
-            onEdit={rowActions.edit}
-            onComplete={rowActions.complete}
-          />
-        </div>
-        <Pagination page={page} pageSize={pageSize} count={data?.count} loading={loading} />
-      </>
-    );
+  function clearAll() {
+    updateQuery(Object.fromEntries(["search", "status", ...FILTER_KEYS].map((key) => [key, null])));
+    setClears((count) => count + 1); // a fresh search box drops a search still being typed
+    setFiltersOpen(false);
   }
 
   return (
     <div className={fillClass}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Work Activities</h1>
-          <p className="mt-0.5 min-h-5 text-sm text-muted-foreground">
-            {data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "activity" : "activities"}` : " "}
-          </p>
-        </div>
-        {addButton}
-      </div>
+      <PageHeader
+        title="Work Activities"
+        description={data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "activity" : "activities"}` : undefined}
+      >
+        <button type="button" onClick={() => setAdding(true)} className={primaryButton}>
+          <PlusIcon className="size-4" />
+          Add activity
+        </button>
+      </PageHeader>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-96">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-faint" />
-          <input
-            type="search"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Search customer, Work ID, activity or staff"
-            aria-label="Search activities"
-            className={`${inputClass} pl-8`}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((open) => !open)}
-          aria-expanded={filtersOpen}
-          aria-controls={filterPanelId}
-          className={secondaryButton}
-        >
-          <FilterIcon className="size-4" />
-          Filter
-          {activeFilters > 0 && <span className="rounded bg-primary px-1.5 text-xs leading-5 text-white">{activeFilters}</span>}
-        </button>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Sort</span>
-          <select
-            value={searchParams.get("ordering") ?? DEFAULT_ORDERING}
-            onChange={(event) =>
-              updateQuery({ ordering: event.target.value === DEFAULT_ORDERING ? null : event.target.value })
-            }
-            className={`${fieldClass} h-9`}
-          >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <StatusTabs statuses={ACTIVITY_STATUSES} />
+        <SearchBox key={clears} label="Search activities" placeholder="Search customer, Work ID, activity or staff" />
+        <FilterToggle
+          open={filtersOpen}
+          onToggle={() => setFiltersOpen((open) => !open)}
+          controls={filterPanelId}
+          active={activeFilters}
+        />
+        <SortSelect options={SORT_OPTIONS} defaultValue={DEFAULT_ORDERING} />
+        <ColumnsButton columns={columns} />
         {!isAdmin && <span className="text-xs text-muted-foreground">Yours come first</span>}
       </div>
-
       {filtersOpen && (
         <FilterPanel
           id={filterPanelId}
           searchParams={searchParams}
           assignees={assignees.data}
-          onDone={() => setFiltersOpen(false)}
+          onDone={() => {
+            setFiltersOpen(false);
+            // The panel, and the button pressed in it, go away.
+            document.querySelector<HTMLElement>(`[aria-controls="${filterPanelId}"]`)?.focus();
+          }}
         />
       )}
 
-      {content}
+      <ListShell
+        noun="activities"
+        error={error}
+        onRetry={reload}
+        page={page}
+        pageSize={pageSize}
+        count={data?.count}
+        loading={loading}
+        boxed
+        empty={
+          narrowed ? (
+            <EmptyState title="No activities match your search or filters." hint="Try a different search, or clear the filters.">
+              <button type="button" onClick={clearAll} className={secondaryButton}>
+                Clear search and filters
+              </button>
+            </EmptyState>
+          ) : (
+            <EmptyState title="No activities yet." hint="Add a follow-up to keep track of the next action on a Work.">
+              <button type="button" onClick={() => setAdding(true)} className={secondaryButton}>
+                Add activity
+              </button>
+            </EmptyState>
+          )
+        }
+      >
+        <WorkActivityTable
+          rows={data?.results}
+          loading={loading}
+          showWork
+          shows={columns.shows}
+          completingId={rowActions.completingId}
+          onEdit={rowActions.edit}
+          onComplete={rowActions.complete}
+        />
+      </ListShell>
 
       {rowActions.dialog}
       {adding && (
@@ -241,21 +170,10 @@ function FilterPanel({ id, searchParams, assignees, onDone }: FilterPanelProps) 
         updateQuery(Object.fromEntries(FILTER_KEYS.map((key) => [key, draft[key] || null])));
         onDone();
       }}
-      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-3"
+      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-4"
     >
       <label className="text-sm">
-        <span className="mb-1.5 block font-medium text-label">Status</span>
-        <select {...bind("status")}>
-          <option value="">All statuses</option>
-          {ACTIVITY_STATUSES.map((status) => (
-            <option key={status.value} value={status.value}>
-              {status.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="text-sm">
-        <span className="mb-1.5 block font-medium text-label">Activity type</span>
+        <span className="mb-1.5 block font-medium text-label">Type</span>
         <select {...bind("type")}>
           <option value="">All types</option>
           {ACTIVITY_TYPES.map((type) => (
@@ -284,7 +202,7 @@ function FilterPanel({ id, searchParams, assignees, onDone }: FilterPanelProps) 
         <span className="mb-1.5 block font-medium text-label">Due to</span>
         <input type="date" min={draft.due_after || undefined} {...bind("due_before")} />
       </label>
-      <div className="flex items-end justify-end gap-2 sm:col-span-2 lg:col-span-1">
+      <div className="flex justify-end gap-2 sm:col-span-2 lg:col-span-4">
         <button
           type="button"
           onClick={() => {

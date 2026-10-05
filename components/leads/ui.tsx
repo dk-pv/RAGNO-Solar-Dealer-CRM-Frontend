@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode, type RefObject } from "react";
 
 import { CloseIcon, PinIcon, SpinnerIcon } from "@/components/layout/icons";
 import { toApiError } from "@/lib/api";
@@ -76,6 +76,32 @@ export const emptyAreaClass =
 // The footer under a list. `mt-auto` keeps it at the bottom even when nothing above it grows; callers add the alignment.
 export const paginationFooterClass = "mt-auto flex min-h-8 flex-wrap items-center gap-3 pt-3 text-sm pointer-coarse:min-h-11";
 
+type PageHeaderProps = {
+  title: string;
+  /** The line under the title: a count, or what the page is for. Its place is kept while a count loads. */
+  description?: string;
+  /** To move the keyboard focus to the title when what had it leaves the page. */
+  titleRef?: RefObject<HTMLHeadingElement | null>;
+  /** On the right: the page's view switch and its main action. */
+  children?: ReactNode;
+};
+
+// The heading of a list or board page, the same on every one: Leads, Works, both pipelines and both Activities pages.
+export function PageHeader({ title, description = " ", titleRef, children }: PageHeaderProps) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined} className="text-xl font-semibold">
+          {title}
+        </h1>
+        {/* min-h-5: the line is reserved while the count loads, so the title doesn't move when it arrives. */}
+        <p className="mt-0.5 min-h-5 text-sm text-muted-foreground">{description}</p>
+      </div>
+      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+    </div>
+  );
+}
+
 // Switches between a module's List and Pipeline views. `query` carries the search and filters both views share.
 export function ViewSwitch({ label, views, query = "" }: { label: string; views: { label: string; href: string }[]; query?: string }) {
   const pathname = usePathname();
@@ -105,6 +131,16 @@ export const STATUS_STYLES: Record<LeadStatus, string> = {
   SUPERHOT: "bg-warning text-white ring-warning",
   WON: "bg-success-soft text-success ring-success-border",
   LOST: "bg-error-soft text-error ring-error-border",
+};
+
+// Each status's dot, for the Lead Pipeline's column headers (as the Work stages have theirs).
+export const STATUS_DOTS: Record<LeadStatus, string> = {
+  NEW: "bg-neutral",
+  INITIAL_CONTACT: "bg-info",
+  HOT: "bg-warning",
+  SUPERHOT: "bg-white",
+  WON: "bg-success",
+  LOST: "bg-error",
 };
 
 export function StatusBadge({ status }: { status: LeadStatus }) {
