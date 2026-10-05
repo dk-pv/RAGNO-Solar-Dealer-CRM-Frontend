@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { CloseIcon, ConvertIcon, EyeIcon, MoreIcon, PencilIcon, PlusIcon } from "@/components/layout/icons";
 import {
+  ACTIVITY_NOT_YOURS,
   ACTIVITY_TYPES,
   formatDate,
   formatPhone,
@@ -281,14 +282,18 @@ function ActivityMenu({ activity, withWork, completing, onEdit, onComplete }: Ac
           Edit
         </button>
         {activity.status === "PENDING" && (
+          // Only the staff member it is assigned to, or an admin, completes it: anyone else is told why on choosing
+          // it (aria-disabled keeps the item reachable; the API refuses them too).
           <button
             type="button"
             onClick={() => {
+              if (completing) return;
               hide();
               onComplete();
             }}
-            disabled={completing}
-            className={menuItemClass}
+            aria-disabled={completing || !activity.can_update_status || undefined}
+            title={activity.can_update_status ? undefined : ACTIVITY_NOT_YOURS}
+            className={`${menuItemClass} aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
           >
             <ConvertIcon className="size-4 text-success" />
             {completing ? "Completing…" : "Mark completed"}
@@ -312,6 +317,10 @@ export function useActivityRowActions(notify: Notify, onChanged: () => void, ass
   const [completingId, setCompletingId] = useState<number>();
 
   async function complete(activity: WorkActivity) {
+    if (!activity.can_update_status) {
+      notify({ text: ACTIVITY_NOT_YOURS, error: true });
+      return;
+    }
     setCompletingId(activity.id);
     try {
       await saveWorkActivity({ status: "COMPLETED" }, { id: activity.id });
@@ -486,7 +495,8 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
         description: description.trim(),
         assigned_to: assignedTo ? Number(assignedTo) : null,
         due_date: dueDate || null,
-        status,
+        // Sent only when changed here: an untouched status (the disabled control included) is never a status change.
+        ...(activity && status === activity.status ? {} : { status }),
       };
       onSaved(await saveWorkActivity(input, activity ? { id: activity.id } : { work: target.id }));
       close();
@@ -543,11 +553,18 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
               ))}
             </select>
           </Field>
-          <Field label="Status" id={fieldId("status")} error={errors.status}>
+          <Field
+            label="Status"
+            id={fieldId("status")}
+            error={errors.status}
+            hint={activity && !activity.can_update_status ? ACTIVITY_NOT_YOURS : undefined}
+          >
             <select
               id={fieldId("status")}
               value={status}
               onChange={(event) => setStatus(event.target.value as ActivityStatus)}
+              // Only the assignee or an admin changes it; the API refuses anyone else.
+              disabled={activity !== undefined && !activity.can_update_status}
               className={inputClass}
             >
               {ACTIVITY_STATUSES.map((item) => (

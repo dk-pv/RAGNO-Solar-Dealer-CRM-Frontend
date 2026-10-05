@@ -100,12 +100,26 @@ export type WorkActivity = {
   created_at: string;
   // The Work it belongs to, for tables that list several Works' activities.
   work_summary: Pick<Work, "id" | "customer_name" | "country_code" | "phone" | "plan_name" | "stage">;
+  // Completing or reopening it: only the staff member it is assigned to, or an admin (the API refuses anyone else).
+  can_update_status: boolean;
 };
 
 export type WorkActivityInput = Pick<WorkActivity, "type" | "description" | "assigned_to" | "due_date" | "status">;
 
 export function updateWork(id: number, changes: WorkChanges) {
   return apiRequest<Work>(`/works/${id}/`, { method: "PATCH", json: changes });
+}
+
+// The list's bulk actions on the selected rows (BulkResult in components/selection.tsx). Moving Works needs the Work
+// module, as the row's stage control does; deleting them (with their activity history) is for admins only.
+type BulkResult = { succeeded: number[]; failed: { id: number; name: string | null; reason: string }[] };
+
+export function bulkChangeWorkStage(ids: number[], stage: WorkStage) {
+  return apiRequest<BulkResult>("/works/bulk-stage/", { method: "POST", json: { ids, stage } });
+}
+
+export function bulkDeleteWorks(ids: number[]) {
+  return apiRequest<BulkResult>("/works/bulk-delete/", { method: "POST", json: { ids } });
 }
 
 // Completing records when and by whom on the server; setting it back to Pending clears that.

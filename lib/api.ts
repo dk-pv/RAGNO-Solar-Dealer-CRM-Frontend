@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { getAccessToken, signOut } from "./auth";
 
@@ -140,6 +140,7 @@ export function useApi<T>(path: string | null) {
     data: result.data,
     error: result.key === key ? result.error : undefined,
     loading: path !== null && result.key !== key,
-    reload: () => setVersion((current) => current + 1),
+    // The same function on every render, so an effect (a poll, say) can depend on it without re-running each render.
+    reload: useCallback(() => setVersion((current) => current + 1), []),
   };
 }

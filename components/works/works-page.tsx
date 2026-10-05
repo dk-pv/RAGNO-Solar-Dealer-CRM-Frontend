@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useId, useState, type ChangeEvent } from "react";
+import { useContext, useEffect, useId, useState, type ChangeEvent } from "react";
 
-import { ChevronLeftIcon, FilterIcon, PinIcon, SearchIcon } from "@/components/layout/icons";
+import { ChevronLeftIcon, FilterIcon, FlagIcon, PinIcon, SearchIcon, TrashIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
+import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { formatDate, formatMoney, formatPhone, type Assignee, type Page, type Plan } from "@/components/leads/api";
 import { Pagination } from "@/components/leads/leads-page";
 import { updateQuery } from "@/components/leads/leads-toolbar";
@@ -19,11 +20,33 @@ import {
   messageAreaClass,
   primaryButton,
   secondaryButton,
+  secondaryDangerButton,
   tableAreaClass,
   useNotice,
 } from "@/components/leads/ui";
+import {
+  ActionDialog,
+  BulkBar,
+  ChoiceDialog,
+  RowCheckbox,
+  SelectAllCheckbox,
+  SelectionAnnouncement,
+  describeBulkResult,
+  useSelection,
+  type BulkResult,
+} from "@/components/selection";
 import { toApiError, useApi } from "@/lib/api";
-import { WORK_STAGES, stageFor, today, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
+import {
+  WORK_STAGES,
+  bulkChangeWorkStage,
+  bulkDeleteWorks,
+  stageFor,
+  today,
+  updateWork,
+  type Work,
+  type WorkChanges,
+  type WorkStage,
+} from "./api";
 import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
 
 const FILTER_KEYS = ["stage", "plan", "assigned_to", "created_after", "created_before"] as const;
@@ -32,7 +55,9 @@ type FilterKey = (typeof FILTER_KEYS)[number];
 const QUERY_KEYS = ["search", ...FILTER_KEYS, "ordering", "page", "page_size"];
 const DEFAULT_ORDERING = "-created_at";
 const DEFAULT_PAGE_SIZE = 25; // the API's default page size
-const COLUMN_COUNT = 13;
+const COLUMN_COUNT = 14;
+
+type BulkAction = "stage" | "delete";
 
 // The List and Pipeline show the same Works; both headers switch between them.
 export const WORK_VIEWS = [
@@ -68,6 +93,22 @@ export function WorksPage() {
   const [noticeElement, notify] = useNotice();
   const actions = useWorkActions(notify, reload, assignees);
   const filterPanelId = useId();
+  // Deleting Works is an admin's decision on the API; only admins are offered it.
+  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
+
+  // The rows selected on this page, for the bulk actions. A new search, filter, sort or page starts with none selected.
+  const rows = data?.results ?? [];
+  const selection = useSelection(rows.map((work) => work.id), query.toString());
+  const [bulkAction, setBulkAction] = useState<BulkAction>();
+
+  // Runs a bulk action on the selected Works and reports what went through and what didn't. The selection is kept when
+  // nothing went through, so the user can change it and try again.
+  async function runBulk(request: (ids: number[]) => Promise<BulkResult>, past: string) {
+    const result = await request(selection.selected);
+    notify(describeBulkResult(result, "work", past));
+    if (result.succeeded.length > 0) selection.clear();
+    reload();
+  }
 
   // Search as the user types, once they pause.
   useEffect(() => {
@@ -124,17 +165,41 @@ export function WorksPage() {
       </div>
     );
   } else {
-    const rows = data && data.results.length > 0 ? data.results : undefined;
+    const loaded = rows.length > 0;
     content = (
       <>
-        <div className={`${tableAreaClass} mt-4`}>
+        <SelectionAnnouncement count={selection.count} />
+        {selection.count > 0 && (
+          <BulkBar count={selection.count} onClear={selection.clear}>
+            <button type="button" onClick={() => setBulkAction("stage")} className={secondaryButton}>
+              <FlagIcon className="size-4" />
+              Update Stage
+            </button>
+            {isAdmin && (
+              <button type="button" onClick={() => setBulkAction("delete")} className={secondaryDangerButton}>
+                <TrashIcon className="size-4" />
+                Delete
+              </button>
+            )}
+          </BulkBar>
+        )}
+        <div className={`${tableAreaClass} ${selection.count > 0 ? "mt-3" : "mt-4"}`}>
           <table
             aria-busy={loading}
-            className={`w-full min-w-300 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
+            className={`w-full min-w-310 text-sm transition-opacity ${loading && loaded ? "opacity-60" : ""}`}
           >
             <caption className="sr-only">Works</caption>
             <thead>
               <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
+                <th scope="col" className="w-10 px-3 py-2.5">
+                  <SelectAllCheckbox
+                    checked={selection.allSelected}
+                    indeterminate={selection.someSelected}
+                    onChange={selection.toggleAll}
+                    disabled={!loaded}
+                    label="Select all works on this page"
+                  />
+                </th>
                 <th scope="col" className="w-11 px-3 py-2.5">
                   <PinIcon className="size-3.5" />
                   <span className="sr-only">Pinned</span>
@@ -160,12 +225,14 @@ export function WorksPage() {
               </tr>
             </thead>
             <tbody>
-              {rows ? (
+              {loaded ? (
                 rows.map((work) => (
                   // Keyed by the last update too, so a row starts fresh once its saved change has reloaded.
                   <WorkRow
                     key={`${work.id}-${work.updated_at}`}
                     work={work}
+                    selected={selection.isSelected(work.id)}
+                    onToggle={() => selection.toggle(work.id)}
                     assignees={assignees.data}
                     actions={actions}
                     onSaved={(text) => {
@@ -185,6 +252,36 @@ export function WorksPage() {
       </>
     );
   }
+
+  // The bulk actions' confirmations. Each closes on success, shows the API's message on failure, and reports per Work.
+  const count = selection.count;
+  const worksWord = count === 1 ? "work" : "works";
+  const bulkDialog =
+    bulkAction === "stage" ? (
+      <ChoiceDialog
+        title={`Move ${count} selected ${worksWord} to a stage`}
+        description="Every selected Work moves to the chosen stage of the Work Pipeline, in either direction, as the row's stage control does for one."
+        label="Stage"
+        placeholder="Choose a stage"
+        options={WORK_STAGES}
+        confirmLabel="Update Stage"
+        pendingLabel="Updating…"
+        onConfirm={(value) => runBulk((ids) => bulkChangeWorkStage(ids, value as WorkStage), "updated")}
+        onClose={() => setBulkAction(undefined)}
+        onError={(text) => notify({ text, error: true })}
+      />
+    ) : bulkAction === "delete" ? (
+      <ActionDialog
+        destructive
+        title={`Delete ${count} selected ${worksWord}?`}
+        description="This action will permanently remove these Works and their activity history. Each lead stays Won and can be converted again. Users are never affected."
+        confirmLabel="Delete"
+        pendingLabel="Deleting…"
+        onConfirm={() => runBulk(bulkDeleteWorks, "deleted")}
+        onClose={() => setBulkAction(undefined)}
+        onError={(text) => notify({ text, error: true })}
+      />
+    ) : null;
 
   return (
     <div className={fillClass}>
@@ -251,6 +348,7 @@ export function WorksPage() {
       {content}
 
       {actions.dialogs}
+      {bulkDialog}
       {noticeElement}
     </div>
   );
@@ -258,6 +356,8 @@ export function WorksPage() {
 
 type WorkRowProps = {
   work: Work;
+  selected: boolean;
+  onToggle: () => void;
   assignees?: Assignee[];
   actions: WorkActions;
   onSaved: (message: string) => void;
@@ -268,14 +368,14 @@ const chevron = (
   <ChevronLeftIcon className="pointer-events-none absolute top-1/2 right-1.5 size-3 -translate-y-1/2 -rotate-90 opacity-70" />
 );
 
-function WorkRow({ work, assignees, actions, onSaved, onError }: WorkRowProps) {
+function WorkRow({ work, selected, onToggle, assignees, actions, onSaved, onError }: WorkRowProps) {
   // A change being saved shows straight away; if the API refuses it, the saved value comes back.
   const [pending, setPending] = useState<WorkChanges>();
   const [saving, setSaving] = useState(false);
   const location = [work.area, work.district].filter(Boolean).join(", ");
   const overdue = isOverdue(work);
-  // Sticky cells need an opaque background, so the row hover colour is a solid colour too.
-  const stickyCell = "sticky z-1 bg-background group-hover:bg-row-hover";
+  // Sticky cells need an opaque background: the row's own colour (selected or not), and the solid hover colour.
+  const stickyCell = `sticky z-1 ${selected ? "bg-primary-softer" : "bg-background"} group-hover:bg-row-hover`;
 
   const stageValue = pending?.stage ?? work.stage;
   const stage = stageFor(stageValue);
@@ -304,7 +404,10 @@ function WorkRow({ work, assignees, actions, onSaved, onError }: WorkRowProps) {
   }
 
   return (
-    <tr className="group border-b border-border last:border-0 hover:bg-row-hover">
+    <tr aria-selected={selected} className={`group border-b border-border last:border-0 hover:bg-row-hover ${selected ? "bg-primary-softer" : ""}`}>
+      <td className="px-3 py-1.5">
+        <RowCheckbox checked={selected} onChange={onToggle} label={`Select ${work.customer_name}`} />
+      </td>
       <td className="px-1.5 py-1.5">
         {/* Unpinned rows show a faint pin until hovered, so the pinned ones stand out. */}
         <WorkPinButton

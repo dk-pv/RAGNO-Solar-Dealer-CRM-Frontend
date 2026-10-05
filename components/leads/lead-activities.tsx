@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useId, useRef, useState, type ChangeEvent } from "react";
+import { useContext, useId, useRef, useState, type ChangeEvent } from "react";
 
 import { EyeIcon, MoreIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
+import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { toApiError, useApi } from "@/lib/api";
 import {
+  ACTIVITY_NOT_YOURS,
   ACTIVITY_TYPES,
   FOLLOW_UP_STATUSES,
   deleteActivity,
@@ -74,6 +76,9 @@ export function LeadActivitiesPage() {
   const [clears, setClears] = useState(0);
   const filterPanelId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
+  // The API lists a staff member's own follow-ups first, then the rest in the chosen order; an admin's page is in the
+  // chosen order alone.
+  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
   const status = searchParams.get("status") ?? "";
   const search = searchParams.get("search") ?? "";
@@ -85,8 +90,13 @@ export function LeadActivitiesPage() {
   // A row that leaves the list (completed while showing Pending, deleted) takes the focus with it: keep it on the page.
   const keepFocus = () => headingRef.current?.focus();
 
-  // Pending -> Completed; a completed follow-up stays completed.
+  // Pending -> Completed; a completed follow-up stays completed. Only the staff member it is assigned to, or an admin,
+  // completes it (the API refuses anyone else): the reason is shown rather than nothing happening.
   async function complete(activity: Activity) {
+    if (!activity.can_update_status) {
+      notify({ text: ACTIVITY_NOT_YOURS, error: true });
+      return;
+    }
     setBusyId(activity.id);
     try {
       await updateActivity(activity.id, { status: "COMPLETED" });
@@ -249,6 +259,7 @@ export function LeadActivitiesPage() {
           active={activeFilters}
         />
         <SortSelect options={SORT_OPTIONS} defaultValue={DEFAULT_ORDERING} />
+        {!isAdmin && <span className="text-xs text-muted-foreground">Yours come first</span>}
       </div>
       {filtersOpen && (
         <FilterPanel
@@ -363,15 +374,17 @@ function FollowUpRow({ activity, busy, onComplete, onEdit, onDelete }: FollowUpR
         <div className="flex items-center justify-end gap-1">
           {pending ? (
             activity.can_edit && (
+              // Only the staff member it is assigned to, or an admin, completes it: anyone else is told why on
+              // pressing it (aria-disabled, not disabled: a disabled button can't be reached or explain itself).
               <button
                 type="button"
                 onClick={() => {
                   if (!busy) onComplete(activity);
                 }}
-                // aria-disabled, not disabled, while saving: a disabled button would drop the keyboard focus.
-                aria-disabled={busy || undefined}
+                title={activity.can_update_status ? undefined : ACTIVITY_NOT_YOURS}
+                aria-disabled={busy || !activity.can_update_status || undefined}
                 aria-label={`Mark complete: ${heading(activity)} (${activity.lead_name})`}
-                className={`${secondaryButton} px-2.5 aria-disabled:opacity-50`}
+                className={`${secondaryButton} px-2.5 aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
               >
                 {busy ? <Busy>Completing…</Busy> : "Mark complete"}
               </button>

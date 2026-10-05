@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 
 import { iconButton } from "@/components/leads/ui";
-import { BellIcon, LogoutIcon, MenuIcon, UserIcon, WhatsAppIcon } from "./icons";
+import { LogoutIcon, MenuIcon, UserIcon, WhatsAppIcon } from "./icons";
+import { NotificationsBell } from "./notifications";
 import type { ShellUser } from "./use-shell-session";
 
 // wa.me needs the full international number without "+". A 10-digit local number is an Indian
@@ -20,9 +21,9 @@ const ROLE_LABELS: Record<ShellUser["role"], string> = { ADMIN: "Admin", STAFF: 
 
 const iconButtonClass = `${iconButton} size-9`;
 
-// Popovers sit in the browser's top layer, pinned under the navbar's right edge.
+// Popovers sit in the browser's top layer, pinned under the navbar's right edge. Each adds its width.
 const panelClass =
-  "fixed top-15 right-3 bottom-auto left-auto w-72 max-w-[calc(100vw-1.5rem)] rounded-md border border-border bg-background text-foreground shadow-lg";
+  "fixed top-15 right-3 bottom-auto left-auto max-w-[calc(100vw-1.5rem)] rounded-md border border-border bg-background text-foreground shadow-lg";
 
 export function initials(name: string) {
   return name
@@ -78,15 +79,12 @@ export function Navbar({ user, onLogout, onOpenNavigation }: NavbarProps) {
           </Tooltip>
         )}
 
-        <Tooltip label="Notifications">
-          <button type="button" popoverTarget="notifications-panel" aria-label="Notifications" className={iconButtonClass}>
-            <BellIcon />
-          </button>
-        </Tooltip>
-        <div id="notifications-panel" popover="auto" className={panelClass}>
-          <p className="border-b border-border px-4 py-3 text-sm font-medium">Notifications</p>
-          <p className="px-4 py-6 text-center text-sm text-muted-foreground">Notifications aren&apos;t available yet.</p>
-        </div>
+        {/* Once signed in: the API sends each user only their own notifications. */}
+        {user && (
+          <Tooltip label="Notifications">
+            <NotificationsBell user={user} buttonClass={iconButtonClass} panelClass={panelClass} />
+          </Tooltip>
+        )}
 
         <Tooltip label="Account">
           <button
@@ -100,7 +98,7 @@ export function Navbar({ user, onLogout, onOpenNavigation }: NavbarProps) {
             </span>
           </button>
         </Tooltip>
-        <div id="account-menu" popover="auto" className={panelClass}>
+        <div id="account-menu" popover="auto" className={`${panelClass} w-72`}>
           <div className="px-4 py-3">
             {user ? (
               <>

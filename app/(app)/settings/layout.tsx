@@ -10,6 +10,7 @@ import { fillClass, tabClass, tabListClass } from "@/components/leads/ui";
 const TABS = [
   { label: "Users", href: "/settings/users", adminOnly: false },
   { label: "Roles & Access", href: "/settings/roles", adminOnly: true },
+  { label: "Data", href: "/settings/data", adminOnly: true },
 ];
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {

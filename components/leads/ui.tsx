@@ -95,8 +95,9 @@ export function ViewSwitch({ label, views, query = "" }: { label: string; views:
   );
 }
 
-// Colour carries meaning only: neutral, information, attention, high priority, success, negative.
-const STATUS_STYLES: Record<LeadStatus, string> = {
+// Colour carries meaning only: neutral, information, attention, high priority, success, negative. The leads list's
+// inline status control wears the same colours as the badge.
+export const STATUS_STYLES: Record<LeadStatus, string> = {
   NEW: "bg-neutral-soft text-neutral ring-neutral-border",
   INITIAL_CONTACT: "bg-info-soft text-info ring-info-border",
   HOT: "bg-warning-soft text-warning ring-warning-border",
@@ -167,14 +168,15 @@ export function PinButton({ lead, onChanged, onError, className = "size-8" }: Pi
   );
 }
 
-type Notice = { text: string; error?: boolean };
+// `persist`: the notice stays until dismissed (a list of rows that need reading, say) instead of going away by itself.
+type Notice = { text: string; error?: boolean; persist?: boolean };
 
 // A short confirmation or error in the corner of the page. Returns the element to render and a function to show a notice.
 export function useNotice() {
   const [notice, setNotice] = useState<Notice>();
 
   useEffect(() => {
-    if (!notice) return;
+    if (!notice || notice.persist) return;
     const timer = setTimeout(() => setNotice(undefined), notice.error ? 8000 : 4000);
     return () => clearTimeout(timer);
   }, [notice]);
@@ -184,7 +186,7 @@ export function useNotice() {
       {notice && (
         <p
           role={notice.error ? "alert" : "status"}
-          className="flex items-start gap-3 rounded-md border border-border bg-background px-4 py-3 text-sm shadow-lg"
+          className="flex max-h-[60vh] items-start gap-3 overflow-y-auto rounded-md border border-border bg-background px-4 py-3 text-sm whitespace-pre-line shadow-lg"
         >
           <span className={notice.error ? "text-error" : undefined}>{notice.text}</span>
           <button

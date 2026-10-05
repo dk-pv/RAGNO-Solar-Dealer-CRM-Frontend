@@ -135,7 +135,12 @@ export type Activity = {
   can_edit: boolean;
   can_delete: boolean;
   can_open_lead: boolean;
+  // Completing it: only the staff member it is assigned to, or an admin (the API refuses anyone else with 403).
+  can_update_status: boolean;
 };
+
+// The API's refusal when someone else tries to complete an activity; shown as the reason on the disabled control too.
+export const ACTIVITY_NOT_YOURS = "You can only update activities assigned to you.";
 // Adding or editing a follow-up: everything but the status, which the API starts at Pending.
 export type ActivityInput = { title: string; type: ActivityType; assigned_to: number; due_date: string; description: string };
 export type Page<T> = { count: number; next: string | null; previous: string | null; results: T[] };
@@ -163,6 +168,23 @@ export function convertLead(id: number) {
 // Admins only (the Leads module doesn't give staff the delete permission). Its activities go with it.
 export function deleteLead(id: number) {
   return apiRequest<void>(`/leads/${id}/`, { method: "DELETE" });
+}
+
+// The list's bulk actions, on the rows selected on one page. Each lead goes through the same rules as the single
+// action (the pipeline, Won-only conversion once, delete with its Work kept), and the API answers which went through
+// and which didn't and why (BulkResult in components/selection.tsx).
+type BulkResult = { succeeded: number[]; failed: { id: number; name: string | null; reason: string }[] };
+
+export function bulkChangeLeadStatus(ids: number[], status: LeadStatus) {
+  return apiRequest<BulkResult>("/leads/bulk-status/", { method: "POST", json: { ids, status } });
+}
+
+export function bulkConvertLeads(ids: number[]) {
+  return apiRequest<BulkResult>("/leads/bulk-convert/", { method: "POST", json: { ids } });
+}
+
+export function bulkDeleteLeads(ids: number[]) {
+  return apiRequest<BulkResult>("/leads/bulk-delete/", { method: "POST", json: { ids } });
 }
 
 // No status is sent: the API starts every new follow-up as Pending.

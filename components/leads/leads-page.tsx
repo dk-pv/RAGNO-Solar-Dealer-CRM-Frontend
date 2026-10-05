@@ -4,17 +4,43 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useContext, useState } from "react";
 
-import { ChevronLeftIcon, DownloadIcon, PinIcon } from "@/components/layout/icons";
+import { ChevronLeftIcon, ConvertIcon, DownloadIcon, FlagIcon, PinIcon, SpinnerIcon, TrashIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
+import {
+  ActionDialog,
+  BulkBar,
+  ChoiceDialog,
+  RowCheckbox,
+  SelectAllCheckbox,
+  SelectionAnnouncement,
+  describeBulkResult,
+  useSelection,
+  type BulkResult,
+} from "@/components/selection";
 import { toApiError, useApi } from "@/lib/api";
-import { exportLeads, formatDate, formatMoney, formatPhone, type Lead, type Page } from "./api";
+import {
+  LEAD_STATUSES,
+  bulkChangeLeadStatus,
+  bulkConvertLeads,
+  bulkDeleteLeads,
+  changeLeadStatus,
+  exportLeads,
+  formatDate,
+  formatMoney,
+  formatPhone,
+  statusLabel,
+  type Lead,
+  type LeadStatus,
+  type Page,
+} from "./api";
 import { LeadMenu, useLeadActions, type LeadActions } from "./lead-actions";
 import { FILTER_KEYS, LeadsHeader, LeadsToolbar, VIEW_KEYS, pickParams, updateQuery } from "./leads-toolbar";
 import {
   Busy,
   ErrorState,
   PinButton,
+  STATUS_STYLES,
   StatusBadge,
   emptyAreaClass,
   fieldClass,
@@ -23,6 +49,7 @@ import {
   messageAreaClass,
   paginationFooterClass,
   secondaryButton,
+  secondaryDangerButton,
   tableAreaClass,
   useNotice,
 } from "./ui";
@@ -31,7 +58,9 @@ import {
 const QUERY_KEYS = [...VIEW_KEYS, "page", "page_size"];
 const DEFAULT_PAGE_SIZE = 25; // the API's default page size
 const PAGE_SIZES = [10, 25, 50, 100];
-const COLUMN_COUNT = 11;
+const COLUMN_COUNT = 12;
+
+type BulkAction = "status" | "convert" | "delete";
 
 // The Works list imports these from here.
 export { menuItemClass, placeMenu } from "./lead-actions";
@@ -54,6 +83,25 @@ export function LeadsPage() {
   const pageSize = Number(searchParams.get("page_size")) || DEFAULT_PAGE_SIZE;
   const activeFilters = FILTER_KEYS.filter((key) => searchParams.get(key)).length;
   const showError = (text: string) => notify({ text, error: true });
+
+  // The rows selected on this page, for the bulk actions. A new search, filter, sort or page starts with none selected.
+  const rows = data?.results ?? [];
+  const selection = useSelection(rows.map((lead) => lead.id), query.toString());
+  const selectedLeads = rows.filter((lead) => selection.isSelected(lead.id));
+  const [bulkAction, setBulkAction] = useState<BulkAction>();
+  // Offered when they could apply to at least one selected lead; the API decides lead by lead.
+  const canBulkChange = selectedLeads.some((lead) => lead.can_edit);
+  const canBulkConvert = selectedLeads.some((lead) => lead.can_convert);
+  const canBulkDelete = selectedLeads.some((lead) => lead.can_delete);
+
+  // Runs a bulk action on the selected leads and reports what went through and what didn't. The selection is kept when
+  // nothing went through, so the user can change it and try again.
+  async function runBulk(request: (ids: number[]) => Promise<BulkResult>, noun: string, past: string) {
+    const result = await request(selection.selected);
+    notify(describeBulkResult(result, noun, past));
+    if (result.succeeded.length > 0) selection.clear();
+    reload();
+  }
 
   async function exportCsv() {
     // Same search, filters and sort as the table, without paging.
@@ -116,17 +164,51 @@ export function LeadsPage() {
       </div>
     );
   } else {
-    const rows = data && data.results.length > 0 ? data.results : undefined;
+    const loaded = rows.length > 0;
     content = (
       <>
-        <div className={`${tableAreaClass} mt-4`}>
+        <SelectionAnnouncement count={selection.count} />
+        {selection.count > 0 && (
+          <BulkBar count={selection.count} onClear={selection.clear}>
+            <button type="button" onClick={() => setBulkAction("status")} disabled={!canBulkChange} className={secondaryButton}>
+              <FlagIcon className="size-4" />
+              Update Status
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkAction("convert")}
+              disabled={!canBulkConvert}
+              title={canBulkConvert ? undefined : "Only Won leads that don't have a Work yet can be converted."}
+              className={secondaryButton}
+            >
+              <ConvertIcon className="size-4" />
+              Convert to Work
+            </button>
+            {canBulkDelete && (
+              <button type="button" onClick={() => setBulkAction("delete")} className={secondaryDangerButton}>
+                <TrashIcon className="size-4" />
+                Delete
+              </button>
+            )}
+          </BulkBar>
+        )}
+        <div className={`${tableAreaClass} ${selection.count > 0 ? "mt-3" : "mt-4"}`}>
           <table
             aria-busy={loading}
-            className={`w-full min-w-270 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}
+            className={`w-full min-w-280 text-sm transition-opacity ${loading && loaded ? "opacity-60" : ""}`}
           >
             <caption className="sr-only">Leads</caption>
             <thead>
               <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
+                <th scope="col" className="w-10 px-3 py-2.5">
+                  <SelectAllCheckbox
+                    checked={selection.allSelected}
+                    indeterminate={selection.someSelected}
+                    onChange={selection.toggleAll}
+                    disabled={!loaded}
+                    label="Select all leads on this page"
+                  />
+                </th>
                 <th scope="col" className="w-11 px-3 py-2.5">
                   <PinIcon className="size-3.5" />
                   <span className="sr-only">Pinned</span>
@@ -148,9 +230,21 @@ export function LeadsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows ? (
+              {loaded ? (
                 rows.map((lead) => (
-                  <LeadRow key={lead.id} lead={lead} actions={actions} onChanged={reload} onError={showError} />
+                  <LeadRow
+                    key={lead.id}
+                    lead={lead}
+                    selected={selection.isSelected(lead.id)}
+                    onToggle={() => selection.toggle(lead.id)}
+                    actions={actions}
+                    onChanged={reload}
+                    onStatusChanged={(updated) => {
+                      notify({ text: `${updated.name} is now ${statusLabel(updated.status)}.` });
+                      reload();
+                    }}
+                    onError={showError}
+                  />
                 ))
               ) : (
                 <SkeletonRows />
@@ -162,6 +256,46 @@ export function LeadsPage() {
       </>
     );
   }
+
+  // The bulk actions' confirmations. Each closes on success, shows the API's message on failure, and reports per lead.
+  const count = selection.count;
+  const leadsWord = count === 1 ? "lead" : "leads";
+  const bulkDialog =
+    bulkAction === "status" ? (
+      <ChoiceDialog
+        title={`Update the status of ${count} selected ${leadsWord}`}
+        description="Each lead moves only where the pipeline allows: forward, or to Won or Lost, which are final. Leads that can't move are listed afterwards and left as they are. Reaching Won doesn't create a Work: convert the lead for that."
+        label="New status"
+        placeholder="Choose a status"
+        options={LEAD_STATUSES}
+        confirmLabel="Update Status"
+        pendingLabel="Updating…"
+        onConfirm={(value) => runBulk((ids) => bulkChangeLeadStatus(ids, value as LeadStatus), "lead", "updated")}
+        onClose={() => setBulkAction(undefined)}
+        onError={showError}
+      />
+    ) : bulkAction === "convert" ? (
+      <ActionDialog
+        title={`Convert ${count} selected ${leadsWord} to Work?`}
+        description="Only Won leads that don't have a Work yet are converted, each once; a Work is created for each with its plan and amount. Any other selected lead is left as it is and listed afterwards."
+        confirmLabel="Convert to Work"
+        pendingLabel="Converting…"
+        onConfirm={() => runBulk(bulkConvertLeads, "lead", "converted to Work")}
+        onClose={() => setBulkAction(undefined)}
+        onError={showError}
+      />
+    ) : bulkAction === "delete" ? (
+      <ActionDialog
+        destructive
+        title={`Delete ${count} selected ${leadsWord}?`}
+        description="This action will permanently remove these CRM records and related CRM activity data. A lead that has been converted keeps its Work and is not deleted."
+        confirmLabel="Delete"
+        pendingLabel="Deleting…"
+        onConfirm={() => runBulk(bulkDeleteLeads, "lead", "deleted")}
+        onClose={() => setBulkAction(undefined)}
+        onError={showError}
+      />
+    ) : null;
 
   return (
     <div className={fillClass}>
@@ -179,6 +313,7 @@ export function LeadsPage() {
       </LeadsToolbar>
       {content}
       {actions.dialogs}
+      {bulkDialog}
       {noticeElement}
     </div>
   );
@@ -186,18 +321,24 @@ export function LeadsPage() {
 
 type LeadRowProps = {
   lead: Lead;
+  selected: boolean;
+  onToggle: () => void;
   actions: LeadActions;
   onChanged: () => void;
+  onStatusChanged: (lead: Lead) => void;
   onError: (message: string) => void;
 };
 
-function LeadRow({ lead, actions, onChanged, onError }: LeadRowProps) {
+function LeadRow({ lead, selected, onToggle, actions, onChanged, onStatusChanged, onError }: LeadRowProps) {
   const location = [lead.area, lead.district].filter(Boolean).join(", ");
-  // Sticky cells need an opaque background, so the row hover colour is the solid muted colour.
-  const stickyCell = "sticky z-1 bg-background group-hover:bg-row-hover";
+  // Sticky cells need an opaque background: the row's own colour (selected or not), and the solid hover colour.
+  const stickyCell = `sticky z-1 ${selected ? "bg-primary-softer" : "bg-background"} group-hover:bg-row-hover`;
 
   return (
-    <tr className="group border-b border-border last:border-0 hover:bg-row-hover">
+    <tr aria-selected={selected} className={`group border-b border-border last:border-0 hover:bg-row-hover ${selected ? "bg-primary-softer" : ""}`}>
+      <td className="px-3 py-1.5">
+        <RowCheckbox checked={selected} onChange={onToggle} label={`Select ${lead.name}`} />
+      </td>
       <td className="px-1.5 py-1.5">
         {/* Unpinned rows show a faint pin until hovered, so the pinned ones stand out. */}
         <PinButton
@@ -223,7 +364,7 @@ function LeadRow({ lead, actions, onChanged, onError }: LeadRowProps) {
       <td className="px-3 py-2 whitespace-nowrap">{lead.plan_name ?? "—"}</td>
       <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatMoney(lead.amount)}</td>
       <td className="px-3 py-2">
-        <StatusBadge status={lead.status} />
+        <InlineStatus lead={lead} onSaved={onStatusChanged} onError={onError} />
       </td>
       <td className="px-3 py-2 whitespace-nowrap">
         {lead.assigned_to_name ? (
@@ -246,6 +387,62 @@ function LeadRow({ lead, actions, onChanged, onError }: LeadRowProps) {
         <LeadMenu lead={lead} actions={actions} />
       </td>
     </tr>
+  );
+}
+
+type InlineStatusProps = { lead: Lead; onSaved: (lead: Lead) => void; onError: (message: string) => void };
+
+// The row's status, changed in place through the same status API as Update Status (the pipeline rules apply: only the
+// moves the API allows can be chosen, and reaching Won never converts the lead). A final lead, or one this user can't
+// change, shows the plain badge. While a change saves, the control is disabled and shows a spinner; if the API refuses
+// it, the saved status comes back.
+function InlineStatus({ lead, onSaved, onError }: InlineStatusProps) {
+  // The status being saved, and the lead's last change when it started: the control stays busy until the list reloads a
+  // changed lead (the saved one, or someone else's change), or the API refuses the move.
+  const [saving, setSaving] = useState<{ status: LeadStatus; since: string }>();
+  if (saving !== undefined && saving.since !== lead.updated_at) setSaving(undefined);
+  if (lead.allowed_transitions.length === 0) return <StatusBadge status={lead.status} />;
+
+  const busy = saving !== undefined && saving.since === lead.updated_at;
+  const shown = busy ? saving.status : lead.status;
+
+  async function change(next: LeadStatus) {
+    if (busy || next === lead.status) return;
+    setSaving({ status: next, since: lead.updated_at });
+    try {
+      onSaved(await changeLeadStatus(lead.id, next));
+    } catch (error) {
+      setSaving(undefined); // back to the saved status
+      onError(`Couldn't update ${lead.name}. ${toApiError(error).message}`);
+    }
+  }
+
+  return (
+    <span className="relative inline-flex items-center">
+      <select
+        value={shown}
+        onChange={(event) => change(event.target.value as LeadStatus)}
+        disabled={busy}
+        aria-label={`Status for ${lead.name}`}
+        aria-busy={busy || undefined}
+        className={`cursor-pointer appearance-none rounded-md py-0.5 pr-6 pl-2 text-xs font-medium ring-1 ring-inset transition-colors hover:ring-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary pointer-coarse:min-h-11 disabled:cursor-wait disabled:opacity-70 ${STATUS_STYLES[shown]}`}
+      >
+        {LEAD_STATUSES.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
+            disabled={option.value !== lead.status && !lead.allowed_transitions.includes(option.value)}
+          >
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {busy ? (
+        <SpinnerIcon className="pointer-events-none absolute right-1.5 size-3" />
+      ) : (
+        <ChevronLeftIcon className="pointer-events-none absolute top-1/2 right-1.5 size-3 -translate-y-1/2 -rotate-90 opacity-70" />
+      )}
+    </span>
   );
 }
 

@@ -17,6 +17,7 @@ import {
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { toApiError, useApi } from "@/lib/api";
 import {
+  ACTIVITY_NOT_YOURS,
   convertBlocker,
   deleteActivity,
   deleteLead,
@@ -327,7 +328,8 @@ type ActivitiesProps = {
   notify: (text: string, error?: boolean) => void;
 };
 
-const linkButton = "font-medium text-foreground underline-offset-2 hover:underline aria-disabled:opacity-50 pointer-coarse:py-2";
+const linkButton =
+  "font-medium text-foreground underline-offset-2 hover:underline aria-disabled:cursor-not-allowed aria-disabled:opacity-50 pointer-coarse:py-2";
 
 // The lead's follow-ups, each Pending until marked Completed (which is final). Whoever can edit the lead (an admin, or
 // the staff member it's assigned to) adds, completes, edits and deletes them; the API applies the same rules.
@@ -426,10 +428,17 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
                   {activity.can_edit && (
                     <>
                       {activity.status === "PENDING" && (
+                        // Only the staff member it is assigned to, or an admin, completes it: anyone else is told why
+                        // on pressing it (the API refuses them too).
                         <button
                           type="button"
+                          title={activity.can_update_status ? undefined : ACTIVITY_NOT_YOURS}
                           onClick={() => {
                             if (busyId === activity.id) return;
+                            if (!activity.can_update_status) {
+                              setActionError(ACTIVITY_NOT_YOURS);
+                              return;
+                            }
                             run(
                               activity,
                               async () => {
@@ -440,8 +449,8 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
                               "Follow-up marked complete.",
                             );
                           }}
-                          // aria-disabled, not disabled, while saving: a disabled button would drop the focus.
-                          aria-disabled={busyId === activity.id || undefined}
+                          // aria-disabled, not disabled: a disabled button would drop the focus, or be unreachable.
+                          aria-disabled={busyId === activity.id || !activity.can_update_status || undefined}
                           aria-label={`Mark complete: ${heading(activity)}`}
                           className={linkButton}
                         >

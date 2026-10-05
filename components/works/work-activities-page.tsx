@@ -1,9 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useId, useState, type ChangeEvent } from "react";
+import { useContext, useEffect, useId, useState, type ChangeEvent } from "react";
 
 import { FilterIcon, PlusIcon, SearchIcon } from "@/components/layout/icons";
+import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { ACTIVITY_TYPES, type Assignee, type Page } from "@/components/leads/api";
 import { Pagination } from "@/components/leads/leads-page";
 import { updateQuery } from "@/components/leads/leads-toolbar";
@@ -57,6 +58,9 @@ export function WorkActivitiesPage() {
   const [searchText, setSearchText] = useState(search);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterPanelId = useId();
+  // The API lists a staff member's own activities first, then the rest in the chosen order (each Work's together);
+  // an admin's page is in the chosen order alone.
+  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
   // Search as the user types, once they pause.
   useEffect(() => {
@@ -186,6 +190,7 @@ export function WorkActivitiesPage() {
             ))}
           </select>
         </label>
+        {!isAdmin && <span className="text-xs text-muted-foreground">Yours come first</span>}
       </div>
 
       {filtersOpen && (
