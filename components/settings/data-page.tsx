@@ -70,9 +70,9 @@ export function DataPage() {
       <section className="mt-4 rounded-lg border border-error-border bg-background p-5">
         <h3 className="text-sm font-semibold text-error">Reset CRM data</h3>
         <p className="mt-2 text-sm text-muted-foreground">
-          Deletes every lead, Work, activity and notification, so the CRM starts with clean data. It keeps every user and
-          their password, the roles and their module access, departments, and the solar plans with their prices: everyone
-          can still sign in afterwards. This can&apos;t be undone.
+          Deletes every lead, Work (with its documents), activity and notification, so the CRM starts with clean data. It
+          keeps every user and their password, the roles and their module access, departments, and the solar plans with
+          their prices: everyone can still sign in afterwards. This can&apos;t be undone.
         </p>
         <button type="button" onClick={() => setConfirming(true)} disabled={!preview.data} className={`${destructiveButton} mt-4`}>
           Reset CRM data
@@ -122,7 +122,7 @@ function ResetDialog({ preview, onClose, onDone, onError }: ResetDialogProps) {
           <strong className="text-foreground">
             {counts.leads} leads, {counts.works} works, {counts.activities} activities and {counts.notifications} notifications
           </strong>
-          . Users, roles, departments and plans are kept.
+          , with every Work&apos;s documents. Users, roles, departments and plans are kept.
         </>
       }
       confirmLabel="Reset CRM data"

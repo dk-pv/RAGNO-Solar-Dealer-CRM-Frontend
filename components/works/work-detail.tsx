@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useContext, useEffect, useState } from "react";
 
-import { ChevronLeftIcon, PencilIcon, PhoneIcon, PlusIcon, WhatsAppIcon } from "@/components/layout/icons";
+import { ChevronLeftIcon, FileIcon, PencilIcon, PhoneIcon, PlusIcon, WhatsAppIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { formatDate, formatMoney, formatPhone, telHref, whatsappHref, type Assignee } from "@/components/leads/api";
 import { Details } from "@/components/leads/lead-detail";
@@ -12,6 +12,7 @@ import { useApi } from "@/lib/api";
 import { stageFor, type Work } from "./api";
 import { WorkActivities } from "./work-activities";
 import { WorkPinButton, isOverdue, useWorkActions } from "./work-actions";
+import { DocumentStatus } from "./work-documents";
 
 const outlinedIcon = `${iconButton} size-9 border border-border`;
 
@@ -33,7 +34,8 @@ export function WorkDetail({ id }: { id: number }) {
   );
   const loaded = work !== undefined;
 
-  // The View activities action links to #activities, which exists only once the Work has loaded.
+  // Links to #activities (the list's next follow-up, the board's cards, the dashboard, notifications) need the section,
+  // which exists only once the Work has loaded.
   useEffect(() => {
     if (loaded && window.location.hash === "#activities") document.getElementById("activities")?.scrollIntoView();
   }, [loaded]);
@@ -104,6 +106,10 @@ export function WorkDetail({ id }: { id: number }) {
           <a href={telHref(work)} aria-label={`Call ${work.customer_name}`} title="Call" className={outlinedIcon}>
             <PhoneIcon className="size-4.5" />
           </a>
+          <Link href={`/works/${work.id}/documents`} className={secondaryButton}>
+            <FileIcon className="size-4" />
+            Documents
+          </Link>
           <button type="button" onClick={() => actions.addActivity(work)} className={secondaryButton}>
             <PlusIcon className="size-4" />
             Add follow-up
@@ -173,6 +179,17 @@ export function WorkDetail({ id }: { id: number }) {
               <PencilIcon className="size-4" />
               Change stage, staff or due date
             </button>
+          </section>
+          <section className="border-t border-border pt-6">
+            <h2 className="text-sm font-semibold">Documents</h2>
+            <p className="mt-3 text-sm tabular-nums">
+              {work.document_summary.completed_count} of {work.document_summary.required_count} provided
+            </p>
+            <DocumentStatus work={work} className="mt-1" />
+            <Link href={`/works/${work.id}/documents`} className={`${secondaryButton} mt-4 w-full`}>
+              <FileIcon className="size-4" />
+              Open documents
+            </Link>
           </section>
         </aside>
       </div>

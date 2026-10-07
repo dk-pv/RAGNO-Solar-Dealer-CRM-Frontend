@@ -36,6 +36,7 @@ import {
   type WorkStage,
 } from "./api";
 import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
+import { DocumentStatus } from "./work-documents";
 import { FILTER_KEYS, VIEW_KEYS, WorksHeader, WorksToolbar } from "./works-toolbar";
 
 // The URL query and the API query use the same names.
@@ -49,6 +50,7 @@ const COLUMNS = [
   { key: "plan", label: "Plan" },
   { key: "amount", label: "Confirmed amount" },
   { key: "stage", label: "Stage" },
+  { key: "documents", label: "Documents" },
   { key: "assigned", label: "Assigned" },
   { key: "due", label: "Due date" },
   { key: "follow_up", label: "Next follow-up" },
@@ -120,7 +122,7 @@ export function WorksPage() {
       <ActionDialog
         destructive
         title={`Delete ${count} selected ${worksWord}?`}
-        description="This action will permanently remove these Works and their activity history. Each lead stays Won and can be converted again. Users are never affected."
+        description="This action will permanently remove these Works with their activity history and documents. Each lead stays Won and can be converted again. Users are never affected."
         confirmLabel="Delete"
         pendingLabel="Deleting…"
         onConfirm={() => runBulk(bulkDeleteWorks, "deleted")}
@@ -183,7 +185,7 @@ export function WorksPage() {
         <table
           aria-busy={loading}
           // With columns hidden the table is as wide as what's left needs, no wider.
-          className={`w-full text-sm transition-opacity ${columns.hiddenCount > 0 ? "min-w-max" : "min-w-310"} ${loading && loaded ? "opacity-60" : ""}`}
+          className={`w-full text-sm transition-opacity ${columns.hiddenCount > 0 ? "min-w-max" : "min-w-350"} ${loading && loaded ? "opacity-60" : ""}`}
         >
           <caption className="sr-only">Works</caption>
           <thead>
@@ -214,6 +216,7 @@ export function WorksPage() {
               {shows("plan") && <th scope="col" className="px-3 py-2.5">Plan</th>}
               {shows("amount") && <th scope="col" className="px-3 py-2.5 text-right">Confirmed amount</th>}
               {shows("stage") && <th scope="col" className="px-3 py-2.5">Stage</th>}
+              {shows("documents") && <th scope="col" className="px-3 py-2.5">Documents</th>}
               {shows("assigned") && <th scope="col" className="px-3 py-2.5">Assigned</th>}
               {shows("due") && <th scope="col" className="px-3 py-2.5">Due date</th>}
               {shows("follow_up") && <th scope="col" className="px-3 py-2.5">Next follow-up</th>}
@@ -324,11 +327,12 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
         <Link href={`/works/${work.id}`} className="block max-w-52 truncate hover:underline">
           {work.customer_name}
         </Link>
-        {/* On a phone the Stage column is off to the right, so the stage also sits under the name. */}
+        {/* On a phone the Stage and Documents columns are off to the right, so both also sit under the name. */}
         <span className="mt-1 flex items-center gap-1.5 text-xs font-normal text-muted-foreground sm:hidden">
           <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${stage.dot}`} />
           {stage.label}
         </span>
+        <DocumentStatus work={work} className="mt-1 sm:hidden" />
       </th>
       {shows("phone") && <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(work)}</td>}
       {shows("location") && (
@@ -359,6 +363,11 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
             </select>
             {chevron}
           </span>
+        </td>
+      )}
+      {shows("documents") && (
+        <td className="px-3 py-2 whitespace-nowrap">
+          <DocumentStatus work={work} />
         </td>
       )}
       {shows("assigned") && (

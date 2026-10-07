@@ -23,6 +23,7 @@ import {
 import { toApiError, useApi } from "@/lib/api";
 import { WORK_STAGES, stageFor, today, updateWork, type StageSummary, type Work, type WorkStage } from "./api";
 import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
+import { DocumentStatus } from "./work-documents";
 import { DEFAULT_ORDERING, FILTER_KEYS, SORT_OPTIONS, WorksHeader, WorksToolbar } from "./works-toolbar";
 
 type Stage = (typeof WORK_STAGES)[number];
@@ -362,7 +363,7 @@ type WorkCardProps = {
 };
 
 // The whole card opens the Work (its customer name is a link stretched over the card); the pin, the menu and the
-// activities link sit above it, as on the lead cards.
+// activities and documents links sit above it, as on the lead cards.
 function WorkCard({ work, saving, dragging, actions, onDragStart, onDragEnd }: WorkCardProps) {
   const stage = stageFor(work.stage);
   const location = [work.area, work.district].filter(Boolean).join(", ");
@@ -449,6 +450,7 @@ function WorkCard({ work, saving, dragging, actions, onDragStart, onDragEnd }: W
           </span>
         </Link>
       )}
+      <DocumentStatus work={work} className="relative z-1 mt-2" />
 
       <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-muted-foreground">
         <CardAssignee name={work.assigned_to_name} />

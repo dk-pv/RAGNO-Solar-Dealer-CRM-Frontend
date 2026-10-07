@@ -3,18 +3,7 @@
 import Link from "next/link";
 import { useContext, useEffect, useId, useRef, useState, type FormEvent } from "react";
 
-import {
-  CalendarIcon,
-  CloseIcon,
-  EyeIcon,
-  LeadsIcon,
-  MoreIcon,
-  PencilIcon,
-  PhoneIcon,
-  PinIcon,
-  PlusIcon,
-  WhatsAppIcon,
-} from "@/components/layout/icons";
+import { CloseIcon, FileIcon, MoreIcon, PencilIcon, PhoneIcon, PinIcon, PlusIcon, WhatsAppIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { formatDate, formatMoney, formatPhone, telHref, whatsappHref, type Assignee } from "@/components/leads/api";
 import { Field, Section, dialogClass } from "@/components/leads/lead-dialogs";
@@ -101,14 +90,11 @@ export function WorkPinButton({ work, actions, className = "size-8" }: WorkPinBu
   );
 }
 
-// The Work's three-dot menu, as on the lead cards and rows. Everything here is part of the Work module, which the API
-// checks on every request.
+// The Work's three-dot menu on the list's rows and the board's cards. Everything here is part of the Work module, which
+// the API checks on every request. Opening the Work, its activities and pinning it are on the row and card themselves.
 export function WorkMenu({ work, actions }: { work: Work; actions: WorkActions }) {
-  const me = useContext(CurrentUserContext);
   const menuId = useId();
   const hide = () => document.getElementById(menuId)?.hidePopover();
-  // The lead's page needs the Leads module.
-  const canOpenLeads = me?.role === "ADMIN" || me?.modules.includes("leads");
   const run = (action: () => void) => () => {
     hide();
     action();
@@ -130,9 +116,9 @@ export function WorkMenu({ work, actions }: { work: Work; actions: WorkActions }
         popover="auto"
         className="fixed inset-auto m-0 w-56 rounded-md border border-border bg-background p-1 text-foreground shadow-lg"
       >
-        <Link href={`/works/${work.id}`} className={menuItemClass}>
-          <EyeIcon className="size-4 text-muted-foreground" />
-          View Work
+        <Link href={`/works/${work.id}/documents`} className={menuItemClass}>
+          <FileIcon className="size-4 text-muted-foreground" />
+          Documents
         </Link>
         <button type="button" onClick={run(() => actions.edit(work))} className={menuItemClass}>
           <PencilIcon className="size-4 text-muted-foreground" />
@@ -141,14 +127,6 @@ export function WorkMenu({ work, actions }: { work: Work; actions: WorkActions }
         <button type="button" onClick={run(() => actions.addActivity(work))} className={menuItemClass}>
           <PlusIcon className="size-4 text-muted-foreground" />
           Add follow-up
-        </button>
-        <Link href={`/works/${work.id}#activities`} className={menuItemClass}>
-          <CalendarIcon className="size-4 text-muted-foreground" />
-          View activities
-        </Link>
-        <button type="button" onClick={run(() => actions.togglePin(work))} className={menuItemClass}>
-          <PinIcon className="size-4 text-muted-foreground" fill={work.is_pinned ? "currentColor" : "none"} />
-          {work.is_pinned ? "Unpin Work" : "Pin Work"}
         </button>
         <div className="my-1 border-t border-border" />
         <a href={whatsappHref(work)} target="_blank" rel="noopener noreferrer" onClick={hide} className={menuItemClass}>
@@ -159,12 +137,6 @@ export function WorkMenu({ work, actions }: { work: Work; actions: WorkActions }
           <PhoneIcon className="size-4 text-muted-foreground" />
           Call
         </a>
-        {canOpenLeads && (
-          <Link href={`/leads/${work.lead}`} className={menuItemClass}>
-            <LeadsIcon className="size-4 text-muted-foreground" />
-            View lead #{work.lead}
-          </Link>
-        )}
       </div>
     </>
   );

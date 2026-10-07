@@ -24,16 +24,13 @@ export function toApiError(error: unknown) {
 
 type RequestOptions = { method?: string; json?: unknown; signal?: AbortSignal; accept?: string };
 
-// Every CRM request goes through here, signed with the user's access token (see lib/auth.ts).
-async function send(path: string, { method = "GET", json, signal, accept = "application/json" }: RequestOptions = {}) {
-  if (!API_URL) throw new ApiError("The API address isn't configured. Set NEXT_PUBLIC_API_URL.", 0);
-  const token = await getAccessToken();
-  // Signed out: the API would only answer 401, and the app is already on its way to the sign-in page.
-  if (!token) throw new ApiError(STATUS_MESSAGES[401], 401);
+const UNREACHABLE = "Can't reach the server. Check your connection and try again.";
 
-  const request = async (bearer: string) => {
+// Every CRM request goes through here (uploads through apiUpload), signed with the user's access token.
+async function send(path: string, { method = "GET", json, signal, accept = "application/json" }: RequestOptions = {}) {
+  return signed(async (bearer) => {
     try {
-      return await fetch(API_URL + path, {
+      return await fetch(`${API_URL}${path}`, {
         method,
         signal,
         headers: {
@@ -45,9 +42,52 @@ async function send(path: string, { method = "GET", json, signal, accept = "appl
       });
     } catch (error) {
       if (signal?.aborted) throw error;
-      throw new ApiError("Can't reach the server. Check your connection and try again.", 0);
+      throw new ApiError(UNREACHABLE, 0);
     }
-  };
+  });
+}
+
+type UploadOptions = { signal?: AbortSignal; onProgress?: (fraction: number) => void; onSent?: () => void };
+
+// Uploads `form` (multipart), signed and answered like every other request. It goes through XMLHttpRequest because fetch
+// can't tell how much of a body has been sent: `onProgress` gets the fraction sent, and `onSent` runs once the server has
+// the whole body (stopping the request after that no longer stops the upload).
+export async function apiUpload<T>(path: string, form: FormData, { signal, onProgress, onSent }: UploadOptions = {}) {
+  const response = await signed(
+    (bearer) =>
+      new Promise<Response>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${API_URL}${path}`);
+        xhr.setRequestHeader("Accept", "application/json");
+        xhr.setRequestHeader("Authorization", `Bearer ${bearer}`);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+        };
+        xhr.upload.onload = () => onSent?.();
+        xhr.onload = () => {
+          const headers = { "Content-Type": xhr.getResponseHeader("Content-Type") ?? "" };
+          resolve(new Response(xhr.status === 204 ? null : xhr.responseText, { status: xhr.status, headers }));
+        };
+        // As fetch does when its signal is aborted.
+        const stopped = () => reject(new DOMException("The upload was stopped.", "AbortError"));
+        xhr.onerror = () => reject(new ApiError(UNREACHABLE, 0));
+        xhr.onabort = stopped;
+        // An XMLHttpRequest that hasn't been sent yet fires nothing when aborted.
+        if (signal?.aborted) return stopped();
+        signal?.addEventListener("abort", () => xhr.abort(), { once: true });
+        xhr.send(form);
+      }),
+  );
+  return (await response.json()) as T;
+}
+
+// Sends `request` with the user's access token (see lib/auth.ts). If the API refuses the token, it is renewed once and
+// the request sent again. An error answer becomes an ApiError.
+async function signed(request: (bearer: string) => Promise<Response>) {
+  if (!API_URL) throw new ApiError("The API address isn't configured. Set NEXT_PUBLIC_API_URL.", 0);
+  const token = await getAccessToken();
+  // Signed out: the API would only answer 401, and the app is already on its way to the sign-in page.
+  if (!token) throw new ApiError(STATUS_MESSAGES[401], 401);
 
   let response = await request(token);
   if (response.status === 401) {
@@ -106,10 +146,15 @@ export async function apiRequest<T>(path: string, options?: RequestOptions): Pro
   return (response.status === 204 ? undefined : await response.json()) as T;
 }
 
+// A file response (a CSV export, a Work's document) as a Blob, through the same authenticated request: a plain link or
+// <img src> to the API would be refused, as it carries no token.
+export async function apiBlob(path: string, signal?: AbortSignal) {
+  return (await send(path, { accept: "*/*", signal })).blob();
+}
+
 // Downloads a file response (such as a CSV export) through the same authenticated request.
 export async function apiDownload(path: string, filename: string) {
-  const response = await send(path, { accept: "*/*" });
-  const url = URL.createObjectURL(await response.blob());
+  const url = URL.createObjectURL(await apiBlob(path));
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
@@ -142,5 +187,7 @@ export function useApi<T>(path: string | null) {
     loading: path !== null && result.key !== key,
     // The same function on every render, so an effect (a poll, say) can depend on it without re-running each render.
     reload: useCallback(() => setVersion((current) => current + 1), []),
+    // Shows `data` as the path's answer without loading it again, such as the updated record a change sent back.
+    replace: useCallback((data: T) => setResult({ key, data }), [key]),
   };
 }

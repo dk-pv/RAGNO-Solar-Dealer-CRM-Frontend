@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api";
+import { apiRequest, apiUpload } from "@/lib/api";
 import type { ActivityType } from "@/components/leads/api";
 
 // The Work Pipeline, in order. Values and labels must match the backend's WorkStage choices.
@@ -64,15 +64,71 @@ export type Work = {
   activity_count: number;
   pending_activity_count: number;
   next_activity_due: string | null; // the earliest due date among the pending activities
+  document_summary: DocumentSummary;
   created_at: string;
   updated_at: string;
+};
+
+// How complete a Work's required documents are, computed by the backend from its list of required documents.
+export type DocumentSummary = {
+  required_count: number;
+  completed_count: number;
+  missing_count: number;
+  is_complete: boolean;
+  missing_documents: string[]; // their names, in the Documents page's order
 };
 
 // GET /api/works/summary/: every stage with its number of Works and their total confirmed amount.
 export type StageSummary = { stage: WorkStage; label: string; count: number; total_amount: string };
 
-// Only the pipeline fields and the pin change; the backend accepts any stage, in either direction, and validates it.
-export type WorkChanges = Partial<Pick<Work, "stage" | "assigned_to" | "due_date" | "is_pinned">>;
+// The pipeline fields, the pin and the email change (the email is one of the required documents); the backend accepts
+// any stage, in either direction, and validates everything.
+export type WorkChanges = Partial<Pick<Work, "stage" | "assigned_to" | "due_date" | "is_pinned" | "email">>;
+
+// GET /api/works/{id}/documents/: every document the Work needs, in groups, as the backend defines them. A file is
+// uploaded for most; Email ID and Phone number are the Work's own email and phone.
+export type DocumentChecklist = {
+  work: Work;
+  groups: { key: string; label: string; items: DocumentItem[] }[];
+  max_file_size: number; // bytes
+  can_delete: boolean; // deleting a document is for admins only
+};
+
+export type DocumentItem = {
+  key: string;
+  name: string;
+  required: boolean;
+  provided: boolean;
+  kind: "file" | "field";
+  field: "email" | "phone" | null; // for a "field" item: the Work field that holds it
+  accept: string[]; // for a "file" item: the extensions an upload may have, such as ".pdf"
+  document: UploadedDocument | null; // for a "file" item: the file uploaded for it, if any
+};
+
+// Where the file is stored never reaches the browser: it is shown and downloaded through documentFilePath.
+export type UploadedDocument = {
+  original_filename: string;
+  content_type: string; // read by the backend from the file itself
+  file_size: number; // bytes
+  uploaded_at: string;
+  uploaded_by_name: string | null;
+};
+
+// The document's file, sent by the backend after the same access check as the Work (apiBlob / apiDownload).
+export const documentFilePath = (workId: number, key: string) => `/works/${workId}/documents/${key}/file/`;
+
+// Uploads a document's file, or replaces the one there, reporting its progress (see apiUpload). Answers the updated
+// checklist.
+export function uploadWorkDocument(workId: number, key: string, file: File, options: Parameters<typeof apiUpload>[2]) {
+  const form = new FormData();
+  form.append("file", file);
+  return apiUpload<DocumentChecklist>(`/works/${workId}/documents/${key}/`, form, options);
+}
+
+// Admins only: deletes a document's file. Answers the updated checklist.
+export function deleteWorkDocument(workId: number, key: string) {
+  return apiRequest<DocumentChecklist>(`/works/${workId}/documents/${key}/`, { method: "DELETE" });
+}
 
 // Must match the backend's Activity statuses.
 export const ACTIVITY_STATUSES = [
