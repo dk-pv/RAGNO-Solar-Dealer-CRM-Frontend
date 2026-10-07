@@ -4,21 +4,21 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useContext, useId, useRef, useState, type ChangeEvent } from "react";
 
+import { CompleteActivityDialog } from "@/components/complete-activity-dialog";
 import { EyeIcon, MoreIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { ActionDialog } from "@/components/selection";
 import { ColumnsButton, DEFAULT_PAGE_SIZE, EmptyState, ListShell, SkeletonRows, useColumns, type Columns } from "@/components/table";
-import { toApiError, useApi } from "@/lib/api";
+import { useApi } from "@/lib/api";
 import {
-  ACTIVITY_NOT_YOURS,
   ACTIVITY_TYPES,
   FOLLOW_UP_STATUSES,
   deleteActivity,
   formatDate,
   formatPhone,
   isOverdue,
-  updateActivity,
+  withRow,
   type Activity,
   type Assignee,
   type Page,
@@ -26,7 +26,7 @@ import {
 import { FollowUpDialog } from "./follow-ups";
 import { menuItemClass, placeMenu } from "./lead-actions";
 import { FilterToggle, SearchBox, SortSelect, StatusTabs, pickParams, updateQuery } from "./leads-toolbar";
-import { Busy, FollowUpBadge, PageHeader, fillClass, iconButton, inputClass, primaryButton, secondaryButton, useNotice } from "./ui";
+import { FollowUpBadge, PageHeader, fillClass, iconButton, inputClass, primaryButton, secondaryButton, useNotice } from "./ui";
 
 const FILTER_KEYS = ["type", "assigned_to", "due_after", "due_before"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
@@ -55,25 +55,24 @@ const FIXED_COLUMNS = 3; // lead, heading, actions
 
 const heading = (activity: Activity) => activity.title || activity.type_display;
 
-// Lead Activities: the follow-ups this user works with. An admin's are all of them; staff see those on their own leads
-// and those assigned to them (the API decides). Search, filters, sort and page live in the URL, as on the leads list.
+// Lead Activities: the follow-ups this user works with. An admin's are all of them; staff see only those assigned to
+// them (the API decides). Search, filters, sort and page live in the URL, as on the leads list.
 export function LeadActivitiesPage() {
   const searchParams = useSearchParams();
   const query = pickParams(searchParams, QUERY_KEYS);
-  const { data, error, loading, reload } = useApi<Page<Activity>>(
+  const { data, error, loading, reload, replace } = useApi<Page<Activity>>(
     query.toString() ? `/activities/?${query}` : "/activities/",
   );
   const [noticeElement, notify] = useNotice();
   const [editing, setEditing] = useState<Activity | null>(); // null: a new follow-up; undefined: the dialog is closed
   const [deleting, setDeleting] = useState<Activity>();
-  const [busyId, setBusyId] = useState<number>();
+  const [completing, setCompleting] = useState<Activity>();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [clears, setClears] = useState(0);
   const filterPanelId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const columns = useColumns("lead-activities", COLUMNS);
-  // The API lists a staff member's own follow-ups first, then the rest in the chosen order; an admin's page is in the
-  // chosen order alone.
+  // Adding follow-ups, and choosing whose to list, are for admins; staff see and complete only their own.
   const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
   const status = searchParams.get("status") ?? "";
@@ -91,27 +90,6 @@ export function LeadActivitiesPage() {
   // A row that leaves the list (completed while showing Pending, deleted) takes the focus with it: keep it on the page.
   const keepFocus = () => headingRef.current?.focus();
 
-  // Pending -> Completed; a completed follow-up stays completed. Only the staff member it is assigned to, or an admin,
-  // completes it (the API refuses anyone else): the reason is shown rather than nothing happening.
-  async function complete(activity: Activity) {
-    if (!activity.can_update_status) {
-      showError(ACTIVITY_NOT_YOURS);
-      return;
-    }
-    setBusyId(activity.id);
-    try {
-      await updateActivity(activity.id, { status: "COMPLETED" });
-      notify({ text: `Completed: ${heading(activity)} (${activity.lead_name}).` });
-      // The Mark complete button goes away (and the row may leave a filtered or sorted view).
-      keepFocus();
-      reload();
-    } catch (err) {
-      showError(toApiError(err).message);
-    } finally {
-      setBusyId(undefined);
-    }
-  }
-
   function clearAll() {
     updateQuery(Object.fromEntries(["search", "status", ...FILTER_KEYS].map((key) => [key, null])));
     setClears((count) => count + 1); // a fresh search box drops a search still being typed
@@ -126,10 +104,12 @@ export function LeadActivitiesPage() {
         titleRef={headingRef}
         description={data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "follow-up" : "follow-ups"}` : undefined}
       >
-        <button type="button" onClick={() => setEditing(null)} className={primaryButton}>
-          <PlusIcon className="size-4" />
-          Add follow-up
-        </button>
+        {isAdmin && (
+          <button type="button" onClick={() => setEditing(null)} className={primaryButton}>
+            <PlusIcon className="size-4" />
+            Add follow-up
+          </button>
+        )}
       </PageHeader>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -143,12 +123,12 @@ export function LeadActivitiesPage() {
         />
         <SortSelect options={SORT_OPTIONS} defaultValue={DEFAULT_ORDERING} />
         <ColumnsButton columns={columns} />
-        {!isAdmin && <span className="text-xs text-muted-foreground">Yours come first</span>}
       </div>
       {filtersOpen && (
         <FilterPanel
           id={filterPanelId}
           searchParams={searchParams}
+          showAssignee={isAdmin}
           onDone={() => {
             setFiltersOpen(false);
             // The panel, and the button pressed in it, go away.
@@ -172,12 +152,14 @@ export function LeadActivitiesPage() {
                 Clear search and filters
               </button>
             </EmptyState>
-          ) : (
+          ) : isAdmin ? (
             <EmptyState title="No follow-ups yet." hint="Add one here, or from a lead's Follow-ups / Activities section.">
               <button type="button" onClick={() => setEditing(null)} className={secondaryButton}>
                 Add follow-up
               </button>
             </EmptyState>
+          ) : (
+            <EmptyState title="No follow-ups assigned to you." hint="Follow-ups an admin assigns to you show here." />
           )
         }
       >
@@ -211,8 +193,7 @@ export function LeadActivitiesPage() {
                   key={activity.id}
                   activity={activity}
                   shows={shows}
-                  busy={busyId === activity.id}
-                  onComplete={complete}
+                  onComplete={setCompleting}
                   onEdit={setEditing}
                   onDelete={setDeleting}
                 />
@@ -258,6 +239,24 @@ export function LeadActivitiesPage() {
           onError={showError}
         />
       )}
+      {completing && (
+        <CompleteActivityDialog
+          activity={completing}
+          label={`"${heading(completing)}" for ${completing.lead_name}`}
+          onCompleted={(saved) => {
+            // The row shows Completed at once, so it can't be completed twice; the reload may then take it out of a
+            // filtered or sorted view.
+            if (data) replace(withRow(data, saved));
+            notify({ text: `Completed: ${heading(saved)} (${saved.lead_name}).` });
+            reload();
+          }}
+          onClose={(completed) => {
+            setCompleting(undefined);
+            if (completed) keepFocus(); // the Mark as Completed button that opened this is gone
+          }}
+          onError={showError}
+        />
+      )}
       {noticeElement}
     </div>
   );
@@ -266,13 +265,12 @@ export function LeadActivitiesPage() {
 type FollowUpRowProps = {
   activity: Activity;
   shows: Columns<ColumnKey>["shows"];
-  busy: boolean;
   onComplete: (activity: Activity) => void;
   onEdit: (activity: Activity) => void;
   onDelete: (activity: Activity) => void;
 };
 
-function FollowUpRow({ activity, shows, busy, onComplete, onEdit, onDelete }: FollowUpRowProps) {
+function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUpRowProps) {
   const overdue = isOverdue(activity);
   const pending = activity.status === "PENDING";
   const phone = formatPhone({ country_code: activity.lead_country_code, phone: activity.lead_phone });
@@ -301,6 +299,11 @@ function FollowUpRow({ activity, shows, busy, onComplete, onEdit, onDelete }: Fo
         </span>
         {activity.description && (
           <span className="mt-0.5 line-clamp-2 block max-w-72 text-xs text-muted-foreground">{activity.description}</span>
+        )}
+        {activity.completion_note && (
+          <span title={activity.completion_note} className="mt-1 line-clamp-3 max-w-72 text-xs break-words text-muted-foreground">
+            <span className="font-medium text-label">Completion note:</span> {activity.completion_note}
+          </span>
         )}
       </td>
       {shows("type") && <td className="min-w-28 px-3 py-2.5">{activity.type_display}</td>}
@@ -347,20 +350,15 @@ function FollowUpRow({ activity, shows, busy, onComplete, onEdit, onDelete }: Fo
       <td className={`${stickyCell} px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0`}>
         <div className="flex items-center justify-end gap-1">
           {pending ? (
-            activity.can_edit && (
-              // Only the staff member it is assigned to, or an admin, completes it: anyone else is told why on
-              // pressing it (aria-disabled, not disabled: a disabled button can't be reached or explain itself).
+            // Only its assignee, or an admin, completes it (the API refuses anyone else).
+            activity.can_update_status && (
               <button
                 type="button"
-                onClick={() => {
-                  if (!busy) onComplete(activity);
-                }}
-                title={activity.can_update_status ? undefined : ACTIVITY_NOT_YOURS}
-                aria-disabled={busy || !activity.can_update_status || undefined}
-                aria-label={`Mark complete: ${heading(activity)} (${activity.lead_name})`}
-                className={`${secondaryButton} px-2.5 aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
+                onClick={() => onComplete(activity)}
+                aria-label={`Mark as Completed: ${heading(activity)} (${activity.lead_name})`}
+                className={`${secondaryButton} px-2.5`}
               >
-                {busy ? <Busy>Completing…</Busy> : "Mark complete"}
+                Mark as Completed
               </button>
             )
           ) : (
@@ -433,10 +431,12 @@ function RowMenu({ activity, onEdit, onDelete }: RowMenuProps) {
   );
 }
 
-type FilterPanelProps = { id: string; searchParams: URLSearchParams; onDone: () => void };
+// `showAssignee`: whose follow-ups to list can be chosen (admins). The staff list needs the Leads module, so it is loaded
+// only then.
+type FilterPanelProps = { id: string; searchParams: URLSearchParams; showAssignee: boolean; onDone: () => void };
 
-function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
-  const assignees = useApi<Assignee[]>("/leads/assignees/");
+function FilterPanel({ id, searchParams, showAssignee, onDone }: FilterPanelProps) {
+  const assignees = useApi<Assignee[]>(showAssignee ? "/leads/assignees/" : null);
   const [draft, setDraft] = useState(
     () => Object.fromEntries(FILTER_KEYS.map((key) => [key, searchParams.get(key) ?? ""])) as Record<FilterKey, string>,
   );
@@ -468,17 +468,19 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
           ))}
         </select>
       </label>
-      <label className="text-sm">
-        <span className="mb-1.5 block font-medium text-label">Assigned staff</span>
-        <select {...bind("assigned_to")}>
-          <option value="">{assignees.error ? "Anyone (staff couldn't be loaded)" : "Anyone"}</option>
-          {assignees.data?.map((person) => (
-            <option key={person.id} value={person.id}>
-              {person.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {showAssignee && (
+        <label className="text-sm">
+          <span className="mb-1.5 block font-medium text-label">Assigned staff</span>
+          <select {...bind("assigned_to")}>
+            <option value="">{assignees.error ? "Anyone (staff couldn't be loaded)" : "Anyone"}</option>
+            {assignees.data?.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="text-sm">
         <span className="mb-1.5 block font-medium text-label">Due from</span>
         <input type="date" max={draft.due_before || undefined} {...bind("due_after")} />

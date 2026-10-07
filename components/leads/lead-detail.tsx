@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
+import { CompleteActivityDialog } from "@/components/complete-activity-dialog";
 import {
   CalendarIcon,
   ChevronLeftIcon,
@@ -16,9 +17,8 @@ import {
 } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { ActionDialog } from "@/components/selection";
-import { toApiError, useApi } from "@/lib/api";
+import { useApi } from "@/lib/api";
 import {
-  ACTIVITY_NOT_YOURS,
   convertBlocker,
   deleteActivity,
   deleteLead,
@@ -31,8 +31,8 @@ import {
   statusBlocker,
   statusLabel,
   telHref,
-  updateActivity,
   whatsappHref,
+  withRow,
   type Activity,
   type Lead,
   type Page,
@@ -335,32 +335,17 @@ type ActivitiesProps = {
   notify: (text: string, error?: boolean) => void;
 };
 
-const linkButton =
-  "font-medium text-foreground underline-offset-2 hover:underline aria-disabled:cursor-not-allowed aria-disabled:opacity-50 pointer-coarse:py-2";
+const linkButton = "font-medium text-foreground underline-offset-2 hover:underline pointer-coarse:py-2";
 
-// The lead's follow-ups, each Pending until marked Completed (which is final). Whoever can edit the lead (an admin, or
-// the staff member it's assigned to) adds, completes, edits and deletes them; the API applies the same rules.
+// The lead's follow-ups, each Pending until marked Completed (which is final). Admins add, edit and delete them; the
+// staff member one is assigned to, or an admin, completes it. The API applies the same rules.
 function Activities({ activities, lead, onScheduleFollowUp, notify }: ActivitiesProps) {
-  const { data, error, loading, reload } = activities;
+  const { data, error, loading, reload, replace } = activities;
   const [dialog, setDialog] = useState<{ activity?: Activity }>(); // the open Add or Edit Follow-up dialog
   const [deleting, setDeleting] = useState<Activity>();
-  const [busyId, setBusyId] = useState<number>();
-  const [actionError, setActionError] = useState<string>();
+  const [completing, setCompleting] = useState<Activity>();
   const headingRef = useRef<HTMLHeadingElement>(null);
-
-  async function run(activity: Activity, action: () => Promise<unknown>, done: string) {
-    setBusyId(activity.id);
-    setActionError(undefined);
-    try {
-      await action();
-      reload();
-      notify(done);
-    } catch (err) {
-      setActionError(toApiError(err).message);
-    } finally {
-      setBusyId(undefined);
-    }
-  }
+  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
   let content;
   if (error?.status === 404) {
@@ -416,52 +401,35 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
                 {activity.description && (
                   <p className="mt-1 text-sm break-words whitespace-pre-line text-muted-foreground">{activity.description}</p>
                 )}
+                {activity.completion_note && (
+                  <p className="mt-1 text-sm break-words whitespace-pre-line text-muted-foreground">
+                    <span className="font-medium text-label">Completion note:</span> {activity.completion_note}
+                  </p>
+                )}
                 <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
                   <span>
                     Added {formatDateTime(activity.created_at)}
                     {activity.created_by_name ? ` · ${activity.created_by_name}` : ""}
                   </span>
+                  {activity.status === "PENDING" && activity.can_update_status && (
+                    <button
+                      type="button"
+                      onClick={() => setCompleting(activity)}
+                      aria-label={`Mark as Completed: ${heading(activity)}`}
+                      className={linkButton}
+                    >
+                      Mark as Completed
+                    </button>
+                  )}
                   {activity.can_edit && (
-                    <>
-                      {activity.status === "PENDING" && (
-                        // Only the staff member it is assigned to, or an admin, completes it: anyone else is told why
-                        // on pressing it (the API refuses them too).
-                        <button
-                          type="button"
-                          title={activity.can_update_status ? undefined : ACTIVITY_NOT_YOURS}
-                          onClick={() => {
-                            if (busyId === activity.id) return;
-                            if (!activity.can_update_status) {
-                              setActionError(ACTIVITY_NOT_YOURS);
-                              return;
-                            }
-                            run(
-                              activity,
-                              async () => {
-                                await updateActivity(activity.id, { status: "COMPLETED" });
-                                // The button goes away once it's completed, so the focus moves to the list's heading.
-                                headingRef.current?.focus();
-                              },
-                              "Follow-up marked complete.",
-                            );
-                          }}
-                          // aria-disabled, not disabled: a disabled button would drop the focus, or be unreachable.
-                          aria-disabled={busyId === activity.id || !activity.can_update_status || undefined}
-                          aria-label={`Mark complete: ${heading(activity)}`}
-                          className={linkButton}
-                        >
-                          {busyId === activity.id ? "Completing…" : "Mark complete"}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setDialog({ activity })}
-                        aria-label={`Edit follow-up: ${heading(activity)}`}
-                        className={linkButton}
-                      >
-                        Edit
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => setDialog({ activity })}
+                      aria-label={`Edit follow-up: ${heading(activity)}`}
+                      className={linkButton}
+                    >
+                      Edit
+                    </button>
                   )}
                   {activity.can_delete && (
                     <button
@@ -493,7 +461,7 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
         <h2 ref={headingRef} tabIndex={-1} className="text-sm font-semibold">
           Follow-ups / Activities
         </h2>
-        {lead.can_edit && !error && (
+        {isAdmin && !error && (
           <button type="button" onClick={() => setDialog({})} className={secondaryButton}>
             <PlusIcon className="size-4" />
             Add follow-up
@@ -516,11 +484,6 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
           </button>
         )}
       </div>
-      {actionError && (
-        <p role="alert" className="mt-3 text-sm text-error">
-          {actionError}
-        </p>
-      )}
       {content}
       {dialog && (
         <FollowUpDialog
@@ -549,6 +512,23 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
           onClose={() => {
             setDeleting(undefined);
             headingRef.current?.focus(); // the row, and the button that opened this, may be gone
+          }}
+          onError={(text) => notify(text, true)}
+        />
+      )}
+      {completing && (
+        <CompleteActivityDialog
+          activity={completing}
+          label={`"${heading(completing)}" for ${completing.lead_name}`}
+          onCompleted={(saved) => {
+            if (data) replace(withRow(data, saved)); // shows Completed at once, so it can't be completed twice
+            reload();
+            notify("Follow-up marked complete.");
+          }}
+          onClose={(completed) => {
+            setCompleting(undefined);
+            // Its Mark as Completed button is gone, so the focus moves to the list's heading.
+            if (completed) headingRef.current?.focus();
           }}
           onError={(text) => notify(text, true)}
         />

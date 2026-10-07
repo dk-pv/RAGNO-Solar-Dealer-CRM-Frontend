@@ -31,15 +31,20 @@ const POLL_MS = 60_000; // no live connection: the unread count is asked for eve
 const PAGE_SIZE = 20;
 
 // Where a notification leads, on a page this user can open (the same module rules as the sidebar). A Work activity's
-// goes to its Work, whose page lists its activities. A lead follow-up's goes to the Lead Activities page showing that
-// lead's follow-ups (which the person it is assigned to can open even when the lead isn't theirs), or to the lead
-// without the Activities module. None, when no page would show it.
+// goes to its Work, whose page lists its activities, or without the Work module to the Work Activities page showing
+// that Work's. A lead follow-up's goes to the Lead Activities page showing that lead's follow-ups (which the person it
+// is assigned to can open even when the lead isn't theirs), or to the lead without the Activities module. Both
+// Activities pages need only the Activities module. None, when no page would show it.
 export function notificationHref({ activity, lead, work }: Notification, user: ShellUser) {
   const opens = (module: string) => canOpen(user, { module });
-  if (work !== null) return opens("work") ? `/works/${work}${activity !== null ? "#activities" : ""}` : undefined;
-  if (lead === null || !opens("leads")) return undefined;
-  if (activity !== null) return opens("activities") ? `/leads/activities?search=%23${lead}` : `/leads/${lead}#activities`;
-  return `/leads/${lead}`;
+  const toActivities = activity !== null && opens("activities");
+  if (work !== null) {
+    if (opens("work")) return `/works/${work}${activity !== null ? "#activities" : ""}`;
+    return toActivities ? `/works/activities?search=%23${work}` : undefined;
+  }
+  if (lead === null) return undefined;
+  if (toActivities) return `/leads/activities?search=%23${lead}`;
+  return opens("leads") ? `/leads/${lead}${activity !== null ? "#activities" : ""}` : undefined;
 }
 
 type NotificationsBellProps = { user: ShellUser; buttonClass: string; panelClass: string };

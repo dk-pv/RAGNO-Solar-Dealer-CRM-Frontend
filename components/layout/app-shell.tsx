@@ -5,7 +5,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 
 import { ErrorState, PageLoading } from "@/components/leads/ui";
 import { Navbar } from "./navbar";
-import { blockedEntryFor } from "./navigation";
+import { blockedEntryFor, startPageFor } from "./navigation";
 import { Sidebar, SidebarPanel } from "./sidebar";
 import { CurrentUserContext, useShellSession } from "./use-shell-session";
 
@@ -38,8 +38,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   let content: ReactNode;
   if (user) {
     const blocked = blockedEntryFor(user, pathname);
+    // The way on is the page "/" opens for them: Lead Activities for Activities-only staff. Without one, "/" says so.
+    const start = startPageFor(user);
     content = blocked ? (
-      <ErrorState title="You don't have access to this page" message={`Ask an admin to give you access to ${blocked.label}.`} />
+      <ErrorState
+        title="You don't have access to this page"
+        message={`Your role doesn't include ${blocked.label}.`}
+        onRetry={() => router.replace(start ?? "/")}
+        retryLabel={start === "/leads/activities" ? "Go to Activities" : "Go to start page"}
+      />
     ) : (
       children
     );

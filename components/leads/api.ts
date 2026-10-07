@@ -116,8 +116,8 @@ export const FOLLOW_UP_STATUSES = [
 export type FollowUpStatus = (typeof FOLLOW_UP_STATUSES)[number]["value"];
 
 // A lead's follow-up. GET /api/activities/ lists every follow-up the user can see (the Activities page: an admin's
-// are all; staff see those on their own leads and those assigned to them); ?lead={id} lists one lead's. Paginated,
-// newest first unless sorted. Follow-ups added before headings, staff and due dates existed may lack them.
+// are all; staff see only those assigned to them); ?lead={id} lists one lead's. Paginated, newest first unless sorted.
+// Follow-ups added before headings, staff and due dates existed may lack them.
 export type Activity = {
   id: number;
   lead: number;
@@ -132,10 +132,11 @@ export type Activity = {
   due_date: string | null; // YYYY-MM-DD
   description: string; // notes
   status: FollowUpStatus; // Completed is final
+  completion_note: string; // what was done, as noted when it was marked completed ("" if no note)
   created_by_name: string | null;
   created_at: string;
   updated_at: string;
-  // What this user may do with it, as the API decides: complete and edit; delete; open its lead.
+  // What this user may do with it, as the API decides: edit (admins); delete; open its lead.
   can_edit: boolean;
   can_delete: boolean;
   can_open_lead: boolean;
@@ -148,6 +149,12 @@ export const ACTIVITY_NOT_YOURS = "You can only update activities assigned to yo
 // Adding or editing a follow-up: everything but the status, which the API starts at Pending.
 export type ActivityInput = { title: string; type: ActivityType; assigned_to: number; due_date: string; description: string };
 export type Page<T> = { count: number; next: string | null; previous: string | null; results: T[] };
+
+// The page with the saved version of one of its rows: shows a change at once (useApi's replace) while the page reloads.
+export const withRow = <T extends { id: number }>(page: Page<T>, saved: T): Page<T> => ({
+  ...page,
+  results: page.results.map((row) => (row.id === saved.id ? saved : row)),
+});
 
 export function saveLead(input: LeadInput, id?: number) {
   return id
@@ -196,8 +203,14 @@ export function addActivity(lead: number, input: ActivityInput) {
   return apiRequest<Activity>("/activities/", { method: "POST", json: { lead, ...input } });
 }
 
-export function updateActivity(id: number, changes: Partial<ActivityInput> | { status: "COMPLETED" }) {
+export function updateActivity(id: number, changes: Partial<ActivityInput>) {
   return apiRequest<Activity>(`/activities/${id}/`, { method: "PATCH", json: changes });
+}
+
+// Marks a pending activity completed (a lead's follow-up, or a Work's with T = WorkActivity), with an optional note on
+// what was done, and answers the saved activity. Its assignee or an admin, and only once: the API refuses a second time.
+export function completeActivity<T = Activity>(id: number, completionNote: string) {
+  return apiRequest<T>(`/activities/${id}/complete/`, { method: "POST", json: { completion_note: completionNote } });
 }
 
 export function deleteActivity(id: number) {

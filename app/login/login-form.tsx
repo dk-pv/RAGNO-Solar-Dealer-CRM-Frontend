@@ -8,13 +8,13 @@ import { PasswordInput } from "@/components/password-input";
 import { toApiError } from "@/lib/api";
 import { isSignedIn, signIn, subscribeToSession } from "@/lib/auth";
 
-// Where signing in lands when no page asked to be returned to.
-const HOME = "/leads";
+// Where signing in lands when no page asked to be returned to: "/" opens the user's start page (All Leads, or Lead
+// Activities for Activities-only staff), which this form can't tell as it never loads the user.
+const HOME = "/";
 
-// Only paths on this site, so a crafted link can't send someone elsewhere after they sign in. "/" has no content of
-// its own, so it lands on Leads too.
+// Only paths on this site, so a crafted link can't send someone elsewhere after they sign in.
 function safeNext(next: string | null) {
-  return next && next !== "/" && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : HOME;
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : HOME;
 }
 
 export function LoginForm() {

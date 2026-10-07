@@ -1,21 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useContext, useEffect, useId, useRef, useState, type FormEvent } from "react";
 
+import { CompleteActivityDialog } from "@/components/complete-activity-dialog";
 import { EyeIcon, MoreIcon, PencilIcon, PlusIcon } from "@/components/layout/icons";
+import { canOpen } from "@/components/layout/navigation";
+import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import {
   ACTIVITY_NOT_YOURS,
   ACTIVITY_TYPES,
   formatDate,
   formatPhone,
+  withRow,
   type ActivityType,
   type Assignee,
   type Page,
 } from "@/components/leads/api";
 import { menuItemClass, placeMenu } from "@/components/leads/lead-actions";
 import { Field, FormDialog } from "@/components/leads/lead-dialogs";
-import { Busy, ErrorState, FollowUpBadge, iconButton, inputClass, secondaryButton, tableAreaClass } from "@/components/leads/ui";
+import { ErrorState, FollowUpBadge, iconButton, inputClass, secondaryButton, tableAreaClass } from "@/components/leads/ui";
 import { SkeletonRows } from "@/components/table";
 import { toApiError, useApi, type ApiError } from "@/lib/api";
 import {
@@ -113,19 +117,24 @@ type WorkActivityTableProps = {
   showWork: boolean;
   /** Which optional columns show (the Columns menu of the Work Activities page); all of them unless given. */
   shows?: (column: WorkActivityColumn) => boolean;
-  completingId?: number;
   onEdit: (activity: WorkActivity) => void;
   onComplete: (activity: WorkActivity) => void;
 };
 
-// Work activities as a table, one row each, with the same row actions as the lead follow-ups: Mark complete, and a menu.
-// A Work's rows share its colour (the row wash, the left edge and the badge's dot); where several Works are listed, a
-// stronger line marks where the next Work's activities start.
-export function WorkActivityTable({ rows, loading, showWork, shows = () => true, completingId, onEdit, onComplete }: WorkActivityTableProps) {
+const workBadgeClass =
+  "inline-flex items-center gap-1.5 rounded-md bg-background px-1.5 py-0.5 text-xs font-medium whitespace-nowrap text-foreground ring-1 ring-border";
+
+// Work activities as a table, one row each, with the same row actions as the lead follow-ups: Mark as Completed, and a
+// menu. A Work's rows share its colour (the row wash, the left edge and the badge's dot); where several Works are listed,
+// a stronger line marks where the next Work's activities start.
+export function WorkActivityTable({ rows, loading, showWork, shows = () => true, onEdit, onComplete }: WorkActivityTableProps) {
   const optional = WORK_ACTIVITY_COLUMNS.filter((column) => (column.key === "customer" ? showWork : true) && shows(column.key));
   const hidden = optional.length < WORK_ACTIVITY_COLUMNS.length - (showWork ? 0 : 1);
   // Always shown: the Work (where several are listed), the activity and the actions.
   const columnCount = optional.length + (showWork ? 3 : 2);
+  // A Work's page needs the Work module: without it (staff with Activities only) the Work is named, not linked.
+  const me = useContext(CurrentUserContext);
+  const linkWorks = showWork && me !== null && canOpen(me, { module: "work" });
 
   return (
     <div className={`${tableAreaClass} relative`}>
@@ -163,7 +172,6 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
               const color = workColor(work.id);
               const overdue = isOverdue(activity);
               const nextWork = showWork && index > 0 && rows[index - 1].work !== activity.work;
-              const completing = completingId === activity.id;
               const label = `${activity.type_display} for ${work.customer_name}`;
               return (
                 <tr
@@ -175,13 +183,17 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                   {showWork && (
                     // Sticky cells need an opaque background: the same wash as the row.
                     <th scope="row" className={`sticky left-0 z-1 px-3 py-2 text-left font-normal ${color.cell} ${color.edge}`}>
-                      <Link
-                        href={`/works/${work.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-background px-1.5 py-0.5 text-xs font-medium whitespace-nowrap text-foreground ring-1 ring-border hover:underline"
-                      >
-                        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${color.dot}`} />
-                        Work #{work.id}
-                      </Link>
+                      {linkWorks ? (
+                        <Link href={`/works/${work.id}`} className={`${workBadgeClass} hover:underline`}>
+                          <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${color.dot}`} />
+                          Work #{work.id}
+                        </Link>
+                      ) : (
+                        <span className={workBadgeClass}>
+                          <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${color.dot}`} />
+                          Work #{work.id}
+                        </span>
+                      )}
                       <span className="mt-1 block text-xs whitespace-nowrap text-muted-foreground">
                         {work.plan_name} · {stageFor(work.stage).label}
                       </span>
@@ -198,6 +210,11 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                     <span title={activity.description} className="line-clamp-2 max-w-80 text-xs break-words text-muted-foreground">
                       {activity.description}
                     </span>
+                    {activity.completion_note && (
+                      <span title={activity.completion_note} className="mt-1 line-clamp-3 max-w-80 text-xs break-words text-muted-foreground">
+                        <span className="font-medium text-label">Completion note:</span> {activity.completion_note}
+                      </span>
+                    )}
                   </td>
                   {shows("assigned") && (
                     <td className="px-3 py-2 whitespace-nowrap">
@@ -232,25 +249,21 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                   <td className={`z-1 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0 ${color.cell}`}>
                     <div className="flex items-center justify-end gap-1">
                       {activity.status === "PENDING" ? (
-                        // Only the staff member it is assigned to, or an admin, completes it: anyone else is told why
-                        // on pressing it (aria-disabled, not disabled: a disabled button can't be reached or explain
-                        // itself). The API refuses them too.
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!completing) onComplete(activity);
-                          }}
-                          title={activity.can_update_status ? undefined : ACTIVITY_NOT_YOURS}
-                          aria-disabled={completing || !activity.can_update_status || undefined}
-                          aria-label={`Mark complete: ${label}`}
-                          className={`${secondaryButton} px-2.5 aria-disabled:cursor-not-allowed aria-disabled:opacity-50`}
-                        >
-                          {completing ? <Busy>Completing…</Busy> : "Mark complete"}
-                        </button>
+                        // Only its assignee, or an admin, completes it (the API refuses anyone else).
+                        activity.can_update_status && (
+                          <button
+                            type="button"
+                            onClick={() => onComplete(activity)}
+                            aria-label={`Mark as Completed: ${label}`}
+                            className={`${secondaryButton} px-2.5`}
+                          >
+                            Mark as Completed
+                          </button>
+                        )
                       ) : (
                         <span className="px-2.5 text-xs whitespace-nowrap text-muted-foreground">Completed</span>
                       )}
-                      <ActivityMenu activity={activity} label={label} withWork={showWork} onEdit={() => onEdit(activity)} />
+                      <ActivityMenu activity={activity} label={label} withWork={linkWorks} onEdit={() => onEdit(activity)} />
                     </div>
                   </td>
                 </tr>
@@ -267,11 +280,13 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
 
 type ActivityMenuProps = { activity: WorkActivity; label: string; withWork: boolean; onEdit: () => void };
 
-// The row's three-dot menu, as on the Works and leads tables. Everything here is part of the Work module, which the API
-// checks on every request. (Completing is the button beside it; a completed activity is reopened from Edit.)
+// The row's three-dot menu, as on the Works and leads tables: Edit for admins (can_edit), and the Work's page for whoever
+// can open it (`withWork`). With neither there is no menu. (Completing is the button beside it; an admin reopens a
+// completed activity from Edit.)
 function ActivityMenu({ activity, label, withWork, onEdit }: ActivityMenuProps) {
   const menuId = useId();
   const hide = () => document.getElementById(menuId)?.hidePopover();
+  if (!activity.can_edit && !withWork) return null;
 
   return (
     <>
@@ -289,17 +304,19 @@ function ActivityMenu({ activity, label, withWork, onEdit }: ActivityMenuProps) 
         popover="auto"
         className="fixed inset-auto m-0 w-56 rounded-md border border-border bg-background p-1 text-foreground shadow-lg"
       >
-        <button
-          type="button"
-          onClick={() => {
-            hide();
-            onEdit();
-          }}
-          className={menuItemClass}
-        >
-          <PencilIcon className="size-4 text-muted-foreground" />
-          Edit
-        </button>
+        {activity.can_edit && (
+          <button
+            type="button"
+            onClick={() => {
+              hide();
+              onEdit();
+            }}
+            className={menuItemClass}
+          >
+            <PencilIcon className="size-4 text-muted-foreground" />
+            Edit
+          </button>
+        )}
         {withWork && (
           <Link href={`/works/${activity.work}`} className={menuItemClass}>
             <EyeIcon className="size-4 text-muted-foreground" />
@@ -311,43 +328,42 @@ function ActivityMenu({ activity, label, withWork, onEdit }: ActivityMenuProps) 
   );
 }
 
-// Edit and Mark completed for a table of Work activities: the edit dialog, and completing through the API.
-// Render `dialog` once; `onChanged` reloads the activities (and anything that counts them) after a change.
-export function useActivityRowActions(notify: Notify, onChanged: () => void, assignees: Assignees) {
+// Edit and Mark as Completed for a table of Work activities: their dialogs. Render `dialog` once; `onChanged` gets the
+// saved activity after a change, to show it at once and reload the activities (and anything that counts them).
+export function useActivityRowActions(notify: Notify, onChanged: (saved: WorkActivity) => void, assignees: Assignees) {
   const [editing, setEditing] = useState<WorkActivity>();
-  const [completingId, setCompletingId] = useState<number>();
+  const [completing, setCompleting] = useState<WorkActivity>();
 
-  async function complete(activity: WorkActivity) {
-    if (!activity.can_update_status) {
-      notify({ text: ACTIVITY_NOT_YOURS, error: true });
-      return;
-    }
-    setCompletingId(activity.id);
-    try {
-      await saveWorkActivity({ status: "COMPLETED" }, { id: activity.id });
-      notify({ text: `Marked the ${activity.type_display.toLowerCase()} for ${activity.work_summary.customer_name} as completed.` });
-      onChanged();
-    } catch (err) {
-      notify({ text: `Couldn't complete the activity. ${toApiError(err).message}`, error: true });
-    } finally {
-      setCompletingId(undefined);
-    }
-  }
-
-  const dialog = editing && (
-    <ActivityDialog
-      work={{ id: editing.work, customer_name: editing.work_summary.customer_name, assigned_to: null }}
-      activity={editing}
-      assignees={assignees}
-      onClose={() => setEditing(undefined)}
-      onSaved={() => {
-        notify({ text: "Saved the activity." });
-        onChanged();
-      }}
-    />
+  const dialog = (
+    <>
+      {editing && (
+        <ActivityDialog
+          work={{ id: editing.work, customer_name: editing.work_summary.customer_name, assigned_to: null }}
+          activity={editing}
+          assignees={assignees}
+          onClose={() => setEditing(undefined)}
+          onSaved={(saved) => {
+            notify({ text: "Saved the activity." });
+            onChanged(saved);
+          }}
+        />
+      )}
+      {completing && (
+        <CompleteActivityDialog
+          activity={completing}
+          label={`${completing.type_display} for ${completing.work_summary.customer_name}`}
+          onCompleted={(saved) => {
+            notify({ text: `Marked the ${saved.type_display.toLowerCase()} for ${saved.work_summary.customer_name} as completed.` });
+            onChanged(saved);
+          }}
+          onClose={() => setCompleting(undefined)}
+          onError={(text) => notify({ text: `Couldn't complete the activity. ${text}`, error: true })}
+        />
+      )}
+    </>
   );
 
-  return { dialog, completingId, edit: setEditing, complete };
+  return { dialog, edit: setEditing, complete: setCompleting };
 }
 
 type WorkActivitiesProps = {
@@ -363,15 +379,19 @@ type WorkActivitiesProps = {
 // (the latest first). Completed activities stay as the Work's history.
 export function WorkActivities({ work, assignees, notify, onAdd, onChanged }: WorkActivitiesProps) {
   const [size, setSize] = useState(PAGE_SIZE);
-  const { data, error, loading, reload } = useApi<Page<WorkActivity>>(`/activities/?work=${work.id}&page_size=${size}`);
+  const { data, error, loading, reload, replace } = useApi<Page<WorkActivity>>(
+    `/activities/?work=${work.id}&page_size=${size}`,
+  );
   const rowActions = useActivityRowActions(
     notify,
-    () => {
+    (saved) => {
+      if (data) replace(withRow(data, saved)); // shown at once (a completed one can't be completed twice)
       reload();
       onChanged();
     },
     assignees,
   );
+  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN"; // adding activities is for admins
 
   let content;
   if (error) {
@@ -394,7 +414,6 @@ export function WorkActivities({ work, assignees, notify, onAdd, onChanged }: Wo
           rows={data?.results}
           loading={loading}
           showWork={false}
-          completingId={rowActions.completingId}
           onEdit={rowActions.edit}
           onComplete={rowActions.complete}
         />
@@ -423,10 +442,12 @@ export function WorkActivities({ work, assignees, notify, onAdd, onChanged }: Wo
             </span>
           )}
         </h2>
-        <button type="button" onClick={onAdd} className={secondaryButton}>
-          <PlusIcon className="size-4" />
-          Add activity
-        </button>
+        {isAdmin && (
+          <button type="button" onClick={onAdd} className={secondaryButton}>
+            <PlusIcon className="size-4" />
+            Add activity
+          </button>
+        )}
       </div>
       {content}
       {rowActions.dialog}

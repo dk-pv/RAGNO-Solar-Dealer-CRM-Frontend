@@ -5,7 +5,7 @@ import { useContext, useId, useState, type ChangeEvent } from "react";
 
 import { PlusIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
-import { ACTIVITY_TYPES, type Assignee, type Page } from "@/components/leads/api";
+import { ACTIVITY_TYPES, withRow, type Assignee, type Page } from "@/components/leads/api";
 import { FilterToggle, SearchBox, SortSelect, StatusTabs, pickParams, updateQuery } from "@/components/leads/leads-toolbar";
 import { PageHeader, fillClass, inputClass, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
 import { ColumnsButton, DEFAULT_PAGE_SIZE, EmptyState, ListShell, useColumns } from "@/components/table";
@@ -33,20 +33,27 @@ const SORT_OPTIONS = [
 export function WorkActivitiesPage() {
   const searchParams = useSearchParams();
   const query = pickParams(searchParams, QUERY_KEYS);
-  const { data, error, loading, reload } = useApi<Page<WorkActivity>>(
+  const { data, error, loading, reload, replace } = useApi<Page<WorkActivity>>(
     query.toString() ? `/activities/works/?${query}` : "/activities/works/",
   );
-  const assignees = useApi<Assignee[]>("/works/assignees/");
+  // Adding and editing activities, and choosing whose to list, are for admins; staff see and complete only their own,
+  // and never load the staff list (it needs the Work module).
+  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
+  const assignees = useApi<Assignee[]>(isAdmin ? "/works/assignees/" : null);
   const [noticeElement, notify] = useNotice();
-  const rowActions = useActivityRowActions(notify, reload, assignees);
+  const rowActions = useActivityRowActions(
+    notify,
+    (saved) => {
+      if (data) replace(withRow(data, saved)); // shown at once (a completed one can't be completed twice)
+      reload();
+    },
+    assignees,
+  );
   const [adding, setAdding] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [clears, setClears] = useState(0);
   const filterPanelId = useId();
   const columns = useColumns("work-activities", WORK_ACTIVITY_COLUMNS);
-  // The API lists a staff member's own activities first, then the rest in the chosen order (each Work's together);
-  // an admin's page is in the chosen order alone.
-  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
   const page = Number(searchParams.get("page")) || 1;
   const pageSize = Number(searchParams.get("page_size")) || DEFAULT_PAGE_SIZE;
@@ -65,10 +72,12 @@ export function WorkActivitiesPage() {
         title="Work Activities"
         description={data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "activity" : "activities"}` : undefined}
       >
-        <button type="button" onClick={() => setAdding(true)} className={primaryButton}>
-          <PlusIcon className="size-4" />
-          Add activity
-        </button>
+        {isAdmin && (
+          <button type="button" onClick={() => setAdding(true)} className={primaryButton}>
+            <PlusIcon className="size-4" />
+            Add activity
+          </button>
+        )}
       </PageHeader>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -82,12 +91,12 @@ export function WorkActivitiesPage() {
         />
         <SortSelect options={SORT_OPTIONS} defaultValue={DEFAULT_ORDERING} />
         <ColumnsButton columns={columns} />
-        {!isAdmin && <span className="text-xs text-muted-foreground">Yours come first</span>}
       </div>
       {filtersOpen && (
         <FilterPanel
           id={filterPanelId}
           searchParams={searchParams}
+          showAssignee={isAdmin}
           assignees={assignees.data}
           onDone={() => {
             setFiltersOpen(false);
@@ -113,12 +122,14 @@ export function WorkActivitiesPage() {
                 Clear search and filters
               </button>
             </EmptyState>
-          ) : (
+          ) : isAdmin ? (
             <EmptyState title="No activities yet." hint="Add a follow-up to keep track of the next action on a Work.">
               <button type="button" onClick={() => setAdding(true)} className={secondaryButton}>
                 Add activity
               </button>
             </EmptyState>
+          ) : (
+            <EmptyState title="No activities assigned to you." hint="Work activities an admin assigns to you show here." />
           )
         }
       >
@@ -127,7 +138,6 @@ export function WorkActivitiesPage() {
           loading={loading}
           showWork
           shows={columns.shows}
-          completingId={rowActions.completingId}
           onEdit={rowActions.edit}
           onComplete={rowActions.complete}
         />
@@ -149,9 +159,10 @@ export function WorkActivitiesPage() {
   );
 }
 
-type FilterPanelProps = { id: string; searchParams: URLSearchParams; assignees?: Assignee[]; onDone: () => void };
+// `showAssignee`: whose activities to list can be chosen (admins).
+type FilterPanelProps = { id: string; searchParams: URLSearchParams; showAssignee: boolean; assignees?: Assignee[]; onDone: () => void };
 
-function FilterPanel({ id, searchParams, assignees, onDone }: FilterPanelProps) {
+function FilterPanel({ id, searchParams, showAssignee, assignees, onDone }: FilterPanelProps) {
   const [draft, setDraft] = useState(
     () => Object.fromEntries(FILTER_KEYS.map((key) => [key, searchParams.get(key) ?? ""])) as Record<FilterKey, string>,
   );
@@ -183,17 +194,19 @@ function FilterPanel({ id, searchParams, assignees, onDone }: FilterPanelProps) 
           ))}
         </select>
       </label>
-      <label className="text-sm">
-        <span className="mb-1.5 block font-medium text-label">Assigned staff</span>
-        <select {...bind("assigned_to")}>
-          <option value="">Anyone</option>
-          {assignees?.map((person) => (
-            <option key={person.id} value={person.id}>
-              {person.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {showAssignee && (
+        <label className="text-sm">
+          <span className="mb-1.5 block font-medium text-label">Assigned staff</span>
+          <select {...bind("assigned_to")}>
+            <option value="">Anyone</option>
+            {assignees?.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="text-sm">
         <span className="mb-1.5 block font-medium text-label">Due from</span>
         <input type="date" max={draft.due_before || undefined} {...bind("due_after")} />

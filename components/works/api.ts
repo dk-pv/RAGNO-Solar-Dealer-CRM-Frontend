@@ -138,8 +138,8 @@ export const ACTIVITY_STATUSES = [
 export type ActivityStatus = (typeof ACTIVITY_STATUSES)[number]["value"];
 
 // GET /api/activities/?work={id} (paginated: pending first, the soonest due first, then completed, the latest first), and
-// GET /api/activities/works/ (every Work's, each Work's together; needs the Work and Activities modules).
-// The same activity log as the leads', with a Work's activities linked to the Work. Anyone with the Work module manages them.
+// GET /api/activities/works/ (every Work's, each Work's together; needs the Activities module). Staff get only theirs.
+// The same activity log as the leads', with a Work's activities linked to the Work. Admins add and edit them.
 export type WorkActivity = {
   id: number;
   work: number;
@@ -152,11 +152,13 @@ export type WorkActivity = {
   status: ActivityStatus;
   completed_at: string | null;
   completed_by_name: string | null;
+  completion_note: string; // what was done, as noted when it was marked completed ("" if no note)
   created_by_name: string | null;
   created_at: string;
   // The Work it belongs to, for tables that list several Works' activities.
   work_summary: Pick<Work, "id" | "customer_name" | "country_code" | "phone" | "plan_name" | "stage">;
-  // Completing or reopening it: only the staff member it is assigned to, or an admin (the API refuses anyone else).
+  can_edit: boolean; // editing it (reassigning, reopening): admins
+  // Completing it: only the staff member it is assigned to, or an admin (the API refuses anyone else).
   can_update_status: boolean;
 };
 

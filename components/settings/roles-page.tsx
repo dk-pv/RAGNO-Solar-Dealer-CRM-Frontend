@@ -114,7 +114,11 @@ type RoleAccessDialogProps = { role: Role; modules: Module[]; onClose: () => voi
 function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const [selected, setSelected] = useState(role.modules);
+  const hintId = useId();
+  // Staff can hold only the Activities module (the API refuses any other), so it is the only one offered. Any other
+  // module the role still has starts unticked, so saving once removes it.
+  const offered = modules.filter((module) => module.key === "activities");
+  const [selected, setSelected] = useState<string[]>(role.modules.filter((key) => key === "activities"));
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
 
@@ -167,7 +171,7 @@ function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogP
             </p>
           )}
           <Section title="Module access">
-            {modules.map((module) => (
+            {offered.map((module) => (
               <label key={module.key} className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -179,11 +183,15 @@ function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogP
                       event.target.checked ? [...current, module.key] : current.filter((key) => key !== module.key),
                     )
                   }
+                  aria-describedby={hintId}
                   className="size-4 accent-primary"
                 />
                 {module.label}
               </label>
             ))}
+            <p id={hintId} className="text-xs text-muted-foreground sm:col-span-2">
+              Staff can only be given Activities.
+            </p>
           </Section>
         </div>
 
