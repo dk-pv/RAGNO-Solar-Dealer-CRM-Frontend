@@ -44,7 +44,7 @@ const COLUMNS: Column<TimelineEvent>[] = [
         "—"
       ),
   },
-  { header: "Customer", render: (event) => <span className="block max-w-44 truncate">{(event.work ?? event.lead)?.customer_name}</span> },
+  { header: "Customer", render: (event) => <span className="block max-w-[max(11rem,12cqw)] truncate">{(event.work ?? event.lead)?.customer_name}</span> },
   {
     header: "Now",
     render: (event) =>
@@ -59,9 +59,10 @@ const COLUMNS: Column<TimelineEvent>[] = [
   },
   {
     header: "Details",
+    // At least 12rem wide: in a table narrower than its columns, a cell that can wrap is squeezed to its longest word.
     render: (event) =>
       event.activity ? (
-        <span title={event.activity.description} className="line-clamp-2 max-w-72 text-xs break-words">
+        <span title={event.activity.description} className="line-clamp-2 min-w-48 max-w-[max(18rem,19cqw)] text-xs break-words">
           <span className="font-medium">{event.activity.type_display}:</span> {event.activity.description}
         </span>
       ) : event.kind === "work_created" ? (

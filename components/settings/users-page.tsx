@@ -112,10 +112,10 @@ export function UsersPage() {
                 ? rows.map((user) => (
                     <tr key={user.id} className="border-b border-border last:border-0 hover:bg-row-hover">
                       <th scope="row" className="px-3 py-2 text-left font-medium">
-                        <span className="block max-w-52 truncate">{user.name}</span>
+                        <span className="block max-w-[max(13rem,14cqw)] truncate">{user.name}</span>
                       </th>
                       <td className="px-3 py-2">
-                        <span className="block max-w-64 truncate">{user.email}</span>
+                        <span className="block max-w-[max(16rem,17cqw)] truncate">{user.email}</span>
                       </td>
                       <td className="px-3 py-2">{ROLE_LABELS[user.role]}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
@@ -385,7 +385,8 @@ function UserDialog({ mode, user, modules, roles, onClose, onSaved }: UserDialog
                 }[mode]
               }
             </h2>
-            <p className="mt-1 truncate text-xs text-muted-foreground">
+            {/* Up to two lines, so the Add hint reads in full on a phone; a very long name or email still ends in an ellipsis. */}
+            <p className="mt-1 line-clamp-2 text-xs break-words text-muted-foreground">
               {user ? `${user.name} · ${user.email}` : "What they can open comes from the role you choose."}
             </p>
           </div>

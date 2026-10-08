@@ -44,7 +44,7 @@ const COLUMNS: Column<LeadReportRow>[] = [
       </Link>
     ),
   },
-  { header: "Customer", render: (lead) => <span className="block max-w-48 truncate font-medium">{lead.customer_name}</span> },
+  { header: "Customer", render: (lead) => <span className="block max-w-[max(12rem,13cqw)] truncate font-medium">{lead.customer_name}</span> },
   { header: "Status (stage)", render: (lead) => <StatusBadge status={lead.status} /> },
   { header: "Assigned to", render: (lead) => lead.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>, className: "whitespace-nowrap" },
   { header: "Source", render: (lead) => lead.source_display || <span className="text-muted-foreground">Not set</span>, className: "whitespace-nowrap" },
@@ -110,7 +110,7 @@ export function LeadReport() {
               ]
             }
           />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 4xl:grid-cols-4">
             <Panel title="Leads created over time" description="Select a column to see those leads.">
               {data ? <TrendChart {...data.trend} series={[{ key: "created", label: "Created", color: "bg-primary/60" }]} /> : <Skeleton lines={6} />}
             </Panel>

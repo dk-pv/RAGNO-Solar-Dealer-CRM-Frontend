@@ -5,7 +5,7 @@ import { useContext, useEffect, useId, useRef, useState, type FormEvent } from "
 import { CloseIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { Section, dialogClass } from "@/components/leads/lead-dialogs";
-import { Busy, ErrorState, ghostButton, iconButton, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
+import { Busy, ErrorState, ghostButton, iconButton, primaryButton, secondaryButton, tableBoxClass, useNotice } from "@/components/leads/ui";
 import { apiRequest, toApiError, useApi } from "@/lib/api";
 import { moduleLabels, type Module, type Role } from "./users-page";
 
@@ -33,7 +33,7 @@ export function RolesPage() {
           <ErrorState title="Couldn't load roles" message={roles.error.message} onRetry={roles.reload} />
         </div>
       ) : (
-        <div className="scrollbar-none relative mt-4 overflow-x-auto rounded-lg border border-border bg-background">
+        <div className={`${tableBoxClass} relative mt-4`}>
           <table aria-busy={roles.loading} className="w-full min-w-160 text-sm">
             <caption className="sr-only">Roles</caption>
             <thead>

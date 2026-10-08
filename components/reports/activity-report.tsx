@@ -44,10 +44,12 @@ const DATE_FIELDS = [
 const COLUMNS: Column<ActivityReportRow>[] = [
   {
     header: "Activity",
+    // The note is at least 12rem wide: in a table narrower than its columns, a cell that can wrap is squeezed to its
+    // longest word.
     render: (activity) => (
       <>
         <span className="block font-medium whitespace-nowrap">{activity.type_display}</span>
-        <span title={activity.description} className="line-clamp-2 max-w-72 text-xs break-words text-muted-foreground">
+        <span title={activity.description} className="line-clamp-2 min-w-48 max-w-[max(18rem,19cqw)] text-xs break-words text-muted-foreground">
           {activity.description}
         </span>
       </>
@@ -64,7 +66,7 @@ const COLUMNS: Column<ActivityReportRow>[] = [
       </Link>
     ),
   },
-  { header: "Customer", render: (activity) => <span className="block max-w-44 truncate">{activity.customer_name}</span> },
+  { header: "Customer", render: (activity) => <span className="block max-w-[max(11rem,12cqw)] truncate">{activity.customer_name}</span> },
   { header: "Assigned to", render: (activity) => activity.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>, className: "whitespace-nowrap" },
   {
     header: "Due date",
@@ -125,8 +127,8 @@ export function ActivityReport() {
   return (
     <div className={`${fillClass} space-y-4`}>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Period by</span>
+        <label className="flex items-center gap-2 text-sm max-sm:w-full">
+          <span className="shrink-0 text-muted-foreground">Period by</span>
           <select
             value={dateField}
             onChange={(event) => updateQuery({ date_field: event.target.value === "created" ? null : event.target.value })}
@@ -142,7 +144,7 @@ export function ActivityReport() {
         <FilterSelect name="record" label="Lead or Work" all="Leads and Works" options={[{ value: "lead", label: "Leads" }, { value: "work", label: "Works" }]} />
         <FilterSelect name="type" label="Activity type" all="All types" options={ACTIVITY_TYPES.map((item) => ({ ...item }))} />
         <FilterSelect name="status" label="Status" all="Any status" options={ACTIVITY_STATUSES.map((item) => ({ ...item }))} />
-        <label className="flex h-9 items-center gap-2 rounded-md border border-input bg-field px-3 text-sm">
+        <label className="flex h-9 items-center gap-2 rounded-md border border-input bg-field px-3 text-sm pointer-coarse:min-h-11">
           <input
             type="checkbox"
             checked={searchParams.get("overdue") === "true"}
@@ -211,7 +213,7 @@ export function ActivityReport() {
               ]
             }
           />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 4xl:grid-cols-4">
             <Panel title="Created and completed over time" description="Select a column to see those days.">
               {data ? (
                 <TrendChart

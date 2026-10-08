@@ -586,7 +586,8 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
                 <select
                   {...bind("country_code")}
                   aria-label="Country code"
-                  className={`${fieldClass} h-9 shrink-0 rounded-r-none`}
+                  // As wide as the chosen country, not the longest one, so the number keeps its room on a phone.
+                  className={`${fieldClass} field-sizing-content h-9 shrink-0 rounded-r-none`}
                 >
                   {COUNTRY_CODES.map((country) => (
                     <option key={country.value} value={country.value}>
@@ -658,7 +659,7 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
                     <button
                       type="button"
                       onClick={() => setValues((current) => ({ ...current, amount: plainAmount(selectedPlan.amount) }))}
-                      className="font-medium text-link underline underline-offset-2 hover:text-link-hover"
+                      className="font-medium text-link underline underline-offset-2 hover:text-link-hover pointer-coarse:py-2"
                     >
                       Use plan price
                     </button>
@@ -724,7 +725,7 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
           {!lead && (
             <fieldset>
               <legend className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Initial follow-up</legend>
-              <label className="mt-3 flex items-center gap-2 text-sm">
+              <label className="mt-3 flex items-center gap-2 text-sm pointer-coarse:min-h-11">
                 <input
                   type="checkbox"
                   name="add_follow_up"

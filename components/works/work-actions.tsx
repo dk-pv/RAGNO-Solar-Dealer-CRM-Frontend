@@ -255,7 +255,7 @@ export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProp
             {work.email && (
               <>
                 <dt className="text-muted-foreground">Email</dt>
-                <dd className="truncate">{work.email}</dd>
+                <dd className="wrap-anywhere">{work.email}</dd>
               </>
             )}
             {location && (

@@ -69,7 +69,7 @@ export function DataPage() {
 
       <section className="mt-4 rounded-lg border border-error-border bg-background p-5">
         <h3 className="text-sm font-semibold text-error">Reset CRM data</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
           Deletes every lead, Work (with its documents), activity and notification, so the CRM starts with clean data. It
           keeps every user and their password, the roles and their module access, departments, and the solar plans with
           their prices: everyone can still sign in afterwards. This can&apos;t be undone.

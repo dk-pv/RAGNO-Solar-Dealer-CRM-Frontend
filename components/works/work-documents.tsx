@@ -150,7 +150,10 @@ export function WorkDocuments({ id }: { id: number }) {
               {group.items.filter((item) => item.provided).length} of {group.items.length} provided
             </span>
           </h2>
-          <ul className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {/* As many cards to a row as fit at 19rem or wider: one on a phone, two on a tablet, three on a laptop and
+              more on a wide screen, with the sidebar open or not. auto-fill keeps a short group's cards as wide as a
+              full group's. */}
+          <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),1fr))] gap-3">
             {group.items.map((item) =>
               item.kind === "field" ? (
                 <InfoCard
@@ -226,7 +229,7 @@ export function WorkDocuments({ id }: { id: number }) {
 
 function BackLink({ id }: { id: number }) {
   return (
-    <Link href={`/works/${id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+    <Link href={`/works/${id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground pointer-coarse:py-2">
       <ChevronLeftIcon className="size-4" />
       Work #{id}
     </Link>

@@ -26,7 +26,17 @@ import {
 import { FollowUpDialog } from "./follow-ups";
 import { menuItemClass, placeMenu } from "./lead-actions";
 import { FilterToggle, SearchBox, SortSelect, StatusTabs, pickParams, updateQuery } from "./leads-toolbar";
-import { FollowUpBadge, PageHeader, fillClass, iconButton, inputClass, primaryButton, secondaryButton, useNotice } from "./ui";
+import {
+  FollowUpBadge,
+  PageHeader,
+  fillClass,
+  iconButton,
+  inputClass,
+  primaryButton,
+  secondaryButton,
+  stickyNameClass,
+  useNotice,
+} from "./ui";
 
 const FILTER_KEYS = ["type", "assigned_to", "due_after", "due_before"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
@@ -281,27 +291,29 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
   return (
     <tr className="group border-b border-border align-top last:border-0 hover:bg-row-hover">
       <th scope="row" className={`${stickyCell} sticky left-0 px-3 py-2.5 text-left font-medium`}>
-        {/* Staff who only do the follow-up can't open someone else's lead. */}
+        {/* Staff who only do the follow-up can't open someone else's lead, so for them the name wraps instead of being
+            cut: nothing else shows it. Its cap (see stickyNameClass) leaves a phone room to scroll the other columns. */}
         {activity.can_open_lead ? (
-          <Link href={`/leads/${activity.lead}`} className="block max-w-52 truncate hover:underline">
+          <Link href={`/leads/${activity.lead}`} className={`block ${stickyNameClass} truncate hover:underline`}>
             {activity.lead_name}
           </Link>
         ) : (
-          <span className="block max-w-52 truncate">{activity.lead_name}</span>
+          // w-max: a name that fits its cap stays on one line, however narrow the table squeezes the column.
+          <span className={`block w-max ${stickyNameClass} break-words`}>{activity.lead_name}</span>
         )}
         <span className="mt-0.5 block text-xs font-normal whitespace-nowrap text-muted-foreground tabular-nums">
           {phone}
         </span>
       </th>
       <td className="min-w-48 px-3 py-2.5">
-        <span className="line-clamp-2 block max-w-72 font-medium">
+        <span className="line-clamp-2 block max-w-[max(18rem,19cqw)] font-medium">
           {activity.title || <span className="font-normal text-muted-foreground italic">No heading</span>}
         </span>
         {activity.description && (
-          <span className="mt-0.5 line-clamp-2 block max-w-72 text-xs text-muted-foreground">{activity.description}</span>
+          <span className="mt-0.5 line-clamp-2 block max-w-[max(18rem,19cqw)] text-xs text-muted-foreground">{activity.description}</span>
         )}
         {activity.completion_note && (
-          <span title={activity.completion_note} className="mt-1 line-clamp-3 max-w-72 text-xs break-words text-muted-foreground">
+          <span title={activity.completion_note} className="mt-1 line-clamp-3 max-w-[max(18rem,19cqw)] text-xs break-words text-muted-foreground">
             <span className="font-medium text-label">Completion note:</span> {activity.completion_note}
           </span>
         )}
@@ -313,7 +325,7 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
             <span className="flex items-center gap-2">
               <span
                 aria-hidden="true"
-                className="grid size-6 place-items-center rounded-full bg-background text-[10px] font-semibold ring-1 ring-border"
+                className="grid size-6 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border"
               >
                 {initials(activity.assigned_to_name)}
               </span>
@@ -383,7 +395,7 @@ function RowMenu({ activity, onEdit, onDelete }: RowMenuProps) {
       <button
         type="button"
         popoverTarget={menuId}
-        onClick={(event) => placeMenu(event.currentTarget, menuId, 150)}
+        onClick={(event) => placeMenu(event.currentTarget, menuId)}
         aria-label={`Actions for the follow-up: ${heading(activity)} (${activity.lead_name})`}
         className={`${iconButton} size-8`}
       >
@@ -455,7 +467,8 @@ function FilterPanel({ id, searchParams, showAssignee, onDone }: FilterPanelProp
         updateQuery(Object.fromEntries(FILTER_KEYS.map((key) => [key, draft[key] || null])));
         onDone();
       }}
-      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-4"
+      // On a wide screen each filter keeps a field's width (24rem at most) instead of a quarter of the page.
+      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,24rem))]"
     >
       <label className="text-sm">
         <span className="mb-1.5 block font-medium text-label">Type</span>

@@ -38,7 +38,7 @@ import {
 } from "./api";
 import { LeadMenu, useLeadActions, type LeadActions } from "./lead-actions";
 import { FILTER_KEYS, LeadsHeader, LeadsToolbar, VIEW_KEYS, pickParams, updateQuery } from "./leads-toolbar";
-import { Busy, PinButton, STATUS_STYLES, StatusBadge, fillClass, secondaryButton, useNotice } from "./ui";
+import { Busy, PinButton, STATUS_STYLES, StatusBadge, fillClass, secondaryButton, stickyNameClass, useNotice } from "./ui";
 
 // The URL query and the API query use the same names.
 const QUERY_KEYS = [...VIEW_KEYS, "page", "page_size"];
@@ -259,7 +259,9 @@ export function LeadsPage() {
               {shows("assigned") && <th scope="col" className="px-3 py-2.5">Assigned</th>}
               {shows("created") && <th scope="col" className="px-3 py-2.5">Created</th>}
               {shows("follow_up") && <th scope="col" className="px-3 py-2.5">Next follow-up</th>}
-              <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
+              {/* The actions stay in view beside a wide table; on a phone they would cover the customer, so there they
+                  scroll with it. */}
+              <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)] max-sm:static">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -327,7 +329,7 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
         />
       </td>
       <th scope="row" className={`${stickyCell} left-0 px-3 py-2 text-left font-medium`}>
-        <Link href={`/leads/${lead.id}`} className="block max-w-52 truncate hover:underline">
+        <Link href={`/leads/${lead.id}`} className={`block ${stickyNameClass} truncate hover:underline`}>
           {lead.name}
         </Link>
         {/* On a phone the Status column is off to the right, so the status also sits under the name. */}
@@ -338,7 +340,7 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
       {shows("phone") && <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(lead)}</td>}
       {shows("location") && (
         <td className="px-3 py-2">
-          <span className="block max-w-48 truncate">{location || "—"}</span>
+          <span className="block max-w-[max(12rem,13cqw)] truncate">{location || "—"}</span>
         </td>
       )}
       {shows("plan") && <td className="px-3 py-2 whitespace-nowrap">{lead.plan_name ?? "—"}</td>}
@@ -354,7 +356,7 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
             <span className="flex items-center gap-2">
               <span
                 aria-hidden="true"
-                className="grid size-6 place-items-center rounded-full bg-background text-[10px] font-semibold ring-1 ring-border"
+                className="grid size-6 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border"
               >
                 {initials(lead.assigned_to_name)}
               </span>
@@ -367,7 +369,7 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
       )}
       {shows("created") && <td className="px-3 py-2 whitespace-nowrap">{formatDate(lead.created_at)}</td>}
       {shows("follow_up") && <td className="px-3 py-2 whitespace-nowrap">{formatDate(lead.next_follow_up)}</td>}
-      <td className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)]`}>
+      <td className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] max-sm:static`}>
         <LeadMenu lead={lead} actions={actions} />
       </td>
     </tr>

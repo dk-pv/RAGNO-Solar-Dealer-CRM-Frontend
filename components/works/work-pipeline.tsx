@@ -8,7 +8,7 @@ import { CalendarIcon, EyeIcon, MapPinIcon, PhoneIcon, PlusIcon } from "@/compon
 import { formatDate, formatMoney, formatPhone, type Assignee, type Page } from "@/components/leads/api";
 import { menuItemClass } from "@/components/leads/lead-actions";
 import { pickParams, updateQuery } from "@/components/leads/leads-toolbar";
-import { ErrorState, secondaryButton, useNotice } from "@/components/leads/ui";
+import { ErrorState, fillClass, secondaryButton, useNotice } from "@/components/leads/ui";
 import {
   Board,
   BoardColumn,
@@ -180,7 +180,7 @@ export function WorkPipeline() {
 
   const hint = "Drag a card to another stage to move the job.";
   return (
-    <div>
+    <div className={fillClass}>
       <WorksHeader
         title="Work Pipeline"
         description={

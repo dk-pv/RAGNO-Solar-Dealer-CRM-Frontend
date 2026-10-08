@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useContext, useEffect, type ReactNode } from "react";
+import { useContext, useEffect, useRef, type ReactNode } from "react";
 
 import { canOpen } from "@/components/layout/navigation";
 import { CurrentUserContext, type ShellUser } from "@/components/layout/use-shell-session";
@@ -29,11 +29,23 @@ export function ReportsShell({ children }: { children: ReactNode }) {
   const reports = useReports();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const tabsRef = useRef<HTMLElement>(null);
   const period = new URLSearchParams();
   for (const key of ["period", "from", "to"]) {
     const value = searchParams.get(key);
     if (value) period.set(key, value);
   }
+
+  // On a phone the tabs scroll sideways: bring the current one into view, from either side, so the open report is
+  // always named. Only the strip scrolls, never the page.
+  useEffect(() => {
+    const tabs = tabsRef.current;
+    const current = tabs?.querySelector("[aria-current=page]");
+    if (!tabs || !current) return;
+    const strip = tabs.getBoundingClientRect();
+    const tab = current.getBoundingClientRect();
+    tabs.scrollLeft += Math.min(0, tab.left - strip.left) + Math.max(0, tab.right - strip.right);
+  }, [pathname]);
 
   return (
     <div className={`${fillClass} space-y-4`}>
@@ -46,7 +58,7 @@ export function ReportsShell({ children }: { children: ReactNode }) {
         </div>
         <PeriodFilter />
       </div>
-      <nav aria-label="Reports" className={tabListClass}>
+      <nav ref={tabsRef} aria-label="Reports" className={tabListClass}>
         {reports.map((report) => {
           const current = pathname === report.href;
           return (

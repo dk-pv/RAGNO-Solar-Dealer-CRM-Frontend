@@ -111,7 +111,8 @@ export function CrmTimeline({ today, users, version }: TimelineProps) {
       <div className={`${fillClass} transition-opacity ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
         {days.map(({ day, events }) => (
           <section key={day} className="mt-4 first:mt-0">
-            <h3 className="sticky top-0 z-1 bg-background py-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            {/* The day stays in view just below the sticky navbar (h-14) while its events scroll past. */}
+            <h3 className="sticky top-14 z-1 bg-background py-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {day === today ? "Today" : day === shiftDay(today, -1) ? "Yesterday" : formatDayHeading(day)}
             </h3>
             <ol className="mt-1 divide-y divide-border">
@@ -230,7 +231,7 @@ function TimelineItem({ event }: { event: TimelineEvent }) {
     <li className="flex gap-3 py-3">
       <span
         aria-hidden="true"
-        className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[11px] font-semibold text-secondary-foreground"
+        className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[0.6875rem] font-semibold text-secondary-foreground"
       >
         {initials(who)}
       </span>

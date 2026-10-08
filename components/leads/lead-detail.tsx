@@ -195,7 +195,7 @@ export function LeadDetail({ id }: { id: number }) {
           {lead.notes && (
             <section>
               <h2 className="text-sm font-semibold">Notes</h2>
-              <p className="mt-2 text-sm break-words whitespace-pre-line">{lead.notes}</p>
+              <p className="mt-2 max-w-4xl text-sm break-words whitespace-pre-line">{lead.notes}</p>
             </section>
           )}
           <Activities
@@ -305,7 +305,7 @@ export function LeadDetail({ id }: { id: number }) {
 
 function BackLink() {
   return (
-    <Link href="/leads" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+    <Link href="/leads" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground pointer-coarse:py-2">
       <ChevronLeftIcon className="size-4" />
       All leads
     </Link>
@@ -316,7 +316,10 @@ export function Details({ title, items }: { title: string; items: [string, React
   return (
     <section>
       <h2 className="text-sm font-semibold">{title}</h2>
-      <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+      {/* One column on a phone and two from sm, as on a laptop; from 2xl, as many as fit (more on a wide screen).
+          auto-fill keeps empty tracks, so fields keep their width instead of spreading across the page and every
+          section's columns line up. */}
+      <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 2xl:grid-cols-[repeat(auto-fill,minmax(min(100%,16.5rem),1fr))]">
         {items.map(([label, value]) => (
           <div key={label}>
             <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -371,7 +374,8 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
               <li key={activity.id} className="relative">
                 <span
                   aria-hidden="true"
-                  className={`absolute top-1.5 -left-[24.5px] size-2 rounded-full ${
+                  // Centred on the list's 1px line at any text size: the padding plus half the dot, plus half the line.
+                  className={`absolute top-1.5 -left-[calc(1.5rem+0.5px)] size-2 rounded-full ${
                     activity.status === "COMPLETED" ? "bg-success" : overdue ? "bg-error" : "bg-muted-foreground"
                   }`}
                 />
@@ -456,7 +460,8 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
   }
 
   return (
-    <section id="activities" className="scroll-mt-20">
+    // A readable line length on a wide screen, with Change and Add follow-up kept near the list.
+    <section id="activities" className="max-w-4xl scroll-mt-20">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 ref={headingRef} tabIndex={-1} className="text-sm font-semibold">
           Follow-ups / Activities

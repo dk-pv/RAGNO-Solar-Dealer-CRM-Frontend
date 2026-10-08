@@ -96,8 +96,8 @@ type BulkActionBarProps = {
 // The one bulk action bar, for every list with row selection. Render it only while rows are selected, as the list
 // shell's `bulkBar`: it sits at the bottom of the list, above the pagination, and rides the bottom of the window while
 // a long list scrolls. Sticky, not fixed: it belongs to the list's own column, so it never covers the sidebar or leaves
-// the content area, on a phone or a wide screen. On narrow screens the actions show their icons only (with their names
-// as tooltips and for screen readers), so the bar always fits.
+// the content area, on a phone or a wide screen. On narrow screens the count stands alone and the actions show their
+// icons only (the words stay for screen readers, the names as tooltips), so the bar fits even a 320px phone.
 export function BulkActionBar({ count, onClear, busy = false, children }: BulkActionBarProps) {
   const divider = <span aria-hidden="true" className="h-5 w-px shrink-0 bg-border" />;
   return (
@@ -111,7 +111,7 @@ export function BulkActionBar({ count, onClear, busy = false, children }: BulkAc
           <span className="grid h-6 min-w-6 place-items-center rounded-md bg-primary px-1.5 text-xs font-semibold text-white tabular-nums">
             {busy ? <SpinnerIcon className="size-3.5" /> : count.toLocaleString("en-IN")}
           </span>{" "}
-          <span>{busy ? "Working…" : "selected"}</span>
+          <span className="max-sm:sr-only">{busy ? "Working…" : "selected"}</span>
         </p>
         {divider}
         <fieldset disabled={busy} className="flex min-w-0 items-center gap-0.5">

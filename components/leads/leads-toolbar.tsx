@@ -152,7 +152,9 @@ export function SearchBox({ label, placeholder }: { label: string; placeholder: 
   }, [searchText, search]);
 
   return (
-    <div className="relative w-full sm:w-72">
+    // A row of its own on a phone. From sm it is 18rem and grows into the toolbar row's spare room, up to 24rem, so the
+    // longer placeholders show in full where there is room; it never makes the toolbar wrap sooner.
+    <div className="relative w-full sm:w-72 sm:max-w-96 sm:grow">
       <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-faint" />
       <input
         type="search"
@@ -223,7 +225,8 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
         updateQuery(Object.fromEntries(FILTER_KEYS.map((key) => [key, draft[key] || null])));
         onDone();
       }}
-      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-3"
+      // On a wide screen each filter keeps a field's width (24rem at most) instead of a third of the page.
+      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,24rem))]"
     >
       <label className="text-sm">
         <span className="mb-1.5 block font-medium text-label">Status</span>

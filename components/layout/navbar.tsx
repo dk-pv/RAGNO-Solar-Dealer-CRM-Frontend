@@ -43,19 +43,39 @@ function Tooltip({ label, children }: { label: string; children: ReactNode }) {
 type NavbarProps = {
   user: ShellUser | null;
   onLogout: (() => void) | null;
+  /** The navigation drawer (phones and tablets) that the menu button opens, and whether it is open. */
+  navigationId: string;
+  navigationOpen: boolean;
   onOpenNavigation: () => void;
 };
 
-export function Navbar({ user, onLogout, onOpenNavigation }: NavbarProps) {
+export function Navbar({ user, onLogout, navigationId, navigationOpen, onOpenNavigation }: NavbarProps) {
   const userInitials = user ? initials(user.name) : "";
   const [composing, setComposing] = useState(false);
 
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 lg:px-6">
-      <button type="button" onClick={onOpenNavigation} aria-label="Open navigation" className={`${iconButtonClass} lg:hidden`}>
+      <button
+        type="button"
+        onClick={onOpenNavigation}
+        aria-label="Open navigation"
+        aria-haspopup="dialog"
+        aria-expanded={navigationOpen}
+        aria-controls={navigationId}
+        className={`${iconButtonClass} lg:hidden`}
+      >
         <MenuIcon />
       </button>
-      <span className="truncate text-sm font-semibold lg:hidden">Ragno Power System</span>
+      {/* The brand, while the sidebar that shows it is hidden. A phone narrower than 400px shows the mark and "Ragno"
+          (screen readers still hear the whole name), so it fits beside the actions instead of being cut off. */}
+      <span className="flex min-w-0 items-center gap-2 md:hidden">
+        <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-md bg-brand text-xs font-bold text-white">
+          R
+        </span>
+        <span className="truncate text-sm font-semibold">
+          Ragno<span className="max-[25rem]:sr-only"> Power System</span>
+        </span>
+      </span>
 
       <div className="ml-auto flex items-center gap-1">
         {/* A WhatsApp message to a lead, on the lead's own number: for whoever has the Leads module (the form lists

@@ -84,22 +84,27 @@ export function Dashboard() {
         <>
           <SummaryCards summary={summary} onFollowUps={(bucket) => showFollowUps(bucket, false)} />
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <FollowUpsPanel
-              view={followUps}
-              onView={setFollowUps}
-              counts={summary.data && (followUps.mine ? summary.data.mine.follow_ups : summary.data.follow_ups)}
-              today={today}
-              version={version}
-              links={{ works: canWorks && canActivities, leads: canLeads }}
-              className="lg:col-span-2"
-            />
-            <MyWork summary={summary} me={me} onFollowUps={(bucket) => showFollowUps(bucket, true)} />
-          </div>
+          {/* Two rows up to 4xl. From 4xl they share one: Follow-ups and My work take two thirds of the width and the
+              two overviews stack in the last third, in line with the timeline and the recent records below. */}
+          <div className="grid grid-cols-1 gap-4 4xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 4xl:col-span-2">
+              <FollowUpsPanel
+                view={followUps}
+                onView={setFollowUps}
+                counts={summary.data && (followUps.mine ? summary.data.mine.follow_ups : summary.data.follow_ups)}
+                today={today}
+                version={version}
+                links={{ works: canWorks && canActivities, leads: canLeads }}
+                className="lg:col-span-2"
+              />
+              <MyWork summary={summary} me={me} onFollowUps={(bucket) => showFollowUps(bucket, true)} />
+            </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {canLeads && <LeadOverview summary={summary} onAdd={leadActions.add} />}
-            {canWorks && <WorkOverview stages={stages} />}
+            {/* auto-fit: a role with only one of the two overviews gets it at full width. */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[repeat(auto-fit,minmax(0,1fr))] 4xl:grid-cols-1">
+              {canLeads && <LeadOverview summary={summary} onAdd={leadActions.add} />}
+              {canWorks && <WorkOverview stages={stages} />}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -177,6 +182,10 @@ function sourceHint(totals: FollowUpTotals, key: "pending" | "overdue") {
   return parts.join(" · ");
 }
 
+// The summary tiles: two a row on phones and four from md. From 4xl every tile shares one row of equal columns
+// (eight, or five for a role with only Leads or only Work) instead of two rows of very wide, half-empty tiles.
+const tilesClass = "grid grid-cols-2 gap-3 md:grid-cols-4 4xl:auto-cols-fr 4xl:grid-flow-col 4xl:grid-cols-none";
+
 function SummaryCards({ summary, onFollowUps }: { summary: Loaded<DashboardSummary>; onFollowUps: (bucket: FollowUpBucket) => void }) {
   if (summary.error) {
     return (
@@ -188,9 +197,9 @@ function SummaryCards({ summary, onFollowUps }: { summary: Loaded<DashboardSumma
   // Placeholders, never zeros, while the counts load.
   if (!summary.data) {
     return (
-      <div aria-busy="true" aria-label="Loading the summary" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div aria-busy="true" aria-label="Loading the summary" className={tilesClass}>
         {Array.from({ length: 8 }, (_, index) => (
-          <div key={index} className="h-[6.5rem] animate-pulse rounded-lg border border-border bg-background motion-reduce:animate-none" />
+          <div key={index} className="h-30 animate-pulse rounded-lg border border-border bg-background motion-reduce:animate-none" />
         ))}
       </div>
     );
@@ -231,7 +240,7 @@ function SummaryCards({ summary, onFollowUps }: { summary: Loaded<DashboardSumma
   );
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className={tilesClass}>
       {cards.map((card) => (
         <SummaryCard key={card.title} card={card} />
       ))}
@@ -255,11 +264,13 @@ function SummaryCard({ card }: { card: Card }) {
       <span className={`mt-1 block text-2xl font-semibold tabular-nums ${card.alert ? "text-error" : ""}`}>
         {card.value.toLocaleString("en-IN")}
       </span>
-      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{card.hint}</span>
+      <span className="mt-0.5 block text-xs text-muted-foreground">{card.hint}</span>
     </>
   );
+  // The hint wraps rather than cutting off its counts on a narrow tile. A column keeps every tile's text at the top when
+  // a neighbour's longer hint makes the row taller (a button would centre it).
   const className =
-    "block w-full rounded-lg border border-border bg-background p-4 text-left shadow-xs transition-colors hover:border-border-strong";
+    "flex w-full flex-col rounded-lg border border-border bg-background p-4 text-left shadow-xs transition-colors hover:border-border-strong";
   return card.href ? (
     <Link href={card.href} className={className}>
       {body}
@@ -438,7 +449,7 @@ function MyWork({ summary, me, onFollowUps }: MyWorkProps) {
   } else {
     const mine = summary.data.mine;
     const counts = mine.follow_ups.total;
-    const row = "flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-muted";
+    const row = "flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-muted pointer-coarse:py-3";
     const value = (count: number, alert = false) => (
       <span className={`font-semibold tabular-nums ${alert && count > 0 ? "text-error" : ""}`}>{count.toLocaleString("en-IN")}</span>
     );
@@ -521,7 +532,7 @@ function LeadOverview({ summary, onAdd }: { summary: Loaded<DashboardSummary>; o
             <li key={row.status}>
               <Link
                 href={`/leads?status=${row.status}`}
-                className="-mx-2 grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
+                className="-mx-2 grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted pointer-coarse:min-h-11"
               >
                 <span>
                   <StatusBadge status={row.status} />
@@ -578,7 +589,8 @@ function WorkOverview({ stages }: { stages: Loaded<StageSummary[]> }) {
               <li key={row.stage}>
                 <Link
                   href={`/works?stage=${row.stage}`}
-                  className="-mx-2 grid grid-cols-[minmax(0,12.5rem)_1fr_2.5rem] items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
+                  // The label column fits the longest stage name (Loan Work / Documents), so the bar keeps room on a phone.
+                  className="-mx-2 grid grid-cols-[minmax(0,11rem)_1fr_2.5rem] items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted pointer-coarse:min-h-11"
                 >
                   <span className="flex min-w-0 items-center gap-2 text-sm">
                     <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${stage.dot}`} />
@@ -660,7 +672,7 @@ function RecentLeads({ recent }: { recent: Loaded<RecentRecords> }) {
       empty="No Leads yet"
       render={(lead) => (
         <>
-          <p className="flex items-start justify-between gap-2 text-sm">
+          <p className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1 text-sm">
             <Link href={`/leads/${lead.id}`} className="min-w-0 truncate font-medium hover:underline">
               Lead #{lead.id} · {lead.customer_name}
             </Link>
@@ -685,7 +697,7 @@ function RecentWorks({ recent }: { recent: Loaded<RecentRecords> }) {
         const stage = stageFor(work.stage);
         return (
           <>
-            <p className="flex items-start justify-between gap-2 text-sm">
+            <p className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1 text-sm">
               <Link href={`/works/${work.id}`} className="min-w-0 truncate font-medium hover:underline">
                 Work #{work.id} · {work.customer_name}
               </Link>

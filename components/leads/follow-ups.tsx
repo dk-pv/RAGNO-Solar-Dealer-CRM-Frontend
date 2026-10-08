@@ -80,7 +80,7 @@ export function LeadPicker({ id, value, onChange, error: fieldError, selectable,
             setRefocus(true);
             onChange(undefined);
           }}
-          className="font-medium underline-offset-2 hover:underline"
+          className="font-medium underline-offset-2 hover:underline pointer-coarse:py-2"
         >
           Change
         </button>

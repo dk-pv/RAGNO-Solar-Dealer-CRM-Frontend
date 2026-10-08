@@ -120,17 +120,23 @@ type BoardProps = {
 // The columns, side by side. Each column scrolls its own cards; the board scrolls sideways and ends at the last column.
 // On phones a column snaps into view. `relative` keeps absolutely positioned content (screen-reader labels) inside the
 // board; otherwise it would widen the whole page.
+// The board fills the height left on its page (the page's root is a flex column: fillClass), so the columns, and the
+// footer under a column's cards, end at the bottom of the window whatever sits above them: the tabs, a wrapped
+// toolbar, the open filter panel. Given less than 18rem it keeps 18rem and the page scrolls; on a phone, where the
+// header and toolbar take most of the screen, it is as tall as the screen under the navbar (h-14) less main's bottom
+// padding, so a column shows several cards once the page is scrolled to it. basis-0 and the row's min-h-0 keep the
+// cards from growing it: flex-1's 0% basis would count them while the page's height is still open.
 export function Board({ boardRef, dragging, refreshing = false, busy, onDragOver, children }: BoardProps) {
   return (
     <div
       ref={boardRef}
       aria-busy={busy}
       onDragOver={onDragOver}
-      className={`scrollbar-none relative mt-4 overflow-x-auto transition-opacity motion-reduce:transition-none ${
+      className={`scrollbar-none relative mt-4 flex min-h-72 grow basis-0 flex-col overflow-x-auto transition-opacity motion-reduce:transition-none max-md:min-h-[calc(100dvh-4.5rem)] ${
         dragging ? "" : "snap-x snap-mandatory lg:snap-none"
       } ${refreshing ? "opacity-60" : ""}`}
     >
-      <div className="flex gap-3">{children}</div>
+      <div className="flex min-h-0 flex-1 gap-3">{children}</div>
     </div>
   );
 }
@@ -200,7 +206,7 @@ export function BoardColumn({
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`flex max-h-[calc(100dvh-15rem)] min-h-72 min-w-[min(18rem,85vw)] flex-1 snap-start flex-col rounded-lg border bg-muted transition-[opacity,border-color,box-shadow] motion-reduce:transition-none ${outline} ${
+      className={`flex min-w-[min(18rem,85vw)] flex-1 snap-start flex-col rounded-lg border bg-muted transition-[opacity,border-color,box-shadow] motion-reduce:transition-none ${outline} ${
         dimmed ? "opacity-50" : ""
       }`}
     >
@@ -224,7 +230,7 @@ export function BoardColumn({
               <button
                 type="button"
                 popoverTarget={menuId}
-                onClick={(event) => placeMenu(event.currentTarget, menuId, 130)}
+                onClick={(event) => placeMenu(event.currentTarget, menuId)}
                 aria-label={`More actions for ${title}`}
                 title="More actions"
                 className={headerButton}
@@ -294,7 +300,7 @@ export function CardAssignee({ name }: { name: string | null }) {
   if (!name) return <span>Unassigned</span>;
   return (
     <span className="flex min-w-0 items-center gap-1.5">
-      <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-muted text-[10px] font-semibold text-secondary-foreground">
+      <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-muted text-[0.625rem] font-semibold text-secondary-foreground">
         {initials(name)}
       </span>
       <span className="truncate">

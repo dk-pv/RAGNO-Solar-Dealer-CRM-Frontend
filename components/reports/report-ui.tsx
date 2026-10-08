@@ -150,7 +150,7 @@ export function ActiveFilters({ active, describe }: { active: string[]; describe
           type="button"
           onClick={() => updateQuery({ [key]: null })}
           aria-label={`Remove the filter ${describe(key, searchParams.get(key) ?? "")}`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary-softer px-2 py-1 text-xs font-medium text-primary-strong hover:bg-primary-soft"
+          className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary-softer px-2 py-1 text-xs font-medium text-primary-strong hover:bg-primary-soft pointer-coarse:py-2.5"
         >
           {describe(key, searchParams.get(key) ?? "")}
           <CloseIcon className="size-3.5" />
@@ -159,7 +159,7 @@ export function ActiveFilters({ active, describe }: { active: string[]; describe
       <button
         type="button"
         onClick={() => updateQuery(Object.fromEntries(active.map((key) => [key, null])))}
-        className="text-xs font-medium text-link underline-offset-2 hover:underline"
+        className="text-xs font-medium text-link underline-offset-2 hover:underline pointer-coarse:py-2.5"
       >
         Clear all
       </button>
@@ -254,14 +254,22 @@ export function Stats({ stats }: { stats?: Stat[] }) {
   return (
     <div className={`grid grid-cols-2 gap-3 ${stats.length > 4 ? "md:grid-cols-3 xl:grid-cols-6" : "md:grid-cols-4"}`}>
       {stats.map((stat) => {
+        // A long figure (a total in rupees, ₹14,82,000 or ₹1,48,20,000) is sized to fit its tile on one line: a digit is
+        // about 0.57em wide, so N characters fit in 175cqi / N (cqi: a percentage of the tile's inner width), at most
+        // the usual 1.5rem. A short count keeps the usual size. Tiles are flex columns, so one that is a button starts at
+        // the top like the others.
+        const chars = String(stat.value).length;
+        const fit = chars > 8 ? { fontSize: `min(1.5rem, calc(175cqi / ${chars}))` } : undefined;
         const body = (
           <>
             <span className="block text-sm font-medium text-secondary-foreground">{stat.label}</span>
-            <span className={`mt-1 block text-2xl font-semibold tabular-nums ${stat.alert ? "text-error" : ""}`}>{stat.value}</span>
+            <span style={fit} className={`mt-1 block ${fit ? "leading-8" : "text-2xl"} font-semibold tabular-nums ${stat.alert ? "text-error" : ""}`}>
+              {stat.value}
+            </span>
             {stat.hint && <span className="mt-0.5 block text-xs text-muted-foreground">{stat.hint}</span>}
           </>
         );
-        const className = "block w-full rounded-lg border border-border bg-background p-4 text-left shadow-xs";
+        const className = "@container flex w-full flex-col rounded-lg border border-border bg-background p-4 text-left shadow-xs";
         return stat.onClick ? (
           <button key={stat.label} type="button" onClick={stat.onClick} className={`${className} transition-colors hover:border-primary/50`}>
             {body}
@@ -294,11 +302,13 @@ export function BarList({ items, empty = NO_DATA }: { items: BarItem[]; empty?: 
             </span>
             <span className="text-right text-sm tabular-nums">
               <span className="font-medium">{item.count.toLocaleString("en-IN")}</span>
-              {item.detail && <span className="block text-[11px] text-muted-foreground">{item.detail}</span>}
+              {item.detail && <span className="block text-[0.6875rem] text-muted-foreground">{item.detail}</span>}
             </span>
           </>
         );
-        const className = "-mx-2 grid w-[calc(100%+1rem)] grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3 rounded-md px-2 py-1.5 text-left";
+        // The bar keeps at least 3rem: the label and the count take the room first, and in a phone-width panel they left
+        // no bar at all.
+        const className = "-mx-2 grid w-[calc(100%+1rem)] grid-cols-[minmax(0,11rem)_minmax(3rem,1fr)_auto] items-center gap-3 rounded-md px-2 py-1.5 text-left pointer-coarse:min-h-11";
         return (
           <li key={item.key}>
             {item.onClick && item.count > 0 ? (
@@ -381,7 +391,7 @@ export function TrendChart({
           );
         })}
       </div>
-      <div className="mt-1 flex gap-0.5 text-[10px] text-muted-foreground">
+      <div className="mt-1 flex gap-0.5 text-[0.625rem] text-muted-foreground">
         {points.map((point, index) => (
           <span key={point.start} className="min-w-0 flex-1 overflow-visible text-center whitespace-nowrap">
             {index % every === 0 ? pointFormat(unit, point.start) : ""}

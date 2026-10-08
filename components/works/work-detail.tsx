@@ -202,7 +202,7 @@ export function WorkDetail({ id }: { id: number }) {
 
 function BackLink() {
   return (
-    <Link href="/works" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+    <Link href="/works" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground pointer-coarse:py-2">
       <ChevronLeftIcon className="size-4" />
       All works
     </Link>

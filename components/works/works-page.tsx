@@ -9,7 +9,7 @@ import { initials } from "@/components/layout/navbar";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { formatDate, formatMoney, formatPhone, type Assignee, type Page } from "@/components/leads/api";
 import { pickParams, updateQuery } from "@/components/leads/leads-toolbar";
-import { fillClass, secondaryButton, useNotice } from "@/components/leads/ui";
+import { fillClass, secondaryButton, stickyNameClass, useNotice } from "@/components/leads/ui";
 import {
   ActionDialog,
   BulkAction,
@@ -221,7 +221,9 @@ export function WorksPage() {
               {shows("due") && <th scope="col" className="px-3 py-2.5">Due date</th>}
               {shows("follow_up") && <th scope="col" className="px-3 py-2.5">Next follow-up</th>}
               {shows("converted") && <th scope="col" className="px-3 py-2.5">Converted</th>}
-              <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
+              {/* The actions stay in view beside a wide table; on a phone they would cover the customer, so there they
+                  scroll with it. */}
+              <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)] max-sm:static">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -324,7 +326,7 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
       </td>
       {shows("work") && <td className="px-3 py-2 whitespace-nowrap text-muted-foreground tabular-nums">#{work.id}</td>}
       <th scope="row" className={`${stickyCell} left-0 px-3 py-2 text-left font-medium`}>
-        <Link href={`/works/${work.id}`} className="block max-w-52 truncate hover:underline">
+        <Link href={`/works/${work.id}`} className={`block ${stickyNameClass} truncate hover:underline`}>
           {work.customer_name}
         </Link>
         {/* On a phone the Stage and Documents columns are off to the right, so both also sit under the name. */}
@@ -337,7 +339,7 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
       {shows("phone") && <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(work)}</td>}
       {shows("location") && (
         <td className="px-3 py-2">
-          <span className="block max-w-48 truncate">{location || "—"}</span>
+          <span className="block max-w-[max(12rem,13cqw)] truncate">{location || "—"}</span>
         </td>
       )}
       {shows("plan") && <td className="px-3 py-2 whitespace-nowrap">{work.plan_name}</td>}
@@ -376,7 +378,7 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
             {assigneeName && (
               <span
                 aria-hidden="true"
-                className="grid size-6 shrink-0 place-items-center rounded-full bg-background text-[10px] font-semibold ring-1 ring-border"
+                className="grid size-6 shrink-0 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border"
               >
                 {initials(assigneeName)}
               </span>
@@ -419,7 +421,7 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
         </td>
       )}
       {shows("converted") && <td className="px-3 py-2 whitespace-nowrap">{formatDate(work.created_at)}</td>}
-      <td className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)]`}>
+      <td className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] max-sm:static`}>
         <WorkMenu work={work} actions={actions} />
       </td>
     </tr>

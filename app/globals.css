@@ -1,7 +1,12 @@
 @import "tailwindcss";
 
-/* Styles for the collapsed desktop sidebar. The attribute is set before first paint (see components/layout/sidebar.tsx). */
+/* Styles for the collapsed sidebar rail. The attribute is set before first paint (see components/layout/sidebar.tsx). */
 @custom-variant sidebar-collapsed (&:where([data-sidebar="collapsed"], [data-sidebar="collapsed"] *));
+
+/* A tier for very wide screens (2560px and up), where a page has room for more columns than on a laptop. */
+@theme {
+  --breakpoint-4xl: 160rem;
+}
 
 /* The CRM's one colour system: soft red and warm cream on a light base. Components use these tokens, never raw colours.
    The CRM is light only, so it looks the same whatever the operating system's dark-mode setting. */
@@ -210,6 +215,14 @@
   --color-brand: var(--primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+/* The CRM grows on very wide screens, so a 4K monitor or TV isn't a sea of laptop-sized text: 16px up to a 1920px
+   window, then a little more for each extra pixel of width, up to 20px from 3840px (4K) up. Everything sized in rem
+   (text, spacing, controls, the sidebar) scales with it; layout breakpoints don't (media queries use the browser's own
+   text size), and the text size set in the browser stays the base. */
+html {
+  font-size: clamp(100%, 75% + 0.20833vw, 125%);
 }
 
 body {

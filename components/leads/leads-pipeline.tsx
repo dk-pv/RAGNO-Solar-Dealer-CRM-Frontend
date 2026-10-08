@@ -33,7 +33,7 @@ import {
 } from "./api";
 import { LeadMenu, menuItemClass, useLeadActions, type LeadActions } from "./lead-actions";
 import { LeadsHeader, LeadsToolbar, SORT_OPTIONS, VIEW_KEYS, pickParams, updateQuery } from "./leads-toolbar";
-import { ErrorState, PinButton, STATUS_DOTS, STATUS_STYLES, secondaryButton, useNotice } from "./ui";
+import { ErrorState, PinButton, STATUS_DOTS, STATUS_STYLES, fillClass, secondaryButton, useNotice } from "./ui";
 
 const FIRST_CARDS = 25; // the cards a column loads at first; "Show more" adds as many again
 const MAX_CARDS = 100; // the API's largest page
@@ -282,7 +282,7 @@ export function LeadsPipeline() {
 
   const hint = "Drag a card to another stage to update its status.";
   return (
-    <div>
+    <div className={fillClass}>
       <LeadsHeader
         title="Lead Pipeline"
         description={

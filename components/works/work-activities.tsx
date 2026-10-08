@@ -201,17 +201,19 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                   )}
                   {showWork && shows("customer") && (
                     <td className="px-3 py-2">
-                      <span className="block max-w-48 truncate font-medium">{work.customer_name}</span>
+                      <span className="block max-w-[max(12rem,13cqw)] truncate font-medium">{work.customer_name}</span>
                       <span className="block text-xs whitespace-nowrap text-muted-foreground tabular-nums">{formatPhone(work)}</span>
                     </td>
                   )}
-                  <td className={`px-3 py-2 ${showWork ? "" : color.edge}`}>
+                  {/* A floor, as on the lead follow-ups table: the other columns don't wrap, so whenever the table
+                      scrolls this one would otherwise be squeezed to its longest word. */}
+                  <td className={`min-w-48 px-3 py-2 ${showWork ? "" : color.edge}`}>
                     <span className="block font-medium whitespace-nowrap">{activity.type_display}</span>
-                    <span title={activity.description} className="line-clamp-2 max-w-80 text-xs break-words text-muted-foreground">
+                    <span title={activity.description} className="line-clamp-2 max-w-[max(20rem,21cqw)] text-xs break-words text-muted-foreground">
                       {activity.description}
                     </span>
                     {activity.completion_note && (
-                      <span title={activity.completion_note} className="mt-1 line-clamp-3 max-w-80 text-xs break-words text-muted-foreground">
+                      <span title={activity.completion_note} className="mt-1 line-clamp-3 max-w-[max(20rem,21cqw)] text-xs break-words text-muted-foreground">
                         <span className="font-medium text-label">Completion note:</span> {activity.completion_note}
                       </span>
                     )}
@@ -293,7 +295,7 @@ function ActivityMenu({ activity, label, withWork, onEdit }: ActivityMenuProps) 
       <button
         type="button"
         popoverTarget={menuId}
-        onClick={(event) => placeMenu(event.currentTarget, menuId, 110)}
+        onClick={(event) => placeMenu(event.currentTarget, menuId)}
         aria-label={`Actions for ${label}`}
         className={`${iconButton} size-8`}
       >

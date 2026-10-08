@@ -52,7 +52,7 @@ export function StaffReport() {
       header: "User",
       render: (row) => (
         <span className="flex items-center gap-2 whitespace-nowrap">
-          <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-[10px] font-semibold text-secondary-foreground">
+          <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-[0.625rem] font-semibold text-secondary-foreground">
             {row.user ? initials(row.user.name) : "–"}
           </span>
           <span className="font-medium">{row.user?.name ?? "Unassigned"}</span>
@@ -62,7 +62,8 @@ export function StaffReport() {
     },
     ...STAFF_COLUMNS.map(({ key, label }) => ({
       header: label,
-      className: "text-right tabular-nums whitespace-nowrap",
+      // `relative` frames the number's link, which covers the whole cell: the cell is the target, not just its digits.
+      className: "relative text-right tabular-nums whitespace-nowrap",
       render: (row: StaffReportRow) => {
         const value = row[key];
         // Unassigned work has no one who did anything: only the "assigned" numbers apply to it.
@@ -72,7 +73,7 @@ export function StaffReport() {
         const [path, filters] = drillDown(key, row.user);
         const query = new URLSearchParams({ ...Object.fromEntries(period), ...filters });
         return (
-          <Link href={`${path}?${query}`} className={`font-medium text-link hover:text-link-hover hover:underline ${key === "overdue" ? "text-error" : ""}`}>
+          <Link href={`${path}?${query}`} className={`font-medium text-link after:absolute after:inset-0 hover:text-link-hover hover:underline ${key === "overdue" ? "text-error" : ""}`}>
             {value.toLocaleString("en-IN")}
           </Link>
         );

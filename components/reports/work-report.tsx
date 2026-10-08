@@ -57,7 +57,7 @@ const COLUMNS: Column<WorkReportRow>[] = [
       </Link>
     ),
   },
-  { header: "Customer", render: (work) => <span className="block max-w-48 truncate font-medium">{work.customer_name}</span> },
+  { header: "Customer", render: (work) => <span className="block max-w-[max(12rem,13cqw)] truncate font-medium">{work.customer_name}</span> },
   { header: "Stage", render: (work) => <StageChip stage={work.stage} /> },
   { header: "Assigned to", render: (work) => work.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>, className: "whitespace-nowrap" },
   { header: "Plan", render: (work) => work.plan_name, className: "whitespace-nowrap" },
@@ -117,7 +117,7 @@ export function WorkReport() {
               ]
             }
           />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 4xl:grid-cols-3">
             <Panel title="Works created over time" description="Select a column to see those Works.">
               {data ? (
                 <TrendChart
@@ -150,7 +150,7 @@ export function WorkReport() {
                 <Skeleton lines={7} />
               )}
             </Panel>
-            <Panel title="By assigned staff" className="lg:col-span-2">
+            <Panel title="By assigned staff" className="lg:col-span-2 4xl:col-span-1">
               {data ? (
                 <BarList
                   items={data.by_staff.map((row) => ({

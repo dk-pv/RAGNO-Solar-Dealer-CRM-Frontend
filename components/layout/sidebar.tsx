@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useId, useRef, useSyncExternalStore } from "react";
+import { useId, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 
 import { iconButton } from "@/components/leads/ui";
 import { ChevronLeftIcon, CloseIcon, LogoutIcon } from "./icons";
@@ -12,18 +12,27 @@ import type { ShellUser } from "./use-shell-session";
 // ---- Collapsed preference, remembered in localStorage ----
 
 const STORAGE_KEY = "ragno:sidebar";
+// The rail opens (labels beside the icons) only from lg (1024px) up. Below that it stays icons only, so a tablet's page
+// keeps its width, and the navbar's menu button opens the full navigation as a drawer over the page instead.
+const OPENABLE_QUERY = "(min-width: 64rem)";
+// From lg, until the user chooses, the rail starts collapsed below xl (1280px: small laptops), so the page keeps its
+// room, and expanded from xl up. Their choice, once made, holds at every width from lg.
+const WIDE_QUERY = "(min-width: 80rem)";
 const listeners = new Set<() => void>();
-let collapsedPreference: boolean | null = null;
+// undefined: not read yet; null: no choice made.
+let collapsedPreference: boolean | null | undefined;
 
 function readCollapsed() {
-  if (collapsedPreference === null) {
+  if (collapsedPreference === undefined) {
     try {
-      collapsedPreference = localStorage.getItem(STORAGE_KEY) === "collapsed";
+      const stored = localStorage.getItem(STORAGE_KEY);
+      collapsedPreference = stored === null ? null : stored === "collapsed";
     } catch {
-      collapsedPreference = false;
+      collapsedPreference = null;
     }
   }
-  return collapsedPreference;
+  if (!window.matchMedia(OPENABLE_QUERY).matches) return true;
+  return collapsedPreference ?? !window.matchMedia(WIDE_QUERY).matches;
 }
 
 function writeCollapsed(collapsed: boolean) {
@@ -36,18 +45,23 @@ function writeCollapsed(collapsed: boolean) {
   listeners.forEach((listener) => listener());
 }
 
+// Also follows the window across both widths, which change the state without the user doing anything.
 function subscribe(listener: () => void) {
   listeners.add(listener);
+  const queries = [OPENABLE_QUERY, WIDE_QUERY].map((query) => window.matchMedia(query));
+  queries.forEach((query) => query.addEventListener("change", listener));
   return () => {
     listeners.delete(listener);
+    queries.forEach((query) => query.removeEventListener("change", listener));
   };
 }
 
-// Runs while the HTML is parsed, before first paint, so a collapsed sidebar never flashes open on reload.
-// Every collapsed style keys off this data-sidebar attribute (the `sidebar-collapsed:` variant in globals.css).
-const RESTORE_SCRIPT = `try{if(localStorage.getItem(${JSON.stringify(STORAGE_KEY)})==="collapsed")document.currentScript.parentElement.setAttribute("data-sidebar","collapsed")}catch(e){}`;
+// Runs while the HTML is parsed, before first paint, so a collapsed sidebar never flashes open on reload: the same rule
+// as readCollapsed. Every collapsed style keys off this data-sidebar attribute (the `sidebar-collapsed:` variant in
+// globals.css).
+const RESTORE_SCRIPT = `var c=!matchMedia(${JSON.stringify(WIDE_QUERY)}).matches;try{var s=localStorage.getItem(${JSON.stringify(STORAGE_KEY)});if(s!==null&&matchMedia(${JSON.stringify(OPENABLE_QUERY)}).matches)c=s==="collapsed"}catch(e){}if(c)document.currentScript.parentElement.setAttribute("data-sidebar","collapsed")`;
 
-// ---- Shared panel: desktop sidebar and mobile drawer ----
+// ---- Shared panel: the sidebar rail and the mobile drawer ----
 
 // Labels fade out as the rail narrows; icons keep the same x-position in both states, so nothing jumps.
 const fadeClass = "transition-opacity duration-200 motion-reduce:transition-none sidebar-collapsed:opacity-0";
@@ -74,7 +88,7 @@ type SidebarPanelProps = {
   /** Only the entries this user can open are listed; none until the user has loaded. */
   user: ShellUser | null;
   onLogout: (() => void) | null;
-  /** Desktop rail: adds the icon buttons and flyouts that keep grouped links reachable when collapsed. */
+  /** The rail (tablets and up): adds the icon buttons and flyouts that keep grouped links reachable when collapsed. */
   collapsible?: boolean;
   /** Mobile drawer: shows a close button, and is also called after a link is followed. */
   onClose?: () => void;
@@ -229,11 +243,24 @@ export function SidebarPanel({ user, onLogout, collapsible = false, onClose }: S
   );
 }
 
-// ---- Desktop sidebar: collapsible, hidden below the lg breakpoint (the drawer takes over there) ----
+// ---- The sidebar rail: from the md breakpoint up (the drawer takes over below it), collapsible from lg ----
 
 export function Sidebar({ user, onLogout }: { user: ShellUser | null; onLogout: (() => void) | null }) {
   const collapsed = useSyncExternalStore(subscribe, readCollapsed, () => false);
+  const asideRef = useRef<HTMLElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // React keeps the attribute the pre-paint script set if it disagrees with the hydrated render (the window was
+  // resized between the two), so set it once hydrated, and on every change, from the live value: the first render
+  // after hydration still carries the server's "expanded". A flyout opened from the icons closes when the rail opens
+  // by itself (the window widened), as a click on the edge tab would have closed it.
+  useLayoutEffect(() => {
+    const aside = asideRef.current;
+    if (!aside) return;
+    const live = readCollapsed();
+    aside.setAttribute("data-sidebar", live ? "collapsed" : "expanded");
+    if (!live) aside.querySelectorAll<HTMLElement>(":popover-open").forEach((flyout) => flyout.hidePopover());
+  }, [collapsed]);
 
   // One shared tooltip. It is position: fixed, so the rail's overflow clipping can't cut it off.
   function updateTooltip(target: EventTarget | null) {
@@ -261,6 +288,7 @@ export function Sidebar({ user, onLogout }: { user: ShellUser | null; onLogout: 
 
   return (
     <aside
+      ref={asideRef}
       data-sidebar={collapsed ? "collapsed" : "expanded"}
       suppressHydrationWarning
       onPointerOver={(event) => updateTooltip(event.target)}
@@ -268,7 +296,7 @@ export function Sidebar({ user, onLogout }: { user: ShellUser | null; onLogout: 
       onFocus={(event) => updateTooltip(event.target)}
       onBlur={hideTooltip}
       onClick={hideTooltip}
-      className="hidden w-64 shrink-0 transition-[width] duration-200 ease-out motion-reduce:transition-none sidebar-collapsed:w-18 lg:block"
+      className="hidden w-64 shrink-0 transition-[width] duration-200 ease-out motion-reduce:transition-none sidebar-collapsed:w-18 md:block"
     >
       {/* Executes only in the server-rendered HTML; on client renders it is inert text/plain. */}
       <script
@@ -277,7 +305,8 @@ export function Sidebar({ user, onLogout }: { user: ShellUser | null; onLogout: 
         dangerouslySetInnerHTML={{ __html: RESTORE_SCRIPT }}
       />
       <div className="sticky top-0 z-20 h-dvh">
-        {/* Sits on the sidebar's right edge; first in the DOM so keyboard users reach it before the links. */}
+        {/* A tab on the sidebar's right edge, level with the logo, over the navbar's empty left padding (never the
+            page), from lg up. First in the DOM so keyboard users reach it before the links. */}
         <button
           type="button"
           onClick={() => writeCollapsed(!collapsed)}
@@ -285,9 +314,9 @@ export function Sidebar({ user, onLogout }: { user: ShellUser | null; onLogout: 
           aria-expanded={!collapsed}
           data-tooltip={toggleLabel}
           data-tooltip-always=""
-          className="absolute top-4 -right-3 grid size-6 place-items-center rounded-full border border-input bg-background text-faint shadow-sm transition-colors hover:bg-muted hover:text-label"
+          className="absolute top-7 left-full hidden h-9 w-6 -translate-y-1/2 place-items-center rounded-r-lg bg-primary text-white shadow-md transition-colors hover:bg-primary-hover active:bg-primary-active pointer-coarse:h-11 pointer-coarse:w-7 lg:grid"
         >
-          <ChevronLeftIcon className="size-3.5 transition-transform duration-200 motion-reduce:transition-none sidebar-collapsed:rotate-180" />
+          <ChevronLeftIcon className="size-4 transition-transform duration-200 motion-reduce:transition-none sidebar-collapsed:rotate-180" />
         </button>
         <div className="h-full overflow-hidden border-r border-border">
           <SidebarPanel user={user} onLogout={onLogout} collapsible />

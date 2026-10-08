@@ -64,10 +64,15 @@ export const tabClass =
 // and the list (`fillClass`) grows with it, so the footer under the list (pagination) sits at the bottom of the page
 // whether it follows one row or a full page of them. The data area (the table's box, or the box for an empty or error
 // state: `tableAreaClass`, `emptyAreaClass`, `messageAreaClass`) grows as well, so it keeps its size as a page goes
-// from loading to data, to nothing found, to an error. Pages that don't list records keep the height of their content.
+// from loading to data, to nothing found, to an error. The pipeline boards fill it the same way (see Board in
+// components/pipeline.tsx). Other pages keep the height of their content.
 export const fillClass = "flex flex-1 flex-col";
 // The table's scroll box. `tableBoxClass` is the same box without growing, for a page with something else to fill the room.
-export const tableBoxClass = "scrollbar-none overflow-x-auto rounded-lg border border-border bg-background";
+// A table wider than its box scrolls inside it: a mouse gets a thin scrollbar that shows there is more, a touch screen
+// swipes without one. The box is a size container, so a cell's width cap in cqw follows the room the table really has,
+// with the sidebar open or not (see stickyNameClass below).
+export const tableBoxClass =
+  "@container overflow-x-auto rounded-lg border border-border bg-background [scrollbar-color:var(--faint)_transparent] [scrollbar-width:thin] pointer-coarse:scrollbar-none";
 export const tableAreaClass = `${tableBoxClass} grow`;
 // The box that holds a list's error state, and its empty state.
 export const messageAreaClass = "flex grow flex-col justify-center rounded-lg border border-border bg-background";
@@ -75,6 +80,14 @@ export const emptyAreaClass =
   "flex grow flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-background px-4 py-12 text-center";
 // The footer under a list. `mt-auto` keeps it at the bottom even when nothing above it grows; callers add the alignment.
 export const paginationFooterClass = "mt-auto flex min-h-8 flex-wrap items-center gap-3 pt-3 text-sm pointer-coarse:min-h-11";
+
+// Text cut short in a table cell (truncate, line-clamp) has a cap, so a long value can't widen the table past its box.
+// The cap is the laptop width it always had (max-w-52 = 13rem, and so on) and grows with the table's box once that is
+// wider than about 1500px: max-w-[max(13rem,14cqw)] is 13rem up to there and about 480px in a 4K window (cqw is a
+// percentage of tableBoxClass, the box).
+// The name in a table's sticky first column is also kept to 40% of the box on a phone, so the columns beside it keep
+// room to scroll.
+export const stickyNameClass = "max-w-[max(min(13rem,40cqw),14cqw)]";
 
 type PageHeaderProps = {
   title: string;

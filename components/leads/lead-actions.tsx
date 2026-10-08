@@ -93,20 +93,25 @@ export function useLeadActions(notify: Notify, onChanged: (lead?: Lead) => void)
   };
 }
 
-const MENU_WIDTH = 224; // w-56
-// ponytail: fixed estimates of an open menu's height (this lead menu; 240 for others, such as the Works list's);
-// measure the menu if they grow.
-const LEAD_MENU_HEIGHT = 320;
-
-// The menu opens in the browser's top layer, outside any scrolling table or board, next to its button.
-export function placeMenu(button: HTMLElement, menuId: string, menuHeight = 240) {
+// The menu opens in the browser's top layer, outside any scrolling table or board, next to its button: below it, or
+// above it when it doesn't fit below and there is more room above, always inside the window (it scrolls if the window
+// is shorter than the menu). Called from the button's click, before the menu opens, so it is placed from its real size
+// in the next frame, before it is painted: touch rows are taller, and every size grows on very wide screens.
+export function placeMenu(button: HTMLElement, menuId: string) {
   const menu = document.getElementById(menuId);
   if (!menu) return;
-  const rect = button.getBoundingClientRect();
-  const openUp = rect.bottom + menuHeight > window.innerHeight && rect.top > menuHeight;
-  menu.style.left = `${Math.max(8, rect.right - MENU_WIDTH)}px`;
-  menu.style.top = openUp ? "auto" : `${rect.bottom + 4}px`;
-  menu.style.bottom = openUp ? `${window.innerHeight - rect.top + 4}px` : "auto";
+  requestAnimationFrame(() => {
+    if (!menu.matches(":popover-open")) return;
+    const rect = button.getBoundingClientRect();
+    const room = window.innerHeight - 16;
+    menu.style.maxHeight = `${room}px`;
+    menu.style.overflowY = "auto";
+    const { offsetWidth: width, offsetHeight: height } = menu;
+    const below = window.innerHeight - rect.bottom;
+    const top = height + 12 > below && rect.top > below ? rect.top - 4 - height : rect.bottom + 4;
+    menu.style.left = `${Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(top, room + 8 - height))}px`;
+  });
 }
 
 export const menuItemClass =
@@ -129,7 +134,7 @@ export function LeadMenu({ lead, actions, withView = false }: LeadMenuProps) {
       <button
         type="button"
         popoverTarget={menuId}
-        onClick={(event) => placeMenu(event.currentTarget, menuId, LEAD_MENU_HEIGHT)}
+        onClick={(event) => placeMenu(event.currentTarget, menuId)}
         aria-label={`Actions for ${lead.name}`}
         className={`${iconButton} size-8`}
       >

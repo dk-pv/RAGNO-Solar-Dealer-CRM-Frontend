@@ -181,7 +181,8 @@ function FilterPanel({ id, searchParams, showAssignee, assignees, onDone }: Filt
         updateQuery(Object.fromEntries(FILTER_KEYS.map((key) => [key, draft[key] || null])));
         onDone();
       }}
-      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-4"
+      // On a wide screen each filter keeps a field's width (24rem at most) instead of a quarter of the page.
+      className="mt-3 grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,24rem))]"
     >
       <label className="text-sm">
         <span className="mb-1.5 block font-medium text-label">Type</span>

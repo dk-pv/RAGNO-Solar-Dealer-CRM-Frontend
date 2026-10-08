@@ -149,7 +149,7 @@ export function NotificationsBell({ user, buttonClass, panelClass }: Notificatio
         {count > 0 && (
           <span
             aria-hidden="true"
-            className="absolute top-0.5 right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] leading-none font-semibold text-white"
+            className="absolute top-0.5 right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[0.625rem] leading-none font-semibold text-white"
           >
             {count > 99 ? "99+" : count}
           </span>

@@ -96,7 +96,8 @@ export function Pagination({ page, pageSize, count, loading = false, onPage }: P
               </select>
             </label>
           )}
-          <div className="flex items-center gap-1">
+          {/* Wraps rather than running off a phone: with touch-sized buttons, page 5 of 10 needs more than 320px. */}
+          <div className="flex flex-wrap items-center gap-1">
             <button
               type="button"
               onClick={() => go(page - 1)}
@@ -270,7 +271,7 @@ export function ColumnsButton<K extends string>({ columns }: { columns: Columns<
       <button
         type="button"
         popoverTarget={menuId}
-        onClick={(event) => placeMenu(event.currentTarget, menuId, 90 + options.length * 36)}
+        onClick={(event) => placeMenu(event.currentTarget, menuId)}
         aria-label={hiddenCount > 0 ? `Columns, ${hiddenCount} hidden` : "Columns"}
         title="Choose the columns to show"
         className={secondaryButton}
