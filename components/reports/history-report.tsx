@@ -27,7 +27,11 @@ const COLUMNS: Column<TimelineEvent>[] = [
     ),
     className: "whitespace-nowrap",
   },
-  { header: "User", render: (event) => event.user?.name ?? "—", className: "whitespace-nowrap font-medium" },
+  {
+    header: "User",
+    render: (event) => <span className="block max-w-[max(11rem,12cqw)] truncate">{event.user?.name ?? "—"}</span>,
+    className: "whitespace-nowrap font-medium",
+  },
   { header: "Event", render: (event) => EVENT_KINDS.find((kind) => kind.value === event.kind)?.label, className: "whitespace-nowrap" },
   {
     header: "Record",

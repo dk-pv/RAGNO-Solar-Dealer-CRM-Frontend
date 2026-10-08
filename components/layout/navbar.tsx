@@ -13,9 +13,10 @@ const ROLE_LABELS: Record<ShellUser["role"], string> = { ADMIN: "Admin", STAFF: 
 
 const iconButtonClass = `${iconButton} size-9`;
 
-// Popovers sit in the browser's top layer, pinned under the navbar's right edge. Each adds its width.
+// Popovers sit in the browser's top layer, pinned under the navbar's right edge: inside its padding (px-3, lg:px-6), so
+// they line up with the account button. Each adds its width.
 const panelClass =
-  "fixed top-15 right-3 bottom-auto left-auto max-w-[calc(100vw-1.5rem)] rounded-md border border-border bg-background text-foreground shadow-lg";
+  "fixed top-15 right-3 bottom-auto left-auto max-w-[calc(100vw-1.5rem)] rounded-md border border-border bg-background text-foreground shadow-lg lg:right-6";
 
 export function initials(name: string) {
   return name
@@ -26,13 +27,14 @@ export function initials(name: string) {
     .join("");
 }
 
+// Hidden while one of the navbar's menus is open: the menu would cover all but a sliver of it.
 function Tooltip({ label, children }: { label: string; children: ReactNode }) {
   return (
     <span className="group relative inline-flex">
       {children}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute top-full right-0 z-20 mt-1.5 whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background opacity-0 transition-opacity group-hover:opacity-100 group-has-[:focus-visible]:opacity-100"
+        className="pointer-events-none absolute top-full right-0 z-20 mt-1.5 whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background opacity-0 transition-opacity group-hover:opacity-100 group-has-[:focus-visible]:opacity-100 [header:has(:popover-open)_&]:opacity-0"
       >
         {label}
       </span>

@@ -394,7 +394,8 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
                 // Until the staff list loads, only the current value could be chosen.
                 disabled={saving || !assignees}
                 aria-label={`Assigned staff for ${work.customer_name}`}
-                className={`cursor-pointer appearance-none rounded-md bg-transparent py-1 pr-6 pl-1.5 text-sm hover:bg-muted pointer-coarse:min-h-11 disabled:cursor-wait disabled:opacity-60 ${
+                // As wide as its longest option, unless capped: one long staff name would widen every row.
+                className={`max-w-[max(12rem,13cqw)] cursor-pointer appearance-none truncate rounded-md bg-transparent py-1 pr-6 pl-1.5 text-sm hover:bg-muted pointer-coarse:min-h-11 disabled:cursor-wait disabled:opacity-60 ${
                   assigneeValue ? "text-foreground" : "text-muted-foreground"
                 }`}
               >

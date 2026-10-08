@@ -291,7 +291,11 @@ export function BarList({ items, empty = NO_DATA }: { items: BarItem[]; empty?: 
   if (items.every((item) => item.count === 0)) return <p className="py-6 text-center text-sm text-muted-foreground">{empty}</p>;
   const max = Math.max(...items.map((item) => item.count), 1);
   return (
-    <ul className="space-y-0.5">
+    // One grid for the whole list, each row a subgrid of it, so every bar has the same track: a wide count (₹14,82,000)
+    // doesn't shorten its own row's bar against the others'. The bar keeps at least 3rem: the label and the count take
+    // the room first, and in a phone-width panel they left no bar at all. The label's 11rem is 11.5rem here because a
+    // subgrid row's padding (px-2) comes out of its first track.
+    <ul className="-mx-2 grid grid-cols-[minmax(0,11.5rem)_minmax(3rem,1fr)_auto] gap-x-3 gap-y-0.5">
       {items.map((item) => {
         const width = item.count === 0 ? 0 : Math.max(3, (item.count / max) * 100);
         const content = (
@@ -306,11 +310,9 @@ export function BarList({ items, empty = NO_DATA }: { items: BarItem[]; empty?: 
             </span>
           </>
         );
-        // The bar keeps at least 3rem: the label and the count take the room first, and in a phone-width panel they left
-        // no bar at all.
-        const className = "-mx-2 grid w-[calc(100%+1rem)] grid-cols-[minmax(0,11rem)_minmax(3rem,1fr)_auto] items-center gap-3 rounded-md px-2 py-1.5 text-left pointer-coarse:min-h-11";
+        const className = "col-span-3 grid grid-cols-subgrid items-center rounded-md px-2 py-1.5 text-left pointer-coarse:min-h-11";
         return (
-          <li key={item.key}>
+          <li key={item.key} className="col-span-3 grid grid-cols-subgrid">
             {item.onClick && item.count > 0 ? (
               <button type="button" onClick={item.onClick} className={`${className} hover:bg-muted`}>
                 {content}

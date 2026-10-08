@@ -55,7 +55,7 @@ export function StaffReport() {
           <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-[0.625rem] font-semibold text-secondary-foreground">
             {row.user ? initials(row.user.name) : "–"}
           </span>
-          <span className="font-medium">{row.user?.name ?? "Unassigned"}</span>
+          <span className="max-w-[max(11rem,12cqw)] truncate font-medium">{row.user?.name ?? "Unassigned"}</span>
           {row.user && !row.user.is_active && <span className="text-xs text-muted-foreground">(inactive)</span>}
         </span>
       ),

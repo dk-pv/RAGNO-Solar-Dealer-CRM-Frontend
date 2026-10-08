@@ -360,7 +360,7 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
               >
                 {initials(lead.assigned_to_name)}
               </span>
-              {lead.assigned_to_name}
+              <span className="max-w-[max(12rem,13cqw)] truncate">{lead.assigned_to_name}</span>
             </span>
           ) : (
             <span className="text-muted-foreground">Unassigned</span>

@@ -329,7 +329,7 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
               >
                 {initials(activity.assigned_to_name)}
               </span>
-              {activity.assigned_to_name}
+              <span className="max-w-[max(12rem,13cqw)] truncate">{activity.assigned_to_name}</span>
             </span>
           ) : (
             <span className="text-muted-foreground">Not assigned</span>
@@ -356,7 +356,9 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
       {shows("created") && (
         <td className="px-3 py-2.5 whitespace-nowrap">
           {formatDate(activity.created_at)}
-          {activity.created_by_name && <span className="block text-xs text-muted-foreground">{activity.created_by_name}</span>}
+          {activity.created_by_name && (
+            <span className="block max-w-[max(12rem,13cqw)] truncate text-xs text-muted-foreground">{activity.created_by_name}</span>
+          )}
         </td>
       )}
       <td className={`${stickyCell} px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0`}>

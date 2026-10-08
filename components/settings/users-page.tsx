@@ -47,8 +47,10 @@ export type Role = { name: "ADMIN" | "STAFF"; label: string; description: string
 // Add and Edit set details, role and password; Status activates or deactivates; Delete removes staff with no records.
 type Mode = "add" | "edit" | "status" | "delete";
 
+// The no-break space keeps each dot with the module before it, so a list wrapped in a narrow column never starts a line
+// with one.
 export const moduleLabels = (keys: string[], modules?: Module[]) =>
-  keys.map((key) => modules?.find((module) => module.key === key)?.label ?? key).join(" · ");
+  keys.map((key) => modules?.find((module) => module.key === key)?.label ?? key).join("\u00a0· ");
 
 const ROLE_LABELS: Record<User["role"], string> = { ADMIN: "Admin", STAFF: "Staff" };
 

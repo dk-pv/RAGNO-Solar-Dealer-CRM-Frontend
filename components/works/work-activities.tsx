@@ -19,7 +19,15 @@ import {
 } from "@/components/leads/api";
 import { menuItemClass, placeMenu } from "@/components/leads/lead-actions";
 import { Field, FormDialog } from "@/components/leads/lead-dialogs";
-import { ErrorState, FollowUpBadge, iconButton, inputClass, secondaryButton, tableAreaClass } from "@/components/leads/ui";
+import {
+  ErrorState,
+  FollowUpBadge,
+  iconButton,
+  inputClass,
+  secondaryButton,
+  stickyNameClass,
+  tableAreaClass,
+} from "@/components/leads/ui";
 import { SkeletonRows } from "@/components/table";
 import { toApiError, useApi, type ApiError } from "@/lib/api";
 import {
@@ -194,7 +202,9 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                           Work #{work.id}
                         </span>
                       )}
-                      <span className="mt-1 block text-xs whitespace-nowrap text-muted-foreground">
+                      {/* Held to the sticky column's cap: on a phone it wraps rather than leave the other columns no room
+                          to scroll beside it. */}
+                      <span className={`mt-1 block w-max ${stickyNameClass} text-xs break-words text-muted-foreground`}>
                         {work.plan_name} · {stageFor(work.stage).label}
                       </span>
                     </th>
@@ -220,7 +230,11 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                   </td>
                   {shows("assigned") && (
                     <td className="px-3 py-2 whitespace-nowrap">
-                      {activity.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>}
+                      {activity.assigned_to_name ? (
+                        <span className="block max-w-[max(12rem,13cqw)] truncate">{activity.assigned_to_name}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Unassigned</span>
+                      )}
                     </td>
                   )}
                   {shows("due") && (
@@ -233,7 +247,7 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                     <td className="px-3 py-2 whitespace-nowrap">
                       <FollowUpBadge status={activity.status} />
                       {activity.completed_at && (
-                        <span className="mt-1 block text-xs text-muted-foreground">
+                        <span className="mt-1 block max-w-[max(12rem,13cqw)] truncate text-xs text-muted-foreground">
                           {formatDate(activity.completed_at)}
                           {activity.completed_by_name ? ` · ${activity.completed_by_name}` : ""}
                         </span>
@@ -244,7 +258,7 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                     <td className="px-3 py-2 whitespace-nowrap">
                       {formatDate(activity.created_at)}
                       {activity.created_by_name && (
-                        <span className="block text-xs text-muted-foreground">by {activity.created_by_name}</span>
+                        <span className="block max-w-[max(12rem,13cqw)] truncate text-xs text-muted-foreground">by {activity.created_by_name}</span>
                       )}
                     </td>
                   )}
