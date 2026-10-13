@@ -172,7 +172,7 @@ export function LeadsPage() {
         <ColumnsButton columns={columns} />
         {isAdmin && (
           <button type="button" onClick={exportCsv} disabled={exporting} className={`${secondaryButton} sm:ml-auto`}>
-            {exporting ? <Busy>Exporting…</Busy> : <><DownloadIcon className="size-4" />Export</>}
+            {exporting ? <Busy>Exporting…</Busy> : <><DownloadIcon className="size-4" /><span className="max-sm:sr-only">Export</span></>}
           </button>
         )}
       </LeadsToolbar>
@@ -229,13 +229,14 @@ export function LeadsPage() {
       >
         <table
           aria-busy={loading}
-          // With columns hidden the table is as wide as what's left needs, no wider.
+          // With columns hidden the table is as wide as what's left needs, no wider. On a phone it is a stack of cards (data-stack).
+          data-stack
           className={`w-full text-sm transition-opacity ${columns.hiddenCount > 0 ? "min-w-max" : "min-w-280"} ${loading && loaded ? "opacity-60" : ""}`}
         >
           <caption className="sr-only">Leads</caption>
           <thead>
             <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
-              <th scope="col" className="w-10 px-3 py-2.5">
+              <th scope="col" data-slot="select" data-label="Select all" className="w-10 px-3 py-2.5">
                 <SelectAllCheckbox
                   checked={selection.allSelected}
                   indeterminate={selection.someSelected}
@@ -259,9 +260,8 @@ export function LeadsPage() {
               {shows("assigned") && <th scope="col" className="px-3 py-2.5">Assigned</th>}
               {shows("created") && <th scope="col" className="px-3 py-2.5">Created</th>}
               {shows("follow_up") && <th scope="col" className="px-3 py-2.5">Next follow-up</th>}
-              {/* The actions stay in view beside a wide table; on a phone they would cover the customer, so there they
-                  scroll with it. */}
-              <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)] max-sm:static">
+              {/* The actions stay in view beside a wide table. */}
+              <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -316,10 +316,10 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
 
   return (
     <tr aria-selected={selected} className={`group border-b border-border last:border-0 hover:bg-row-hover ${selected ? "bg-primary-softer" : ""}`}>
-      <td className="px-3 py-1.5">
+      <td data-slot="select" className="px-3 py-1.5">
         <RowCheckbox checked={selected} onChange={onToggle} label={`Select ${lead.name}`} />
       </td>
-      <td className="px-1.5 py-1.5">
+      <td data-slot="pin" className="px-1.5 py-1.5">
         {/* Unpinned rows show a faint pin until hovered, so the pinned ones stand out. */}
         <PinButton
           lead={lead}
@@ -328,35 +328,37 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
           className="size-8 opacity-40 group-hover:opacity-100 focus-visible:opacity-100 aria-pressed:opacity-100"
         />
       </td>
-      <th scope="row" className={`${stickyCell} left-0 px-3 py-2 text-left font-medium`}>
+      <th scope="row" data-slot="title" className={`${stickyCell} left-0 px-3 py-2 text-left font-medium`}>
         <Link href={`/leads/${lead.id}`} className={`block ${stickyNameClass} truncate hover:underline`}>
           {lead.name}
         </Link>
-        {/* On a phone the Status column is off to the right, so the status also sits under the name. */}
-        <span className="mt-1 block sm:hidden">
-          <StatusBadge status={lead.status} />
-        </span>
+        {/* With the Status column hidden (the Columns menu), a phone still shows the status: it heads the card. */}
+        {!shows("status") && (
+          <span className="mt-1 block sm:hidden">
+            <StatusBadge status={lead.status} />
+          </span>
+        )}
       </th>
-      {shows("phone") && <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(lead)}</td>}
+      {shows("phone") && <td data-slot="sub" className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(lead)}</td>}
       {shows("location") && (
-        <td className="px-3 py-2">
+        <td data-label="Location" data-slot="wide" className="px-3 py-2">
           <span className="block max-w-[max(12rem,13cqw)] truncate">{location || "—"}</span>
         </td>
       )}
-      {shows("plan") && <td className="px-3 py-2 whitespace-nowrap">{lead.plan_name ?? "—"}</td>}
-      {shows("amount") && <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatMoney(lead.amount)}</td>}
+      {shows("plan") && <td data-label="Plan" className="px-3 py-2 whitespace-nowrap">{lead.plan_name ?? "—"}</td>}
+      {shows("amount") && <td data-label="Amount" className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatMoney(lead.amount)}</td>}
       {shows("status") && (
-        <td className="px-3 py-2">
+        <td data-label="Status" className="px-3 py-2">
           <InlineStatus lead={lead} onSaved={onStatusChanged} onError={onError} />
         </td>
       )}
       {shows("assigned") && (
-        <td className="px-3 py-2 whitespace-nowrap">
+        <td data-label="Assigned" className="px-3 py-2 whitespace-nowrap">
           {lead.assigned_to_name ? (
             <span className="flex items-center gap-2">
               <span
                 aria-hidden="true"
-                className="grid size-6 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border"
+                className="grid size-6 shrink-0 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border touch:text-xs"
               >
                 {initials(lead.assigned_to_name)}
               </span>
@@ -367,9 +369,9 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
           )}
         </td>
       )}
-      {shows("created") && <td className="px-3 py-2 whitespace-nowrap">{formatDate(lead.created_at)}</td>}
-      {shows("follow_up") && <td className="px-3 py-2 whitespace-nowrap">{formatDate(lead.next_follow_up)}</td>}
-      <td className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] max-sm:static`}>
+      {shows("created") && <td data-label="Created" className="px-3 py-2 whitespace-nowrap">{formatDate(lead.created_at)}</td>}
+      {shows("follow_up") && <td data-label="Next follow-up" className="px-3 py-2 whitespace-nowrap">{formatDate(lead.next_follow_up)}</td>}
+      <td data-slot="menu" className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)]`}>
         <LeadMenu lead={lead} actions={actions} />
       </td>
     </tr>
@@ -411,7 +413,7 @@ function InlineStatus({ lead, onSaved, onError }: InlineStatusProps) {
         disabled={busy}
         aria-label={`Status for ${lead.name}`}
         aria-busy={busy || undefined}
-        className={`cursor-pointer appearance-none rounded-md py-0.5 pr-6 pl-2 text-xs font-medium ring-1 ring-inset transition-colors hover:ring-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary pointer-coarse:min-h-11 disabled:cursor-wait disabled:opacity-70 ${STATUS_STYLES[shown]}`}
+        className={`cursor-pointer appearance-none rounded-md py-0.5 pr-6 pl-2 text-xs font-medium ring-1 ring-inset transition-colors hover:ring-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary touch:min-h-11 touch:text-base disabled:cursor-wait disabled:opacity-70 ${STATUS_STYLES[shown]}`}
       >
         {LEAD_STATUSES.map((option) => (
           <option

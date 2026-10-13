@@ -184,13 +184,14 @@ export function WorksPage() {
       >
         <table
           aria-busy={loading}
-          // With columns hidden the table is as wide as what's left needs, no wider.
+          // With columns hidden the table is as wide as what's left needs, no wider. On a phone it is a stack of cards (data-stack).
+          data-stack
           className={`w-full text-sm transition-opacity ${columns.hiddenCount > 0 ? "min-w-max" : "min-w-350"} ${loading && loaded ? "opacity-60" : ""}`}
         >
           <caption className="sr-only">Works</caption>
           <thead>
             <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
-              <th scope="col" className="w-10 px-3 py-2.5">
+              <th scope="col" data-slot="select" data-label="Select all" className="w-10 px-3 py-2.5">
                 <SelectAllCheckbox
                   checked={selection.allSelected}
                   indeterminate={selection.someSelected}
@@ -221,9 +222,8 @@ export function WorksPage() {
               {shows("due") && <th scope="col" className="px-3 py-2.5">Due date</th>}
               {shows("follow_up") && <th scope="col" className="px-3 py-2.5">Next follow-up</th>}
               {shows("converted") && <th scope="col" className="px-3 py-2.5">Converted</th>}
-              {/* The actions stay in view beside a wide table; on a phone they would cover the customer, so there they
-                  scroll with it. */}
-              <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)] max-sm:static">
+              {/* The actions stay in view beside a wide table. */}
+              <th scope="col" className="sticky right-0 z-1 w-12 bg-page px-2 py-2.5 shadow-[inset_1px_0_0_var(--color-border)]">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -313,10 +313,10 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
 
   return (
     <tr aria-selected={selected} className={`group border-b border-border last:border-0 hover:bg-row-hover ${selected ? "bg-primary-softer" : ""}`}>
-      <td className="px-3 py-1.5">
+      <td data-slot="select" className="px-3 py-1.5">
         <RowCheckbox checked={selected} onChange={onToggle} label={`Select ${work.customer_name}`} />
       </td>
-      <td className="px-1.5 py-1.5">
+      <td data-slot="pin" className="px-1.5 py-1.5">
         {/* Unpinned rows show a faint pin until hovered, so the pinned ones stand out. */}
         <WorkPinButton
           work={work}
@@ -324,28 +324,30 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
           className="size-8 opacity-40 group-hover:opacity-100 focus-visible:opacity-100 aria-pressed:opacity-100"
         />
       </td>
-      {shows("work") && <td className="px-3 py-2 whitespace-nowrap text-muted-foreground tabular-nums">#{work.id}</td>}
-      <th scope="row" className={`${stickyCell} left-0 px-3 py-2 text-left font-medium`}>
+      {shows("work") && <td data-label="Work ID" className="px-3 py-2 whitespace-nowrap text-muted-foreground tabular-nums">#{work.id}</td>}
+      <th scope="row" data-slot="title" className={`${stickyCell} left-0 px-3 py-2 text-left font-medium`}>
         <Link href={`/works/${work.id}`} className={`block ${stickyNameClass} truncate hover:underline`}>
           {work.customer_name}
         </Link>
-        {/* On a phone the Stage and Documents columns are off to the right, so both also sit under the name. */}
-        <span className="mt-1 flex items-center gap-1.5 text-xs font-normal text-muted-foreground sm:hidden">
-          <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${stage.dot}`} />
-          {stage.label}
-        </span>
-        <DocumentStatus work={work} className="mt-1 sm:hidden" />
+        {/* With the Stage or Documents column hidden (the Columns menu), a phone still shows them: they head the card. */}
+        {!shows("stage") && (
+          <span className="mt-1 flex items-center gap-1.5 text-xs font-normal text-muted-foreground sm:hidden">
+            <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${stage.dot}`} />
+            {stage.label}
+          </span>
+        )}
+        {!shows("documents") && <DocumentStatus work={work} className="mt-1 sm:hidden" />}
       </th>
-      {shows("phone") && <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(work)}</td>}
+      {shows("phone") && <td data-slot="sub" className="px-3 py-2 whitespace-nowrap tabular-nums">{formatPhone(work)}</td>}
       {shows("location") && (
-        <td className="px-3 py-2">
+        <td data-label="Location" data-slot="wide" className="px-3 py-2">
           <span className="block max-w-[max(12rem,13cqw)] truncate">{location || "—"}</span>
         </td>
       )}
-      {shows("plan") && <td className="px-3 py-2 whitespace-nowrap">{work.plan_name}</td>}
-      {shows("amount") && <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatMoney(work.amount)}</td>}
+      {shows("plan") && <td data-label="Plan" className="px-3 py-2 whitespace-nowrap">{work.plan_name}</td>}
+      {shows("amount") && <td data-label="Confirmed amount" className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatMoney(work.amount)}</td>}
       {shows("stage") && (
-        <td className="px-3 py-2">
+        <td data-label="Stage" data-slot="wide" className="px-3 py-2">
           <span className="relative inline-flex">
             <select
               value={stageValue}
@@ -355,7 +357,7 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
               }}
               disabled={saving}
               aria-label={`Stage for ${work.customer_name}`}
-              className={`cursor-pointer appearance-none rounded-md py-0.5 pr-6 pl-2 text-xs font-medium hover:ring-1 hover:ring-border-strong pointer-coarse:min-h-11 disabled:cursor-wait disabled:opacity-60 ${stage.header}`}
+              className={`cursor-pointer appearance-none rounded-md py-0.5 pr-6 pl-2 text-xs font-medium hover:ring-1 hover:ring-border-strong touch:min-h-11 touch:text-base disabled:cursor-wait disabled:opacity-60 ${stage.header}`}
             >
               {WORK_STAGES.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -368,17 +370,17 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
         </td>
       )}
       {shows("documents") && (
-        <td className="px-3 py-2 whitespace-nowrap">
+        <td data-label="Documents" className="px-3 py-2 whitespace-nowrap">
           <DocumentStatus work={work} />
         </td>
       )}
       {shows("assigned") && (
-        <td className="px-3 py-2 whitespace-nowrap">
+        <td data-label="Assigned" className="px-3 py-2 whitespace-nowrap">
           <span className="flex items-center gap-1.5">
             {assigneeName && (
               <span
                 aria-hidden="true"
-                className="grid size-6 shrink-0 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border"
+                className="grid size-6 shrink-0 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border touch:text-xs"
               >
                 {initials(assigneeName)}
               </span>
@@ -395,7 +397,7 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
                 disabled={saving || !assignees}
                 aria-label={`Assigned staff for ${work.customer_name}`}
                 // As wide as its longest option, unless capped: one long staff name would widen every row.
-                className={`max-w-[max(12rem,13cqw)] cursor-pointer appearance-none truncate rounded-md bg-transparent py-1 pr-6 pl-1.5 text-sm hover:bg-muted pointer-coarse:min-h-11 disabled:cursor-wait disabled:opacity-60 ${
+                className={`max-w-[max(12rem,13cqw)] cursor-pointer appearance-none truncate rounded-md bg-transparent py-1 pr-6 pl-1.5 text-sm hover:bg-muted touch:min-h-11 touch:text-base disabled:cursor-wait disabled:opacity-60 ${
                   assigneeValue ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -412,17 +414,17 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
         </td>
       )}
       {shows("due") && (
-        <td className={`px-3 py-2 whitespace-nowrap ${overdue ? "font-medium text-error" : ""}`}>
+        <td data-label="Due date" className={`px-3 py-2 whitespace-nowrap ${overdue ? "font-medium text-error" : ""}`}>
           {work.due_date ? `${formatDate(work.due_date)}${overdue ? " · Overdue" : ""}` : "—"}
         </td>
       )}
       {shows("follow_up") && (
-        <td className="px-3 py-2 whitespace-nowrap">
+        <td data-label="Next follow-up" className="px-3 py-2 whitespace-nowrap">
           <NextFollowUp work={work} />
         </td>
       )}
-      {shows("converted") && <td className="px-3 py-2 whitespace-nowrap">{formatDate(work.created_at)}</td>}
-      <td className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] max-sm:static`}>
+      {shows("converted") && <td data-label="Converted" className="px-3 py-2 whitespace-nowrap">{formatDate(work.created_at)}</td>}
+      <td data-slot="menu" className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)]`}>
         <WorkMenu work={work} actions={actions} />
       </td>
     </tr>
@@ -436,7 +438,7 @@ function NextFollowUp({ work }: { work: Work }) {
   return (
     <Link
       href={`/works/${work.id}#activities`}
-      className={`underline-offset-2 hover:underline ${overdue ? "font-medium text-error" : ""}`}
+      className={`underline-offset-2 hover:underline touch:tap-area ${overdue ? "font-medium text-error" : ""}`}
     >
       {work.next_activity_due ? formatDate(work.next_activity_due) : "No date"}
       {overdue ? " · Overdue" : ""}

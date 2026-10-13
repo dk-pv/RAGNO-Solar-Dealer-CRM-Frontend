@@ -52,7 +52,7 @@ export function StaffReport() {
       header: "User",
       render: (row) => (
         <span className="flex items-center gap-2 whitespace-nowrap">
-          <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-[0.625rem] font-semibold text-secondary-foreground">
+          <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-[0.625rem] font-semibold text-secondary-foreground touch:text-xs">
             {row.user ? initials(row.user.name) : "–"}
           </span>
           <span className="max-w-[max(11rem,12cqw)] truncate font-medium">{row.user?.name ?? "Unassigned"}</span>

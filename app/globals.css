@@ -8,6 +8,15 @@
   --breakpoint-4xl: 160rem;
 }
 
+/* Touch-sized controls (44px targets, 16px field text) on any touch screen, and on any window narrower than sm (640px):
+   a phone-sized window used with a mouse, such as a desktop browser resized or devtools without touch, gets the same
+   controls instead of the compact 36px ones. */
+@custom-variant touch {
+  @media (pointer: coarse), (width < 40rem) {
+    @slot;
+  }
+}
+
 /* The CRM's one colour system: soft red and warm cream on a light base. Components use these tokens, never raw colours.
    The CRM is light only, so it looks the same whatever the operating system's dark-mode setting. */
 :root {
@@ -239,13 +248,317 @@ body {
   }
 }
 
+/* A soft shadow at the edge of a scrolling list that has more beyond it (the navigation on a short screen shows Reports
+   and Settings only below the fold), and none once that edge is reached: the shadows stay put while two covers, which
+   scroll with the list, hide them at the ends. */
+@utility scroll-shadow {
+  background:
+    linear-gradient(var(--background) 30%, transparent) 0 0 / 100% 2rem no-repeat local,
+    linear-gradient(transparent, var(--background) 70%) 0 100% / 100% 2rem no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / 0.14), transparent) 0 0 / 100% 0.75rem no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / 0.14), transparent) 0 100% / 100% 0.75rem no-repeat scroll;
+}
+
+/* Gives a small link or button a tap area of at least 44px, centred on it, without changing how it looks or lays out:
+   the extra area is an invisible layer over its surroundings. Used as touch:tap-area, so only where fingers are. */
+@utility tap-area {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 2.75rem);
+    height: max(100%, 2.75rem);
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* One focus style for every interactive element. Inputs replace it with a border and ring (fieldClass). */
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
+/* Taps on controls are taps: no double-tap zoom, so two quick taps on Next page don't zoom the page instead. */
+a,
+button,
+select,
+summary,
+label,
+[role="button"] {
+  touch-action: manipulation;
+}
+
 /* Keep the page from scrolling behind an open modal, such as the mobile navigation drawer. */
 html:has(dialog:modal) {
   overflow: hidden;
+}
+
+/* A list's table turns into a stack of cards below sm (a phone). Its markup stays a table (rows stay rows for screen
+   readers and for the code that finds them); the cells stack inside each row instead of sitting in columns that scroll
+   sideways, so a customer's name, phone, status and actions are all on screen. A cell says what it is: data-label is
+   the small caption above its value, and data-slot places the few that aren't plain fields:
+     title    the row's name, across the top of the card
+     select   the row's checkbox, top left (in the header row: Select all)
+     pin      the pin button, and menu the row's menu, top right
+     wide     a field that takes the whole card
+     actions  the row's own buttons, along its foot
+   This is plain CSS outside Tailwind's layers on purpose: it has to beat the desktop table's utilities (sticky cells,
+   nowrap, min widths, caps) without a max-sm: variant on every cell. A table without data-stack keeps scrolling in its box. */
+@media (width < 40rem) {
+  table[data-stack] {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* The cells say what they are, so the header row goes; only the Select all checkbox stays, as a strip above the cards. */
+  table[data-stack] > thead {
+    display: none;
+  }
+  table[data-stack] > thead:has([data-slot="select"]) {
+    display: block;
+  }
+  table[data-stack] > thead > tr {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 0.25rem;
+    border: 0;
+    background: none;
+  }
+  table[data-stack] > thead > tr > th {
+    display: none;
+  }
+  table[data-stack] > thead > tr > th[data-slot="select"] {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: auto;
+    padding: 0;
+  }
+  table[data-stack] > thead > tr > th[data-slot="select"]::after {
+    content: attr(data-label);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--secondary-foreground);
+  }
+  table[data-stack] > thead > tr > th[data-slot="select"] > label {
+    margin: 0;
+  }
+
+  /* The cards, a column of them; inside a card, fields are 2 to a row where there is room and 1 where there isn't. */
+  table[data-stack] > tbody {
+    display: grid;
+    gap: 0.75rem;
+    padding-top: 0.5rem;
+  }
+  table[data-stack] > tbody > tr {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+    align-content: start;
+    gap: 0.625rem 1rem;
+    padding: 0.25rem 0.75rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+  }
+  table[data-stack] > tbody > tr[aria-selected="true"] {
+    border-color: var(--primary);
+  }
+  table[data-stack] > tbody > tr > :is(td, th) {
+    position: relative;
+    inset: auto;
+    z-index: auto;
+    display: block;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  table[data-stack] > tbody > tr > td:empty {
+    display: none;
+  }
+  /* A field that is a link (a count that opens its records) is as tall as a tap target. */
+  table[data-stack] > tbody > tr > td:has(> a) {
+    min-height: 2.75rem;
+  }
+  table[data-stack] > tbody > tr > [data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.125rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 400;
+    color: var(--muted-foreground);
+  }
+
+  /* The row's name across the top (whatever its place among the cells), with room for the corner controls beside it, and
+     under it, if the row has one, a line that belongs to the name: the customer's phone number. */
+  table[data-stack] > tbody > tr > [data-slot="title"] {
+    order: -2;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    min-height: 2.75rem;
+    font-size: 1rem;
+  }
+  table[data-stack] > tbody > tr:has(> [data-slot="select"]) > [data-slot="title"] {
+    padding-left: 2.25rem;
+  }
+  table[data-stack] > tbody > tr:has(> [data-slot="menu"]) > [data-slot="title"] {
+    padding-right: 2.25rem;
+  }
+  table[data-stack] > tbody > tr:has(> [data-slot="pin"]) > [data-slot="title"] {
+    padding-right: 5rem;
+  }
+  /* A link in the name has a tap area of at least 44px, whatever the line it is on. */
+  table[data-stack] > tbody > tr > [data-slot="title"] a {
+    position: relative;
+  }
+  table[data-stack] > tbody > tr > [data-slot="title"] a::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 2.75rem);
+    height: max(100%, 2.75rem);
+    transform: translate(-50%, -50%);
+  }
+  table[data-stack] > tbody > tr > :is([data-slot="select"], [data-slot="pin"], [data-slot="menu"]) {
+    position: absolute;
+    z-index: 1;
+    top: 0.25rem;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  table[data-stack] > tbody > tr > [data-slot="select"] {
+    left: 0.25rem;
+  }
+  table[data-stack] > tbody > tr > [data-slot="pin"] {
+    right: 3rem;
+  }
+  table[data-stack] > tbody > tr > [data-slot="menu"] {
+    right: 0.25rem;
+  }
+  table[data-stack] > tbody > tr > [data-slot="select"] > label {
+    margin: 0;
+  }
+
+  table[data-stack] > tbody > tr > [data-slot="sub"] {
+    order: -1;
+    grid-column: 1 / -1;
+    margin-top: -0.5rem;
+    color: var(--secondary-foreground);
+  }
+  table[data-stack] > tbody > tr > [data-slot="wide"] {
+    grid-column: 1 / -1;
+  }
+  table[data-stack] > tbody > tr > [data-slot="actions"] {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.125rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Text that a column cap cut short wraps instead: the card has the room, and a phone has no hover to read the rest.
+     (A <select> keeps its cap, at the width of its cell.) */
+  table[data-stack] > tbody .truncate:not(select) {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+  table[data-stack] > tbody [class*="line-clamp-"] {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+  }
+  table[data-stack] > tbody [class*="max-w-"]:not(select) {
+    max-width: none;
+  }
+  table[data-stack] > tbody .w-max {
+    width: auto;
+  }
+  /* A <select> as wide as its cell, however long its longest option: its wrapper takes the cell's width (or what a
+     sibling leaves it), and the control the wrapper's. */
+  table[data-stack] > tbody span:has(> select) {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 100%;
+  }
+  table[data-stack] > tbody select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* A phone narrower than 22rem (352px) has room for one field to a row: the caption then sits beside its value, which
+     takes less height than a caption over every value. A cell's own parts (a date and a note) stack in the value's
+     column. A wide field keeps its caption on top: it needs the room. (Not in a report: see flat below.) */
+  @media (width < 22rem) {
+    table[data-stack]:not([data-stack="flat"]) > tbody > tr > [data-label]:not([data-slot="wide"]) {
+      display: grid;
+      grid-template-columns: 6.5rem minmax(0, 1fr);
+      column-gap: 0.75rem;
+      align-items: baseline;
+    }
+    table[data-stack]:not([data-stack="flat"]) > tbody > tr > [data-label]:not([data-slot="wide"])::before {
+      grid-column: 1;
+      grid-row: 1;
+      margin: 0;
+    }
+    table[data-stack]:not([data-stack="flat"]) > tbody > tr > [data-label]:not([data-slot="wide"]) > * {
+      grid-column: 2;
+    }
+  }
+
+  /* A table inside a panel of its own (a report) has no card borders: its rows are divided by lines, and its fields stay
+     two to a row (its links are tap targets, which need the height of a caption over a value) down to a 320px phone. */
+  table[data-stack="flat"] > tbody {
+    gap: 0;
+  }
+  table[data-stack="flat"] > tbody > tr {
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+    padding: 0.75rem 0;
+    border-width: 1px 0 0;
+    border-radius: 0;
+  }
+  table[data-stack="flat"] > tbody > tr:first-child {
+    border-top-width: 0;
+    padding-top: 0;
+  }
+
+  /* A table still loading: one placeholder card per row, with its first three lines. */
+  table[data-stack] > tbody > tr[data-skeleton] {
+    grid-template-columns: 1fr;
+    padding: 0.75rem;
+  }
+  table[data-stack] > tbody > tr[data-skeleton] > td:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+/* The card's own colour: the page's white, unless a utility gives the row one (selected, a Work's wash). */
+@layer components {
+  @media (width < 40rem) {
+    table[data-stack] > tbody > tr {
+      background-color: var(--background);
+    }
+  }
 }

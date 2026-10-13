@@ -231,7 +231,7 @@ function TimelineItem({ event }: { event: TimelineEvent }) {
     <li className="flex gap-3 py-3">
       <span
         aria-hidden="true"
-        className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[0.6875rem] font-semibold text-secondary-foreground"
+        className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[0.6875rem] font-semibold text-secondary-foreground touch:text-xs"
       >
         {initials(who)}
       </span>

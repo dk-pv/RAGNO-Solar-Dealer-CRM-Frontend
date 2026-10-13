@@ -39,12 +39,12 @@ const COLUMNS: Column<LeadReportRow>[] = [
   {
     header: "Lead",
     render: (lead) => (
-      <Link href={`/leads/${lead.id}`} className="font-medium whitespace-nowrap text-link hover:text-link-hover hover:underline">
+      <Link href={`/leads/${lead.id}`} className="font-medium whitespace-nowrap text-link hover:text-link-hover hover:underline touch:tap-area">
         Lead #{lead.id}
       </Link>
     ),
   },
-  { header: "Customer", render: (lead) => <span className="block max-w-[max(12rem,13cqw)] truncate font-medium">{lead.customer_name}</span> },
+  { header: "Customer", render: (lead) => <span className="block max-w-[max(12rem,13cqw)] truncate font-medium">{lead.customer_name}</span>, wide: true },
   { header: "Status (stage)", render: (lead) => <StatusBadge status={lead.status} /> },
   { header: "Assigned to", render: (lead) => lead.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>, className: "whitespace-nowrap" },
   { header: "Source", render: (lead) => lead.source_display || <span className="text-muted-foreground">Not set</span>, className: "whitespace-nowrap" },

@@ -433,7 +433,7 @@ function WorkCard({ work, saving, dragging, actions, onDragStart, onDragEnd }: W
         <Link
           href={`/works/${work.id}#activities`}
           draggable={false}
-          className={`relative z-1 mt-2 flex w-fit max-w-full items-center gap-1.5 rounded text-xs underline-offset-2 hover:underline ${
+          className={`relative z-1 mt-2 flex w-fit max-w-full items-center gap-1.5 rounded text-xs underline-offset-2 hover:underline touch:min-h-11 ${
             work.pending_activity_count > 0 && followUpOverdue ? "font-medium text-error" : "text-secondary-foreground"
           }`}
         >

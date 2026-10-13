@@ -150,7 +150,7 @@ export function ActiveFilters({ active, describe }: { active: string[]; describe
           type="button"
           onClick={() => updateQuery({ [key]: null })}
           aria-label={`Remove the filter ${describe(key, searchParams.get(key) ?? "")}`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary-softer px-2 py-1 text-xs font-medium text-primary-strong hover:bg-primary-soft pointer-coarse:py-2.5"
+          className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary-softer px-2 py-1 text-xs font-medium text-primary-strong hover:bg-primary-soft touch:min-h-11 touch:py-2.5"
         >
           {describe(key, searchParams.get(key) ?? "")}
           <CloseIcon className="size-3.5" />
@@ -159,7 +159,7 @@ export function ActiveFilters({ active, describe }: { active: string[]; describe
       <button
         type="button"
         onClick={() => updateQuery(Object.fromEntries(active.map((key) => [key, null])))}
-        className="text-xs font-medium text-link underline-offset-2 hover:underline pointer-coarse:py-2.5"
+        className="text-xs font-medium text-link underline-offset-2 hover:underline touch:min-h-11"
       >
         Clear all
       </button>
@@ -306,11 +306,11 @@ export function BarList({ items, empty = NO_DATA }: { items: BarItem[]; empty?: 
             </span>
             <span className="text-right text-sm tabular-nums">
               <span className="font-medium">{item.count.toLocaleString("en-IN")}</span>
-              {item.detail && <span className="block text-[0.6875rem] text-muted-foreground">{item.detail}</span>}
+              {item.detail && <span className="block text-[0.6875rem] text-muted-foreground touch:text-xs">{item.detail}</span>}
             </span>
           </>
         );
-        const className = "col-span-3 grid grid-cols-subgrid items-center rounded-md px-2 py-1.5 text-left pointer-coarse:min-h-11";
+        const className = "col-span-3 grid grid-cols-subgrid items-center rounded-md px-2 py-1.5 text-left touch:min-h-11";
         return (
           <li key={item.key} className="col-span-3 grid grid-cols-subgrid">
             {item.onClick && item.count > 0 ? (
@@ -393,9 +393,13 @@ export function TrendChart({
           );
         })}
       </div>
-      <div className="mt-1 flex gap-0.5 text-[0.625rem] text-muted-foreground">
+      {/* 12px labels where fingers are, every `every`th column: on a phone only every other one of those, so two labels never meet. */}
+      <div className="mt-1 flex gap-0.5 text-[0.625rem] text-muted-foreground touch:text-xs">
         {points.map((point, index) => (
-          <span key={point.start} className="min-w-0 flex-1 overflow-visible text-center whitespace-nowrap">
+          <span
+            key={point.start}
+            className={`min-w-0 flex-1 overflow-visible text-center whitespace-nowrap ${(index / every) % 2 === 1 ? "max-sm:invisible" : ""}`}
+          >
             {index % every === 0 ? pointFormat(unit, point.start) : ""}
           </span>
         ))}
@@ -418,9 +422,11 @@ export function LatestCell({ latest }: { latest: LatestActivity }) {
   );
 }
 
-export type Column<T> = { header: string; render: (row: T) => ReactNode; className?: string };
+// `wide`: on a phone, where each row is a card, the column takes the card's whole width (a name, a note).
+export type Column<T> = { header: string; render: (row: T) => ReactNode; className?: string; wide?: boolean };
 
-// A report's records: a page at a time from the server, scrolling sideways inside its box on small screens.
+// A report's records: a page at a time from the server, scrolling sideways inside its box on a tablet, and a stack of cards
+// on a phone: the first column is each card's heading, the others its labelled fields.
 export function DataTable<T>({
   caption,
   columns,
@@ -446,7 +452,7 @@ export function DataTable<T>({
   return (
     <>
       <div className={`${tableAreaClass} relative`}>
-        <table aria-busy={loading} className={`w-full text-sm transition-opacity ${loading && data ? "opacity-60" : ""}`}>
+        <table aria-busy={loading} data-stack="flat" className={`w-full text-sm transition-opacity ${loading && data ? "opacity-60" : ""}`}>
           <caption className="sr-only">{caption}</caption>
           <thead>
             <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
@@ -461,15 +467,20 @@ export function DataTable<T>({
             {data
               ? data.results.map((row) => (
                   <tr key={rowKey(row)} className="border-b border-border last:border-0 hover:bg-row-hover">
-                    {columns.map((column) => (
-                      <td key={column.header} className={`px-3 py-2 align-top ${column.className ?? ""}`}>
+                    {columns.map((column, index) => (
+                      <td
+                        key={column.header}
+                        data-label={index === 0 ? undefined : column.header}
+                        data-slot={index === 0 ? "title" : column.wide ? "wide" : undefined}
+                        className={`px-3 py-2 align-top ${column.className ?? ""}`}
+                      >
                         {column.render(row)}
                       </td>
                     ))}
                   </tr>
                 ))
               : Array.from({ length: 6 }, (_, row) => (
-                  <tr key={row} className="border-b border-border last:border-0">
+                  <tr key={row} data-skeleton className="border-b border-border last:border-0">
                     {columns.map((column) => (
                       <td key={column.header} className="px-3 py-3.5">
                         <span className="block h-3 animate-pulse rounded bg-subtle motion-reduce:animate-none" />

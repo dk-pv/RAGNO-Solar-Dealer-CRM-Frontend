@@ -92,7 +92,7 @@ export function UsersPage() {
     content = (
       <>
         <div className={`${emptyHint ? tableBoxClass : tableAreaClass} relative mt-4`}>
-          <table aria-busy={loading} className={`w-full min-w-200 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}>
+          <table aria-busy={loading} data-stack className={`w-full min-w-200 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}>
             <caption className="sr-only">Users</caption>
             <thead>
               <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
@@ -113,22 +113,22 @@ export function UsersPage() {
               {rows
                 ? rows.map((user) => (
                     <tr key={user.id} className="border-b border-border last:border-0 hover:bg-row-hover">
-                      <th scope="row" className="px-3 py-2 text-left font-medium">
+                      <th scope="row" data-slot="title" className="px-3 py-2 text-left font-medium">
                         <span className="block max-w-[max(13rem,14cqw)] truncate">{user.name}</span>
                       </th>
-                      <td className="px-3 py-2">
+                      <td data-label="Email" data-slot="wide" className="px-3 py-2">
                         <span className="block max-w-[max(16rem,17cqw)] truncate">{user.email}</span>
                       </td>
-                      <td className="px-3 py-2">{ROLE_LABELS[user.role]}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td data-label="Role" className="px-3 py-2">{ROLE_LABELS[user.role]}</td>
+                      <td data-label="Department" className="px-3 py-2 whitespace-nowrap">
                         {user.department_name ?? <span className="text-muted-foreground">—</span>}
                       </td>
-                      <td className="px-3 py-2">
+                      <td data-label="Status" className="px-3 py-2">
                         <span className={`${badgeClass} ${user.is_active ? activeBadge : inactiveBadge}`}>
                           {user.is_active ? "Active" : "Inactive"}
                         </span>
                       </td>
-                      <td className="px-3 py-2">
+                      <td data-label="Access" data-slot="wide" className="px-3 py-2">
                         {user.modules.length > 0 ? (
                           moduleLabels(user.modules, modules.data)
                         ) : (
@@ -136,7 +136,7 @@ export function UsersPage() {
                         )}
                       </td>
                       {isAdmin && (
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap text-label">
+                        <td data-slot="actions" className="px-2 py-1.5 text-right whitespace-nowrap text-label">
                           {/* Your own account isn't changed here, so you can't lock yourself out. */}
                           {user.email !== me?.email && (
                             <>
@@ -173,7 +173,7 @@ export function UsersPage() {
                     </tr>
                   ))
                 : Array.from({ length: 5 }, (_, row) => (
-                    <tr key={row} className="border-b border-border last:border-0">
+                    <tr key={row} data-skeleton className="border-b border-border last:border-0">
                       {Array.from({ length: columnCount }, (_, cell) => (
                         <td key={cell} className="px-3 py-3.5">
                           <span className="block h-3 animate-pulse rounded bg-subtle motion-reduce:animate-none" />

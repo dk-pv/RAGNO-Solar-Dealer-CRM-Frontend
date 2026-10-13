@@ -144,7 +144,7 @@ export function Board({ boardRef, dragging, refreshing = false, busy, onDragOver
 // ---- A column ----
 
 const headerButton =
-  "grid size-7 shrink-0 place-items-center rounded-md opacity-70 transition hover:bg-background/60 hover:opacity-100 pointer-coarse:size-9";
+  "grid size-7 shrink-0 place-items-center rounded-md opacity-70 transition hover:bg-background/60 hover:opacity-100 touch:size-11";
 
 type BoardColumnProps = {
   title: string;
@@ -300,7 +300,7 @@ export function CardAssignee({ name }: { name: string | null }) {
   if (!name) return <span>Unassigned</span>;
   return (
     <span className="flex min-w-0 items-center gap-1.5">
-      <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-muted text-[0.625rem] font-semibold text-secondary-foreground">
+      <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-muted text-[0.625rem] font-semibold text-secondary-foreground touch:size-6 touch:text-xs">
         {initials(name)}
       </span>
       <span className="truncate">

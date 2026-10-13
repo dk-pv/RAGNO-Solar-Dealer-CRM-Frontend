@@ -17,14 +17,14 @@ export function PasswordInput({ label = "password", className = "", ...props }: 
 
   return (
     <div className="relative">
-      <input {...props} type={visible ? "text" : "password"} className={`${className} pr-10`} />
+      <input {...props} type={visible ? "text" : "password"} className={`${className} pr-10 touch:pr-12`} />
       <button
         type="button"
         onClick={() => setVisible((current) => !current)}
         aria-label={action}
         aria-controls={props.id}
         title={action}
-        className="absolute inset-y-0 right-0 grid w-9 place-items-center rounded-r-md text-faint hover:text-label focus-visible:text-primary"
+        className="absolute inset-y-0 right-0 grid w-9 place-items-center rounded-r-md text-faint hover:text-label focus-visible:text-primary touch:w-11"
       >
         {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
       </button>

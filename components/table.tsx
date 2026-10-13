@@ -62,7 +62,7 @@ export function Pagination({ page, pageSize, count, loading = false, onPage }: P
     else updateQuery({ page: target > 1 ? String(target) : null });
     window.scrollTo({ top: 0 });
   };
-  const pageButton = "grid h-8 min-w-8 place-items-center rounded-md px-2 text-sm tabular-nums transition-colors aria-disabled:cursor-wait pointer-coarse:min-h-11 pointer-coarse:min-w-11";
+  const pageButton = "grid h-8 min-w-8 place-items-center rounded-md px-2 text-sm tabular-nums transition-colors aria-disabled:cursor-wait touch:min-h-11 touch:min-w-11";
   const placeholder = "block animate-pulse rounded bg-subtle motion-reduce:animate-none";
 
   return (
@@ -75,7 +75,7 @@ export function Pagination({ page, pageSize, count, loading = false, onPage }: P
         </p>
       )}
       {count === undefined ? (
-        <span aria-hidden="true" className={`${placeholder} h-8 w-56 max-w-full pointer-coarse:h-11`} />
+        <span aria-hidden="true" className={`${placeholder} h-8 w-56 max-w-full touch:h-11`} />
       ) : (
         <div className={`flex flex-wrap items-center gap-4 transition-opacity ${loading ? "opacity-60" : ""}`}>
           {!onPage && (
@@ -212,7 +212,7 @@ export function ListShell({ noun, error, onRetry, page, pageSize, count, loading
 // A table's body while its first page loads: rows of placeholder cells, one per column shown.
 export function SkeletonRows({ columns, rows = 8 }: { columns: number; rows?: number }) {
   return Array.from({ length: rows }, (_, row) => (
-    <tr key={row} className="border-b border-border last:border-0">
+    <tr key={row} data-skeleton className="border-b border-border last:border-0">
       {Array.from({ length: columns }, (_, cell) => (
         <td key={cell} className="px-3 py-3.5">
           <span className="block h-3 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
@@ -287,7 +287,7 @@ export function ColumnsButton<K extends string>({ columns }: { columns: Columns<
       >
         <p className="px-2.5 pt-1.5 pb-1 text-xs font-medium text-muted-foreground">Show columns</p>
         {options.map((option) => (
-          <label key={option.key} className="flex cursor-pointer items-center gap-2.5 rounded px-2.5 py-2 text-sm hover:bg-muted pointer-coarse:py-3">
+          <label key={option.key} className="flex cursor-pointer items-center gap-2.5 rounded px-2.5 py-2 text-sm hover:bg-muted touch:py-3">
             <input
               type="checkbox"
               checked={columns.shows(option.key)}

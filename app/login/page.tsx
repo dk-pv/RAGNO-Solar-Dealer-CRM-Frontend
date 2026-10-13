@@ -1,10 +1,8 @@
-import type { Metadata } from "next";
+import Image from "next/image";
 import { Suspense } from "react";
 
 import { CalendarIcon, LeadsIcon, WorksIcon } from "@/components/layout/icons";
 import { LoginForm } from "./login-form";
-
-export const metadata: Metadata = { title: "Sign in | Ragno Power System" };
 
 const HIGHLIGHTS = [
   { icon: LeadsIcon, title: "Lead pipeline", text: "Every enquiry from New to Won, at a glance." },
@@ -26,12 +24,14 @@ export default function LoginPage() {
         <span aria-hidden="true" className="absolute -top-8 -right-8 size-48 rounded-full bg-white/5" />
 
         <div className="relative flex items-center gap-3">
-          <span
-            aria-hidden="true"
-            className="grid size-10 place-items-center rounded-lg bg-white text-base font-bold text-primary-strong"
-          >
-            R
-          </span>
+          <Image
+            src="/ragno-favicon-512.png"
+            alt="Ragno Power System logo"
+            width={512}
+            height={512}
+            sizes="80px"
+            className="size-20 shrink-0"
+          />
           <div className="leading-tight">
             <p className="font-semibold">Ragno Power System</p>
             <p className="text-sm text-white/85">Solar Dealer CRM</p>
@@ -62,7 +62,7 @@ export default function LoginPage() {
         </ul>
       </section>
 
-      <div className="flex items-center justify-center bg-background px-4 py-12 sm:px-8">
+      <div className="flex items-center justify-center bg-background px-4 py-8 sm:px-8 sm:py-12">
         {/* LoginForm reads ?next= from the URL, which needs a Suspense boundary when prerendered. */}
         <Suspense>
           <LoginForm />

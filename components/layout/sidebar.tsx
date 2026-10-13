@@ -67,7 +67,7 @@ const RESTORE_SCRIPT = `var c=!matchMedia(${JSON.stringify(WIDE_QUERY)}).matches
 const fadeClass = "transition-opacity duration-200 motion-reduce:transition-none sidebar-collapsed:opacity-0";
 
 const itemClass =
-  "flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md pl-3.75 pr-3 text-sm pointer-coarse:h-11 text-secondary-foreground transition-colors hover:bg-muted hover:text-label aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong";
+  "flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md pl-3.75 pr-3 text-sm touch:h-11 text-secondary-foreground transition-colors hover:bg-muted hover:text-label aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong";
 
 // Flyouts and tooltips sit just past the sidebar's right edge, beside the element they belong to.
 function besideRail(anchor: HTMLElement) {
@@ -123,7 +123,7 @@ export function SidebarPanel({ user, onLogout, collapsible = false, onClose }: S
         )}
       </div>
 
-      <nav aria-label="Main" className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-3">
+      <nav aria-label="Main" className="scroll-shadow flex-1 overflow-x-hidden overflow-y-auto px-3 py-3">
         <ul className="space-y-0.5">
           {/* Until the user has loaded (which decides their entries), placeholder rows keep the rail from looking empty. */}
           {!user &&
@@ -213,7 +213,7 @@ export function SidebarPanel({ user, onLogout, collapsible = false, onClose }: S
                           href={child.href}
                           onClick={onClose}
                           aria-current={child.href === activeHref ? "page" : undefined}
-                          className="flex h-8 items-center whitespace-nowrap rounded-r-md border-l-2 pointer-coarse:h-11 border-border pl-4.75 text-sm text-secondary-foreground transition-colors hover:bg-muted hover:text-label aria-[current=page]:border-brand aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong"
+                          className="flex h-8 items-center whitespace-nowrap rounded-r-md border-l-2 touch:h-11 border-border pl-4.75 text-sm text-secondary-foreground transition-colors hover:bg-muted hover:text-label aria-[current=page]:border-brand aria-[current=page]:bg-primary-soft aria-[current=page]:font-medium aria-[current=page]:text-primary-strong"
                         >
                           {child.label}
                         </Link>
@@ -233,7 +233,7 @@ export function SidebarPanel({ user, onLogout, collapsible = false, onClose }: S
           onClick={onLogout ?? undefined}
           disabled={!onLogout}
           data-tooltip="Log out"
-          className="flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md border border-input pl-3.5 pointer-coarse:h-11 text-sm text-label transition-colors enabled:hover:border-border-strong enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-9 w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md border border-input pl-3.5 touch:h-11 text-sm text-label transition-colors enabled:hover:border-border-strong enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
           <LogoutIcon className="size-4.5 shrink-0" />
           <span className={fadeClass}>Log out</span>
@@ -314,7 +314,7 @@ export function Sidebar({ user, onLogout }: { user: ShellUser | null; onLogout: 
           aria-expanded={!collapsed}
           data-tooltip={toggleLabel}
           data-tooltip-always=""
-          className="absolute top-7 left-full hidden h-9 w-6 -translate-y-1/2 place-items-center rounded-r-lg bg-primary text-white shadow-md transition-colors hover:bg-primary-hover active:bg-primary-active pointer-coarse:h-11 pointer-coarse:w-7 lg:grid"
+          className="absolute top-7 left-full hidden h-9 w-6 -translate-y-1/2 place-items-center rounded-r-lg bg-primary text-white shadow-md transition-colors hover:bg-primary-hover active:bg-primary-active touch:h-11 touch:w-7 lg:grid"
         >
           <ChevronLeftIcon className="size-4 transition-transform duration-200 motion-reduce:transition-none sidebar-collapsed:rotate-180" />
         </button>

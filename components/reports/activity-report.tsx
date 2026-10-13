@@ -60,13 +60,13 @@ const COLUMNS: Column<ActivityReportRow>[] = [
     render: (activity) => (
       <Link
         href={activity.work ? `/works/${activity.work}#activities` : `/leads/${activity.lead}#activities`}
-        className="font-medium whitespace-nowrap text-link hover:text-link-hover hover:underline"
+        className="font-medium whitespace-nowrap text-link hover:text-link-hover hover:underline touch:tap-area"
       >
         {activity.work ? `Work #${activity.work}` : `Lead #${activity.lead}`}
       </Link>
     ),
   },
-  { header: "Customer", render: (activity) => <span className="block max-w-[max(11rem,12cqw)] truncate">{activity.customer_name}</span> },
+  { header: "Customer", render: (activity) => <span className="block max-w-[max(11rem,12cqw)] truncate">{activity.customer_name}</span>, wide: true },
   { header: "Assigned to", render: (activity) => activity.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>, className: "whitespace-nowrap" },
   {
     header: "Due date",
@@ -144,7 +144,7 @@ export function ActivityReport() {
         <FilterSelect name="record" label="Lead or Work" all="Leads and Works" options={[{ value: "lead", label: "Leads" }, { value: "work", label: "Works" }]} />
         <FilterSelect name="type" label="Activity type" all="All types" options={ACTIVITY_TYPES.map((item) => ({ ...item }))} />
         <FilterSelect name="status" label="Status" all="Any status" options={ACTIVITY_STATUSES.map((item) => ({ ...item }))} />
-        <label className="flex h-9 items-center gap-2 rounded-md border border-input bg-field px-3 text-sm pointer-coarse:min-h-11">
+        <label className="flex h-9 items-center gap-2 rounded-md border border-input bg-field px-3 text-sm touch:min-h-11">
           <input
             type="checkbox"
             checked={searchParams.get("overdue") === "true"}

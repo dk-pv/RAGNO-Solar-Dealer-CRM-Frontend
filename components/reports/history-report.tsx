@@ -37,18 +37,18 @@ const COLUMNS: Column<TimelineEvent>[] = [
     header: "Record",
     render: (event) =>
       event.work ? (
-        <Link href={`/works/${event.work.id}`} className="whitespace-nowrap text-link hover:text-link-hover hover:underline">
+        <Link href={`/works/${event.work.id}`} className="whitespace-nowrap text-link hover:text-link-hover hover:underline touch:tap-area">
           Work #{event.work.id}
         </Link>
       ) : event.lead ? (
-        <Link href={`/leads/${event.lead.id}`} className="whitespace-nowrap text-link hover:text-link-hover hover:underline">
+        <Link href={`/leads/${event.lead.id}`} className="whitespace-nowrap text-link hover:text-link-hover hover:underline touch:tap-area">
           Lead #{event.lead.id}
         </Link>
       ) : (
         "—"
       ),
   },
-  { header: "Customer", render: (event) => <span className="block max-w-[max(11rem,12cqw)] truncate">{(event.work ?? event.lead)?.customer_name}</span> },
+  { header: "Customer", render: (event) => <span className="block max-w-[max(11rem,12cqw)] truncate">{(event.work ?? event.lead)?.customer_name}</span>, wide: true },
   {
     header: "Now",
     render: (event) =>
@@ -60,6 +60,7 @@ const COLUMNS: Column<TimelineEvent>[] = [
       ) : (
         event.lead && <StatusBadge status={event.lead.status} />
       ),
+    wide: true,
   },
   {
     header: "Details",
@@ -72,6 +73,7 @@ const COLUMNS: Column<TimelineEvent>[] = [
       ) : event.kind === "work_created" ? (
         <span className="text-xs text-muted-foreground">From Lead #{event.work?.lead}</span>
       ) : null,
+    wide: true,
   },
 ];
 

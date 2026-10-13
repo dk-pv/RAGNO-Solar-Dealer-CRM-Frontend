@@ -56,7 +56,7 @@ export function DocumentStatus({
       href={`/works/${work.id}/documents`}
       draggable={false}
       title={is_complete ? undefined : `Missing: ${missing_documents.join(", ")}`}
-      className={`flex w-fit max-w-full items-center gap-1.5 rounded text-xs font-medium underline-offset-2 hover:underline ${
+      className={`flex w-fit max-w-full items-center gap-1.5 rounded text-xs font-medium underline-offset-2 hover:underline touch:min-h-11 ${
         is_complete ? "text-success" : "text-warning"
       } ${className}`}
     >
@@ -229,7 +229,7 @@ export function WorkDocuments({ id }: { id: number }) {
 
 function BackLink({ id }: { id: number }) {
   return (
-    <Link href={`/works/${id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground pointer-coarse:py-2">
+    <Link href={`/works/${id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground touch:min-h-11">
       <ChevronLeftIcon className="size-4" />
       Work #{id}
     </Link>
@@ -446,7 +446,7 @@ function DocumentCard({ workId, item, maxFileSize, canDelete, notify, onUploaded
                 titleRef.current?.focus();
                 upload(retry);
               }}
-              className="ml-1 font-medium underline underline-offset-2 hover:no-underline pointer-coarse:py-2"
+              className="ml-1 font-medium underline underline-offset-2 hover:no-underline touch:min-h-11"
             >
               Try again
             </button>

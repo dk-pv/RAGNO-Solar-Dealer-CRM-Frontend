@@ -108,14 +108,15 @@ export function LeadsToolbar({ sortOptions = SORT_OPTIONS, children }: LeadsTool
 export function StatusTabs({ statuses }: { statuses: readonly { value: string; label: string }[] }) {
   const status = useSearchParams().get("status") ?? "";
   return (
-    <div role="group" aria-label="Status" className={segmentedClass}>
+    // A row of its own on a phone, the tabs sharing it equally.
+    <div role="group" aria-label="Status" className={`${segmentedClass} max-sm:w-full`}>
       {[{ value: "", label: "All" }, ...statuses].map((tab) => (
         <button
           key={tab.value}
           type="button"
           aria-pressed={status === tab.value}
           onClick={() => updateQuery({ status: tab.value || null })}
-          className={segmentClass}
+          className={`${segmentClass} max-sm:flex-1`}
         >
           {tab.label}
         </button>
@@ -162,7 +163,7 @@ export function SearchBox({ label, placeholder }: { label: string; placeholder: 
         onChange={(event) => setSearchText(event.target.value)}
         placeholder={placeholder}
         aria-label={label}
-        className={`${inputClass} pl-8`}
+        className={`${inputClass} pl-8 text-ellipsis`}
       />
     </div>
   );
@@ -170,27 +171,28 @@ export function SearchBox({ label, placeholder }: { label: string; placeholder: 
 
 type FilterToggleProps = { open: boolean; onToggle: () => void; controls: string; active: number };
 
-// Shows and hides a filter panel; the badge counts the filters in use.
+// Shows and hides a filter panel; the badge counts the filters in use. On a phone it is the icon alone, so the toolbar's
+// buttons and the sort share one row.
 export function FilterToggle({ open, onToggle, controls, active }: FilterToggleProps) {
   return (
     <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={controls} className={secondaryButton}>
       <FilterIcon className="size-4" />
-      Filter
+      <span className="max-sm:sr-only">Filter</span>
       {active > 0 && <span className="rounded bg-primary px-1.5 text-xs leading-5 text-white">{active}</span>}
     </button>
   );
 }
 
-// The URL's ?ordering=, left out of the URL when it's the default.
+// The URL's ?ordering=, left out of the URL when it's the default. On a phone it takes the room the toolbar's buttons leave.
 export function SortSelect({ options, defaultValue }: { options: { value: string; label: string }[]; defaultValue: string }) {
   const ordering = useSearchParams().get("ordering") ?? defaultValue;
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Sort</span>
+    <label className="flex items-center gap-2 text-sm max-sm:min-w-0 max-sm:flex-1">
+      <span className="text-muted-foreground max-sm:sr-only">Sort</span>
       <select
         value={options.some((option) => option.value === ordering) ? ordering : defaultValue}
         onChange={(event) => updateQuery({ ordering: event.target.value === defaultValue ? null : event.target.value })}
-        className={`${fieldClass} h-9`}
+        className={`${fieldClass} h-9 max-sm:w-full max-[22rem]:px-2`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

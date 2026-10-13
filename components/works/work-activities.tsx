@@ -67,48 +67,56 @@ const WORK_COLORS = [
   {
     dot: "bg-work-1",
     edge: "shadow-[inset_3px_0_0_var(--color-work-1)]",
+    card: "max-sm:shadow-[inset_3px_0_0_var(--color-work-1)]",
     row: "bg-work-1-tint hover:bg-work-1-hover",
     cell: "bg-work-1-tint group-hover:bg-work-1-hover",
   },
   {
     dot: "bg-work-2",
     edge: "shadow-[inset_3px_0_0_var(--color-work-2)]",
+    card: "max-sm:shadow-[inset_3px_0_0_var(--color-work-2)]",
     row: "bg-work-2-tint hover:bg-work-2-hover",
     cell: "bg-work-2-tint group-hover:bg-work-2-hover",
   },
   {
     dot: "bg-work-3",
     edge: "shadow-[inset_3px_0_0_var(--color-work-3)]",
+    card: "max-sm:shadow-[inset_3px_0_0_var(--color-work-3)]",
     row: "bg-work-3-tint hover:bg-work-3-hover",
     cell: "bg-work-3-tint group-hover:bg-work-3-hover",
   },
   {
     dot: "bg-work-4",
     edge: "shadow-[inset_3px_0_0_var(--color-work-4)]",
+    card: "max-sm:shadow-[inset_3px_0_0_var(--color-work-4)]",
     row: "bg-work-4-tint hover:bg-work-4-hover",
     cell: "bg-work-4-tint group-hover:bg-work-4-hover",
   },
   {
     dot: "bg-work-5",
     edge: "shadow-[inset_3px_0_0_var(--color-work-5)]",
+    card: "max-sm:shadow-[inset_3px_0_0_var(--color-work-5)]",
     row: "bg-work-5-tint hover:bg-work-5-hover",
     cell: "bg-work-5-tint group-hover:bg-work-5-hover",
   },
   {
     dot: "bg-work-6",
     edge: "shadow-[inset_3px_0_0_var(--color-work-6)]",
+    card: "max-sm:shadow-[inset_3px_0_0_var(--color-work-6)]",
     row: "bg-work-6-tint hover:bg-work-6-hover",
     cell: "bg-work-6-tint group-hover:bg-work-6-hover",
   },
   {
     dot: "bg-work-7",
     edge: "shadow-[inset_3px_0_0_var(--color-work-7)]",
+    card: "max-sm:shadow-[inset_3px_0_0_var(--color-work-7)]",
     row: "bg-work-7-tint hover:bg-work-7-hover",
     cell: "bg-work-7-tint group-hover:bg-work-7-hover",
   },
   {
     dot: "bg-work-8",
     edge: "shadow-[inset_3px_0_0_var(--color-work-8)]",
+    card: "max-sm:shadow-[inset_3px_0_0_var(--color-work-8)]",
     row: "bg-work-8-tint hover:bg-work-8-hover",
     cell: "bg-work-8-tint group-hover:bg-work-8-hover",
   },
@@ -148,7 +156,8 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
     <div className={`${tableAreaClass} relative`}>
       <table
         aria-busy={loading}
-        // With columns hidden the table is as wide as what's left needs, no wider.
+        // With columns hidden the table is as wide as what's left needs, no wider. On a phone it is a stack of cards (data-stack).
+        data-stack
         className={`w-full text-sm transition-opacity ${hidden ? "min-w-max" : showWork ? "min-w-280" : "min-w-210"} ${
           loading && rows ? "opacity-60" : ""
         }`}
@@ -167,7 +176,7 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
             {shows("due") && <th scope="col" className="px-3 py-2.5">Due date</th>}
             {shows("status") && <th scope="col" className="px-3 py-2.5">Status</th>}
             {shows("created") && <th scope="col" className="px-3 py-2.5">Created</th>}
-            {/* The actions stay in view beside a wide table; on a phone they would cover it, so there they scroll with it. */}
+            {/* The actions stay in view beside a wide table. */}
             <th scope="col" className="z-1 bg-page px-3 py-2.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0">
               <span className="sr-only">Actions</span>
             </th>
@@ -184,13 +193,13 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
               return (
                 <tr
                   key={activity.id}
-                  className={`group border-b border-border last:border-0 ${color.row} ${
+                  className={`group border-b border-border last:border-0 ${color.row} ${color.card} ${
                     nextWork ? "border-t-2 border-t-border-strong" : ""
                   }`}
                 >
                   {showWork && (
                     // Sticky cells need an opaque background: the same wash as the row.
-                    <th scope="row" className={`sticky left-0 z-1 px-3 py-2 text-left font-normal ${color.cell} ${color.edge}`}>
+                    <th scope="row" data-slot="title" className={`sticky left-0 z-1 px-3 py-2 text-left font-normal ${color.cell} ${color.edge}`}>
                       {linkWorks ? (
                         <Link href={`/works/${work.id}`} className={`${workBadgeClass} hover:underline`}>
                           <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${color.dot}`} />
@@ -210,14 +219,14 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                     </th>
                   )}
                   {showWork && shows("customer") && (
-                    <td className="px-3 py-2">
+                    <td data-label="Customer" data-slot="wide" className="px-3 py-2">
                       <span className="block max-w-[max(12rem,13cqw)] truncate font-medium">{work.customer_name}</span>
                       <span className="block text-xs whitespace-nowrap text-muted-foreground tabular-nums">{formatPhone(work)}</span>
                     </td>
                   )}
                   {/* A floor, as on the lead follow-ups table: the other columns don't wrap, so whenever the table
                       scrolls this one would otherwise be squeezed to its longest word. */}
-                  <td className={`min-w-48 px-3 py-2 ${showWork ? "" : color.edge}`}>
+                  <td data-slot={showWork ? "wide" : "title"} className={`min-w-48 px-3 py-2 ${showWork ? "" : color.edge}`}>
                     <span className="block font-medium whitespace-nowrap">{activity.type_display}</span>
                     <span title={activity.description} className="line-clamp-2 max-w-[max(20rem,21cqw)] text-xs break-words text-muted-foreground">
                       {activity.description}
@@ -229,7 +238,7 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                     )}
                   </td>
                   {shows("assigned") && (
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    <td data-label="Assigned to" className="px-3 py-2 whitespace-nowrap">
                       {activity.assigned_to_name ? (
                         <span className="block max-w-[max(12rem,13cqw)] truncate">{activity.assigned_to_name}</span>
                       ) : (
@@ -238,13 +247,13 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                     </td>
                   )}
                   {shows("due") && (
-                    <td className={`px-3 py-2 whitespace-nowrap ${overdue ? "font-medium text-error" : ""}`}>
+                    <td data-label="Due date" className={`px-3 py-2 whitespace-nowrap ${overdue ? "font-medium text-error" : ""}`}>
                       {activity.due_date ? formatDate(activity.due_date) : <span className="text-muted-foreground">—</span>}
                       {overdue && <span className="block text-xs">Overdue</span>}
                     </td>
                   )}
                   {shows("status") && (
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    <td data-label="Status" className="px-3 py-2 whitespace-nowrap">
                       <FollowUpBadge status={activity.status} />
                       {activity.completed_at && (
                         <span className="mt-1 block max-w-[max(12rem,13cqw)] truncate text-xs text-muted-foreground">
@@ -255,15 +264,15 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                     </td>
                   )}
                   {shows("created") && (
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    <td data-label="Created" className="px-3 py-2 whitespace-nowrap">
                       {formatDate(activity.created_at)}
                       {activity.created_by_name && (
                         <span className="block max-w-[max(12rem,13cqw)] truncate text-xs text-muted-foreground">by {activity.created_by_name}</span>
                       )}
                     </td>
                   )}
-                  <td className={`z-1 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0 ${color.cell}`}>
-                    <div className="flex items-center justify-end gap-1">
+                  <td data-slot="actions" className={`z-1 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0 ${color.cell}`}>
+                    <div className="flex items-center justify-end gap-1 max-sm:w-full">
                       {activity.status === "PENDING" ? (
                         // Only its assignee, or an admin, completes it (the API refuses anyone else).
                         activity.can_update_status && (
@@ -271,13 +280,13 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                             type="button"
                             onClick={() => onComplete(activity)}
                             aria-label={`Mark as Completed: ${label}`}
-                            className={`${secondaryButton} px-2.5`}
+                            className={`${secondaryButton} px-2.5 max-sm:flex-1`}
                           >
                             Mark as Completed
                           </button>
                         )
                       ) : (
-                        <span className="px-2.5 text-xs whitespace-nowrap text-muted-foreground">Completed</span>
+                        <span className="px-2.5 text-xs whitespace-nowrap text-muted-foreground max-sm:flex-1">Completed</span>
                       )}
                       <ActivityMenu activity={activity} label={label} withWork={linkWorks} onEdit={() => onEdit(activity)} />
                     </div>

@@ -108,7 +108,7 @@ export function Navbar({ user, onLogout, navigationId, navigationOpen, onOpenNav
             type="button"
             popoverTarget="account-menu"
             aria-label="Account"
-            className="grid size-9 place-items-center rounded-full transition-colors hover:bg-muted pointer-coarse:size-11"
+            className="grid size-9 place-items-center rounded-full transition-colors hover:bg-muted touch:size-11"
           >
             <span className="grid size-8 place-items-center rounded-full bg-muted text-xs font-semibold text-foreground">
               {userInitials || <UserIcon className="size-4" />}
@@ -132,7 +132,7 @@ export function Navbar({ user, onLogout, navigationId, navigationOpen, onOpenNav
               type="button"
               onClick={onLogout ?? undefined}
               disabled={!onLogout}
-              className="flex h-9 w-full items-center gap-2.5 rounded px-3 text-sm enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:h-11"
+              className="flex h-9 w-full items-center gap-2.5 rounded px-3 text-sm enabled:hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 touch:h-11"
             >
               <LogoutIcon className="size-4" />
               Log out

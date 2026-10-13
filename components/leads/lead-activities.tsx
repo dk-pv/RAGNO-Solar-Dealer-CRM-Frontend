@@ -175,7 +175,8 @@ export function LeadActivitiesPage() {
       >
         <table
           aria-busy={loading}
-          // With columns hidden the table is as wide as what's left needs, no wider.
+          // With columns hidden the table is as wide as what's left needs, no wider. On a phone it is a stack of cards (data-stack).
+          data-stack
           className={`w-full text-sm transition-opacity ${columns.hiddenCount > 0 ? "min-w-max" : "min-w-240"} ${loading && loaded ? "opacity-60" : ""}`}
         >
           <caption className="sr-only">Lead follow-ups</caption>
@@ -190,7 +191,7 @@ export function LeadActivitiesPage() {
               {shows("due") && <th scope="col" className="px-3 py-2.5">Due date</th>}
               {shows("status") && <th scope="col" className="px-3 py-2.5">Status</th>}
               {shows("created") && <th scope="col" className="px-3 py-2.5">Created</th>}
-              {/* The actions stay in view beside a wide table; on a phone they would cover it, so there they scroll with it. */}
+              {/* The actions stay in view beside a wide table. */}
               <th scope="col" className="z-1 bg-page px-3 py-2.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0">
                 <span className="sr-only">Actions</span>
               </th>
@@ -290,7 +291,7 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
 
   return (
     <tr className="group border-b border-border align-top last:border-0 hover:bg-row-hover">
-      <th scope="row" className={`${stickyCell} sticky left-0 px-3 py-2.5 text-left font-medium`}>
+      <th scope="row" data-slot="title" className={`${stickyCell} sticky left-0 px-3 py-2.5 text-left font-medium`}>
         {/* Staff who only do the follow-up can't open someone else's lead, so for them the name wraps instead of being
             cut: nothing else shows it. Its cap (see stickyNameClass) leaves a phone room to scroll the other columns. */}
         {activity.can_open_lead ? (
@@ -305,7 +306,7 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
           {phone}
         </span>
       </th>
-      <td className="min-w-48 px-3 py-2.5">
+      <td data-slot="wide" className="min-w-48 px-3 py-2.5">
         <span className="line-clamp-2 block max-w-[max(18rem,19cqw)] font-medium">
           {activity.title || <span className="font-normal text-muted-foreground italic">No heading</span>}
         </span>
@@ -318,14 +319,14 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
           </span>
         )}
       </td>
-      {shows("type") && <td className="min-w-28 px-3 py-2.5">{activity.type_display}</td>}
+      {shows("type") && <td data-label="Type" className="min-w-28 px-3 py-2.5">{activity.type_display}</td>}
       {shows("assigned") && (
-        <td className="px-3 py-2.5 whitespace-nowrap">
+        <td data-label="Assigned staff" className="px-3 py-2.5 whitespace-nowrap">
           {activity.assigned_to_name ? (
             <span className="flex items-center gap-2">
               <span
                 aria-hidden="true"
-                className="grid size-6 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border"
+                className="grid size-6 shrink-0 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border touch:text-xs"
               >
                 {initials(activity.assigned_to_name)}
               </span>
@@ -337,7 +338,7 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
         </td>
       )}
       {shows("due") && (
-        <td className="px-3 py-2.5 whitespace-nowrap">
+        <td data-label="Due date" className="px-3 py-2.5 whitespace-nowrap">
           {activity.due_date ? (
             <>
               <span className={overdue ? "font-medium text-error" : undefined}>{formatDate(activity.due_date)}</span>
@@ -349,20 +350,20 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
         </td>
       )}
       {shows("status") && (
-        <td className="px-3 py-2.5">
+        <td data-label="Status" className="px-3 py-2.5">
           <FollowUpBadge status={activity.status} />
         </td>
       )}
       {shows("created") && (
-        <td className="px-3 py-2.5 whitespace-nowrap">
+        <td data-label="Created" className="px-3 py-2.5 whitespace-nowrap">
           {formatDate(activity.created_at)}
           {activity.created_by_name && (
             <span className="block max-w-[max(12rem,13cqw)] truncate text-xs text-muted-foreground">{activity.created_by_name}</span>
           )}
         </td>
       )}
-      <td className={`${stickyCell} px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0`}>
-        <div className="flex items-center justify-end gap-1">
+      <td data-slot="actions" className={`${stickyCell} px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)] sm:sticky sm:right-0`}>
+        <div className="flex items-center justify-end gap-1 max-sm:w-full">
           {pending ? (
             // Only its assignee, or an admin, completes it (the API refuses anyone else).
             activity.can_update_status && (
@@ -370,13 +371,13 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
                 type="button"
                 onClick={() => onComplete(activity)}
                 aria-label={`Mark as Completed: ${heading(activity)} (${activity.lead_name})`}
-                className={`${secondaryButton} px-2.5`}
+                className={`${secondaryButton} px-2.5 max-sm:flex-1`}
               >
                 Mark as Completed
               </button>
             )
           ) : (
-            <span className="px-2.5 text-xs whitespace-nowrap text-muted-foreground">Completed</span>
+            <span className="px-2.5 text-xs whitespace-nowrap text-muted-foreground max-sm:flex-1">Completed</span>
           )}
           <RowMenu activity={activity} onEdit={onEdit} onDelete={onDelete} />
         </div>

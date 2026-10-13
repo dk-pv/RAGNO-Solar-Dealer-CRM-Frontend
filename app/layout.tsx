@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,8 +13,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ragno Power System",
+  title: "Ragno Power System — Solar Dealer CRM",
   description: "Solar Dealer CRM",
+  // The only favicon: app/favicon.ico is gone because Next would list it ahead of this one.
+  icons: { icon: "/ragno-favicon-512.png" },
+};
+
+// The page is as wide as the phone. On Android Chrome the on-screen keyboard resizes the page itself (not just what is
+// visible of it), so a dialog's maximum height follows and its buttons stay above the keyboard.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -659,7 +659,7 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
                     <button
                       type="button"
                       onClick={() => setValues((current) => ({ ...current, amount: plainAmount(selectedPlan.amount) }))}
-                      className="font-medium text-link underline underline-offset-2 hover:text-link-hover pointer-coarse:py-2"
+                      className="font-medium text-link underline underline-offset-2 hover:text-link-hover touch:min-h-11"
                     >
                       Use plan price
                     </button>
@@ -725,7 +725,7 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
           {!lead && (
             <fieldset>
               <legend className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Initial follow-up</legend>
-              <label className="mt-3 flex items-center gap-2 text-sm pointer-coarse:min-h-11">
+              <label className="mt-3 flex items-center gap-2 text-sm touch:min-h-11">
                 <input
                   type="checkbox"
                   name="add_follow_up"

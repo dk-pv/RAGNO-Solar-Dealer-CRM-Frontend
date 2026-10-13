@@ -34,7 +34,7 @@ export function RolesPage() {
         </div>
       ) : (
         <div className={`${tableBoxClass} relative mt-4`}>
-          <table aria-busy={roles.loading} className="w-full min-w-160 text-sm">
+          <table aria-busy={roles.loading} data-stack className="w-full min-w-160 text-sm">
             <caption className="sr-only">Roles</caption>
             <thead>
               <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
@@ -50,18 +50,18 @@ export function RolesPage() {
               {roles.data
                 ? roles.data.map((role) => (
                     <tr key={role.name} className="border-b border-border last:border-0">
-                      <th scope="row" className="px-3 py-2.5 text-left font-medium whitespace-nowrap">
+                      <th scope="row" data-slot="title" className="px-3 py-2.5 text-left font-medium whitespace-nowrap">
                         {role.label}
                       </th>
-                      <td className="px-3 py-2.5 text-muted-foreground">{role.description}</td>
-                      <td className="px-3 py-2.5">
+                      <td data-label="Description" data-slot="wide" className="px-3 py-2.5 text-muted-foreground">{role.description}</td>
+                      <td data-label="Access" data-slot="wide" className="px-3 py-2.5">
                         {role.modules.length > 0 ? (
                           moduleLabels(role.modules, modules.data)
                         ) : (
                           <span className="text-muted-foreground">No access</span>
                         )}
                       </td>
-                      <td className="px-2 py-1.5 text-right whitespace-nowrap text-label">
+                      <td data-slot="actions" className="px-2 py-1.5 text-right whitespace-nowrap text-label">
                         {/* Admins always keep every module, so no one can be locked out of Settings. */}
                         {role.name === "ADMIN" ? (
                           <span className="px-2 text-xs text-muted-foreground">Always full access</span>
@@ -80,7 +80,7 @@ export function RolesPage() {
                     </tr>
                   ))
                 : Array.from({ length: 2 }, (_, row) => (
-                    <tr key={row} className="border-b border-border last:border-0">
+                    <tr key={row} data-skeleton className="border-b border-border last:border-0">
                       {Array.from({ length: 4 }, (_, cell) => (
                         <td key={cell} className="px-3 py-3.5">
                           <span className="block h-3 animate-pulse rounded bg-subtle motion-reduce:animate-none" />
@@ -172,7 +172,7 @@ function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogP
           )}
           <Section title="Module access">
             {offered.map((module) => (
-              <label key={module.key} className="flex items-center gap-2 text-sm">
+              <label key={module.key} className="flex items-center gap-2 text-sm touch:min-h-11">
                 <input
                   type="checkbox"
                   name="modules"
@@ -184,7 +184,7 @@ function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogP
                     )
                   }
                   aria-describedby={hintId}
-                  className="size-4 accent-primary"
+                  className="size-4 accent-primary touch:size-5"
                 />
                 {module.label}
               </label>

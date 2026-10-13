@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useId, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { Busy, PageLoading, inputClass, primaryButton } from "@/components/leads/ui";
 import { PasswordInput } from "@/components/password-input";
@@ -24,6 +25,13 @@ export function LoginForm() {
   const formId = useId();
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+
+  // On a computer the cursor starts in the email field. A phone would raise its keyboard over the form before it has been
+  // read, so there the field waits for a tap.
+  useEffect(() => {
+    if (!window.matchMedia("(pointer: coarse)").matches) emailRef.current?.focus();
+  }, []);
 
   // Signing in updates the session; already signed-in visitors go straight on too.
   useEffect(() => {
@@ -49,13 +57,15 @@ export function LoginForm() {
   return (
     <div className="w-full max-w-sm">
       {/* The brand panel carries the logo on large screens; smaller screens show it here instead. */}
-      <div className="mb-10 flex items-center gap-3 lg:hidden">
-        <span
-          aria-hidden="true"
-          className="grid size-10 place-items-center rounded-lg bg-brand text-base font-bold text-white"
-        >
-          R
-        </span>
+      <div className="mb-8 flex items-center gap-3 sm:mb-10 lg:hidden">
+        <Image
+          src="/ragno-favicon-512.png"
+          alt="Ragno Power System logo"
+          width={512}
+          height={512}
+          sizes="(min-width: 640px) 80px, 64px"
+          className="size-16 shrink-0 sm:size-20"
+        />
         <div className="leading-tight">
           <p className="font-semibold">Ragno Power System</p>
           <p className="text-sm text-muted-foreground">Solar Dealer CRM</p>
@@ -77,7 +87,7 @@ export function LoginForm() {
             autoComplete="username"
             placeholder="name@company.com"
             required
-            autoFocus
+            ref={emailRef}
             className={inputClass}
           />
         </div>

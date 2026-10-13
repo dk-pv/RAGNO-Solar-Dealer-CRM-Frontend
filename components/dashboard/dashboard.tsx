@@ -153,7 +153,7 @@ function Panel({ id, title, description, action, className = "", children }: Pan
   );
 }
 
-const linkClass = "text-sm font-medium text-link underline-offset-2 hover:text-link-hover hover:underline";
+const linkClass = "text-sm font-medium text-link underline-offset-2 hover:text-link-hover hover:underline touch:tap-area";
 
 function Skeleton({ lines = 4 }: { lines?: number }) {
   return (
@@ -256,7 +256,8 @@ function SummaryCard({ card }: { card: Card }) {
         <span className="text-sm font-medium text-secondary-foreground">{card.title}</span>
         <span
           aria-hidden="true"
-          className={`grid size-8 shrink-0 place-items-center rounded-full ${card.alert ? "bg-error-soft text-error" : "bg-primary-softer text-primary"}`}
+          // The icon only decorates: on a 320px phone it gives its room to the title, so "Pending Follow-ups" wraps to two lines, not three.
+          className={`grid size-8 shrink-0 place-items-center rounded-full max-[22rem]:hidden ${card.alert ? "bg-error-soft text-error" : "bg-primary-softer text-primary"}`}
         >
           <Icon className="size-4" />
         </span>
@@ -369,7 +370,7 @@ function FollowUpsPanel({ view, onView, counts, today, version, links, className
               type="button"
               aria-pressed={pressed}
               onClick={() => onView({ bucket: item.value, mine })}
-              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors pointer-coarse:py-2.5 ${
+              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors touch:min-h-11 touch:py-2.5 ${
                 pressed ? "border-primary bg-primary-softer text-primary-strong" : "border-border text-secondary-foreground hover:bg-muted"
               }`}
             >
@@ -394,7 +395,7 @@ function FollowUpItem({ item, today }: { item: FollowUp; today: string }) {
     <li className="flex items-start gap-3 py-2.5">
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-baseline gap-x-1.5 text-sm">
-          <Link href={href} className="font-medium hover:underline">
+          <Link href={href} className="font-medium hover:underline touch:tap-area">
             {item.title}
           </Link>
           <span className="text-muted-foreground">
@@ -449,7 +450,7 @@ function MyWork({ summary, me, onFollowUps }: MyWorkProps) {
   } else {
     const mine = summary.data.mine;
     const counts = mine.follow_ups.total;
-    const row = "flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-muted pointer-coarse:py-3";
+    const row = "flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-muted touch:py-3";
     const value = (count: number, alert = false) => (
       <span className={`font-semibold tabular-nums ${alert && count > 0 ? "text-error" : ""}`}>{count.toLocaleString("en-IN")}</span>
     );
@@ -532,7 +533,7 @@ function LeadOverview({ summary, onAdd }: { summary: Loaded<DashboardSummary>; o
             <li key={row.status}>
               <Link
                 href={`/leads?status=${row.status}`}
-                className="-mx-2 grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted pointer-coarse:min-h-11"
+                className="-mx-2 grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted touch:min-h-11"
               >
                 <span>
                   <StatusBadge status={row.status} />
@@ -590,7 +591,7 @@ function WorkOverview({ stages }: { stages: Loaded<StageSummary[]> }) {
                 <Link
                   href={`/works?stage=${row.stage}`}
                   // The label column fits the longest stage name (Loan Work / Documents), so the bar keeps room on a phone.
-                  className="-mx-2 grid grid-cols-[minmax(0,11rem)_1fr_2.5rem] items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted pointer-coarse:min-h-11"
+                  className="-mx-2 grid grid-cols-[minmax(0,11rem)_1fr_2.5rem] items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted touch:min-h-11"
                 >
                   <span className="flex min-w-0 items-center gap-2 text-sm">
                     <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${stage.dot}`} />
@@ -673,7 +674,7 @@ function RecentLeads({ recent }: { recent: Loaded<RecentRecords> }) {
       render={(lead) => (
         <>
           <p className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1 text-sm">
-            <Link href={`/leads/${lead.id}`} className="min-w-0 truncate font-medium hover:underline">
+            <Link href={`/leads/${lead.id}`} className="min-w-0 truncate font-medium hover:underline touch:-my-3 touch:py-3">
               Lead #{lead.id} · {lead.customer_name}
             </Link>
             <StatusBadge status={lead.status} />
@@ -698,7 +699,7 @@ function RecentWorks({ recent }: { recent: Loaded<RecentRecords> }) {
         return (
           <>
             <p className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1 text-sm">
-              <Link href={`/works/${work.id}`} className="min-w-0 truncate font-medium hover:underline">
+              <Link href={`/works/${work.id}`} className="min-w-0 truncate font-medium hover:underline touch:-my-3 touch:py-3">
                 Work #{work.id} · {work.customer_name}
               </Link>
               <span className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${stage.header}`}>

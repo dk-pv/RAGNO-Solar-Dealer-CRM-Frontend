@@ -305,7 +305,7 @@ export function LeadDetail({ id }: { id: number }) {
 
 function BackLink() {
   return (
-    <Link href="/leads" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground pointer-coarse:py-2">
+    <Link href="/leads" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground touch:min-h-11">
       <ChevronLeftIcon className="size-4" />
       All leads
     </Link>
@@ -338,7 +338,7 @@ type ActivitiesProps = {
   notify: (text: string, error?: boolean) => void;
 };
 
-const linkButton = "font-medium text-foreground underline-offset-2 hover:underline pointer-coarse:py-2";
+const linkButton = "font-medium text-foreground underline-offset-2 hover:underline touch:min-h-11 touch:min-w-11";
 
 // The lead's follow-ups, each Pending until marked Completed (which is final). Admins add, edit and delete them; the
 // staff member one is assigned to, or an admin, completes it. The API applies the same rules.
@@ -440,7 +440,7 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
                       type="button"
                       onClick={() => setDeleting(activity)}
                       aria-label={`Delete follow-up: ${heading(activity)}`}
-                      className="font-medium text-error underline-offset-2 hover:underline pointer-coarse:py-2"
+                      className="font-medium text-error underline-offset-2 hover:underline touch:min-h-11 touch:min-w-11"
                     >
                       Delete
                     </button>
@@ -483,7 +483,7 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
           <button
             type="button"
             onClick={onScheduleFollowUp}
-            className="ml-auto text-sm font-medium underline-offset-2 hover:underline pointer-coarse:py-2"
+            className="ml-auto text-sm font-medium underline-offset-2 hover:underline touch:min-h-11 touch:min-w-11"
           >
             {lead.next_follow_up ? "Change" : "Schedule"}
           </button>

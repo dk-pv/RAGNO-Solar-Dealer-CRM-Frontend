@@ -80,7 +80,7 @@ export function LeadPicker({ id, value, onChange, error: fieldError, selectable,
             setRefocus(true);
             onChange(undefined);
           }}
-          className="font-medium underline-offset-2 hover:underline pointer-coarse:py-2"
+          className="font-medium underline-offset-2 hover:underline touch:min-h-11"
         >
           Change
         </button>
@@ -151,7 +151,7 @@ export function LeadPicker({ id, value, onChange, error: fieldError, selectable,
               role="option"
               aria-selected={index === active}
               onClick={() => choose(lead)}
-              className={`cursor-pointer rounded px-2.5 py-2 text-sm ${index === active ? "bg-muted" : "hover:bg-muted"}`}
+              className={`cursor-pointer rounded px-2.5 py-2 text-sm touch:py-3 ${index === active ? "bg-muted" : "hover:bg-muted"}`}
             >
               <span className="font-medium">{lead.name}</span>
               <span className="text-muted-foreground">

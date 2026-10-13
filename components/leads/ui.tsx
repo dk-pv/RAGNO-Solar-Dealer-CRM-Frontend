@@ -28,10 +28,11 @@ export function PageLoading({ label = "Loading…" }: { label?: string }) {
   );
 }
 
-// The CRM's controls: compact (36px) for a mouse. On touch screens (pointer-coarse) each one is at least 44px tall, and
-// fields use 16px text so phones don't zoom in when one is focused.
-const touchTarget = "pointer-coarse:min-h-11";
-const buttonBase = `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${touchTarget}`;
+// The CRM's controls: compact (36px) for a mouse. On touch screens, and in any window narrower than sm (the `touch:`
+// variant, see globals.css), each one is at least 44px tall and wide, and fields use 16px text so phones don't zoom in
+// when one is focused.
+const touchTarget = "touch:min-h-11";
+const buttonBase = `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${touchTarget} touch:min-w-11`;
 const outlineBase = `${buttonBase} h-9 border border-input bg-background px-3 hover:border-border-strong hover:bg-muted`;
 // Low-emphasis actions in table rows, such as Edit.
 const ghostBase = `${buttonBase} h-8 px-2 hover:bg-muted`;
@@ -43,21 +44,21 @@ export const ghostButton = `${ghostBase} text-label`;
 export const secondaryDangerButton = `${outlineBase} text-error`;
 export const ghostDangerButton = `${ghostBase} text-error`;
 // Callers add the size (size-8 or size-9).
-export const iconButton = `grid shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-muted hover:text-label disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 ${touchTarget} pointer-coarse:min-w-11`;
+export const iconButton = `grid shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-muted hover:text-label disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 ${touchTarget} touch:min-w-11`;
 // Inputs and selects without a size; inputClass adds the usual full-width size.
-export const fieldClass = `min-w-0 rounded-md border border-input bg-field px-3 text-sm text-foreground placeholder:text-placeholder enabled:hover:border-input-hover focus:border-primary focus:ring-3 focus:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-disabled-surface disabled:text-disabled aria-[invalid=true]:border-error ${touchTarget} pointer-coarse:text-base`;
+export const fieldClass = `min-w-0 rounded-md border border-input bg-field px-3 text-sm text-foreground placeholder:text-placeholder enabled:hover:border-input-hover focus:border-primary focus:ring-3 focus:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-disabled-surface disabled:text-disabled aria-[invalid=true]:border-error ${touchTarget} touch:text-base`;
 export const inputClass = `${fieldClass} h-9 w-full`;
 
 // A group of toggle buttons or view links; the pressed or current one is filled.
 export const segmentedClass = "flex rounded-md border border-input bg-background p-0.5";
 export const segmentClass =
-  "rounded px-3 py-1.5 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground pointer-coarse:py-2.5";
+  "rounded px-3 py-1.5 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground touch:py-3";
 
 // A page's sub-navigation (Reports, Settings): the current tab is underlined in the brand colour. The list scrolls
 // sideways on narrow screens rather than wrapping.
 export const tabListClass = "scrollbar-none -mx-1 flex gap-1 overflow-x-auto border-b border-border px-1";
 export const tabClass =
-  "-mb-px shrink-0 border-b-2 border-transparent px-3 py-2 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground aria-[current=page]:border-primary aria-[current=page]:text-foreground pointer-coarse:py-3";
+  "-mb-px shrink-0 border-b-2 border-transparent px-3 py-2 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground aria-[current=page]:border-primary aria-[current=page]:text-foreground touch:py-3";
 
 // ---- Pages that list records ----
 // The app shell's <main> is a flex column. A page that lists records fills it, and every wrapper between the page's root
@@ -70,16 +71,17 @@ export const fillClass = "flex flex-1 flex-col";
 // The table's scroll box. `tableBoxClass` is the same box without growing, for a page with something else to fill the room.
 // A table wider than its box scrolls inside it: a mouse gets a thin scrollbar that shows there is more, a touch screen
 // swipes without one. The box is a size container, so a cell's width cap in cqw follows the room the table really has,
-// with the sidebar open or not (see stickyNameClass below).
+// with the sidebar open or not (see stickyNameClass below). On a phone the table is a stack of cards (data-stack, see
+// globals.css), each with its own border, so the box drops its own.
 export const tableBoxClass =
-  "@container overflow-x-auto rounded-lg border border-border bg-background [scrollbar-color:var(--faint)_transparent] [scrollbar-width:thin] pointer-coarse:scrollbar-none";
+  "@container overflow-x-auto rounded-lg border border-border bg-background [scrollbar-color:var(--faint)_transparent] [scrollbar-width:thin] touch:scrollbar-none max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent";
 export const tableAreaClass = `${tableBoxClass} grow`;
 // The box that holds a list's error state, and its empty state.
 export const messageAreaClass = "flex grow flex-col justify-center rounded-lg border border-border bg-background";
 export const emptyAreaClass =
   "flex grow flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-background px-4 py-12 text-center";
 // The footer under a list. `mt-auto` keeps it at the bottom even when nothing above it grows; callers add the alignment.
-export const paginationFooterClass = "mt-auto flex min-h-8 flex-wrap items-center gap-3 pt-3 text-sm pointer-coarse:min-h-11";
+export const paginationFooterClass = "mt-auto flex min-h-8 flex-wrap items-center gap-3 pt-3 text-sm touch:min-h-11";
 
 // Text cut short in a table cell (truncate, line-clamp) has a cap, so a long value can't widen the table past its box.
 // The cap is the laptop width it always had (max-w-52 = 13rem, and so on) and grows with the table's box once that is

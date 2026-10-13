@@ -52,13 +52,13 @@ const COLUMNS: Column<WorkReportRow>[] = [
   {
     header: "Work",
     render: (work) => (
-      <Link href={`/works/${work.id}`} className="font-medium whitespace-nowrap text-link hover:text-link-hover hover:underline">
+      <Link href={`/works/${work.id}`} className="font-medium whitespace-nowrap text-link hover:text-link-hover hover:underline touch:tap-area">
         Work #{work.id}
       </Link>
     ),
   },
-  { header: "Customer", render: (work) => <span className="block max-w-[max(12rem,13cqw)] truncate font-medium">{work.customer_name}</span> },
-  { header: "Stage", render: (work) => <StageChip stage={work.stage} /> },
+  { header: "Customer", render: (work) => <span className="block max-w-[max(12rem,13cqw)] truncate font-medium">{work.customer_name}</span>, wide: true },
+  { header: "Stage", render: (work) => <StageChip stage={work.stage} />, wide: true },
   { header: "Assigned to", render: (work) => work.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>, className: "whitespace-nowrap" },
   { header: "Plan", render: (work) => work.plan_name, className: "whitespace-nowrap" },
   { header: "Confirmed amount", render: (work) => formatMoney(work.amount), className: "text-right whitespace-nowrap tabular-nums" },
