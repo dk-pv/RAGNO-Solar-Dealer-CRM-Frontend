@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { initials } from "@/components/layout/navbar";
-import type { Assignee, Page } from "@/components/leads/api";
+import { formatDateTime, type Assignee, type Page } from "@/components/leads/api";
 import { ErrorState, StatusBadge, fieldClass, fillClass, paginationFooterClass, secondaryButton } from "@/components/leads/ui";
 import { stageFor } from "@/components/works/api";
 import { ActivityStatusBadge } from "@/components/works/work-activities";
@@ -13,7 +13,6 @@ import {
   dayOf,
   formatDayHeading,
   formatExact,
-  formatShortDateTime,
   formatTime,
   shiftDay,
   type LatestActivity,
@@ -277,7 +276,7 @@ export function LatestActivityLine({ latest }: { latest: LatestActivity }) {
       Latest activity:{" "}
       {latest ? (
         <span className="text-secondary-foreground">
-          {latest.type_display} · <time dateTime={latest.at} title={formatExact(latest.at)}>{formatShortDateTime(latest.at)}</time>
+          {latest.type_display} · <time dateTime={latest.at} title={formatExact(latest.at)}>{formatDateTime(latest.at)}</time>
         </span>
       ) : (
         <span className="italic">No activity yet</span>

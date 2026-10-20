@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useContext, useId, useRef, useState, type ChangeEvent } from "react";
 
+import { AssigneeNames } from "@/components/assignee-picker";
 import { CompleteActivityDialog } from "@/components/complete-activity-dialog";
 import { EyeIcon, MoreIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/layout/icons";
-import { initials } from "@/components/layout/navbar";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { ActionDialog } from "@/components/selection";
 import { ColumnsButton, DEFAULT_PAGE_SIZE, EmptyState, ListShell, SkeletonRows, useColumns, type Columns } from "@/components/table";
@@ -18,6 +18,7 @@ import {
   formatDate,
   formatPhone,
   isOverdue,
+  NO_DUE_DATE,
   withRow,
   type Activity,
   type Assignee,
@@ -27,7 +28,9 @@ import { FollowUpDialog } from "./follow-ups";
 import { menuItemClass, placeMenu } from "./lead-actions";
 import { FilterToggle, SearchBox, SortSelect, StatusTabs, pickParams, updateQuery } from "./leads-toolbar";
 import {
+  CompletedAt,
   FollowUpBadge,
+  Moment,
   PageHeader,
   fillClass,
   iconButton,
@@ -322,19 +325,7 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
       {shows("type") && <td data-label="Type" className="min-w-28 px-3 py-2.5">{activity.type_display}</td>}
       {shows("assigned") && (
         <td data-label="Assigned staff" className="px-3 py-2.5 whitespace-nowrap">
-          {activity.assigned_to_name ? (
-            <span className="flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="grid size-6 shrink-0 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border touch:text-xs"
-              >
-                {initials(activity.assigned_to_name)}
-              </span>
-              <span className="max-w-[max(12rem,13cqw)] truncate">{activity.assigned_to_name}</span>
-            </span>
-          ) : (
-            <span className="text-muted-foreground">Not assigned</span>
-          )}
+          <AssigneeNames people={activity.assignees} empty="Not assigned" />
         </td>
       )}
       {shows("due") && (
@@ -345,18 +336,19 @@ function FollowUpRow({ activity, shows, onComplete, onEdit, onDelete }: FollowUp
               {overdue && <span className="block text-xs text-error">Overdue</span>}
             </>
           ) : (
-            <span className="text-muted-foreground">—</span>
+            <span className="text-muted-foreground">{NO_DUE_DATE}</span>
           )}
         </td>
       )}
       {shows("status") && (
         <td data-label="Status" className="px-3 py-2.5">
           <FollowUpBadge status={activity.status} />
+          <CompletedAt activity={activity} />
         </td>
       )}
       {shows("created") && (
-        <td data-label="Created" className="px-3 py-2.5 whitespace-nowrap">
-          {formatDate(activity.created_at)}
+        <td data-label="Created" className="px-3 py-2.5">
+          <Moment value={activity.created_at} />
           {activity.created_by_name && (
             <span className="block max-w-[max(12rem,13cqw)] truncate text-xs text-muted-foreground">{activity.created_by_name}</span>
           )}

@@ -587,7 +587,7 @@ function PipelineCard(props: PipelineCardProps) {
       )}
 
       <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-muted-foreground">
-        <CardAssignee name={lead.assigned_to_name} />
+        <CardAssignee name={lead.assignees[0]?.name ?? null} others={lead.assignees.slice(1).map((person) => person.name)} />
         <span className={`flex shrink-0 items-center gap-1 ${overdue ? "font-medium text-error" : ""}`}>
           <CalendarIcon className="size-3.5" />
           {lead.next_follow_up

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useContext, useState } from "react";
 
+import { AssigneeNames } from "@/components/assignee-picker";
 import { ChevronLeftIcon, ConvertIcon, DownloadIcon, FlagIcon, PinIcon, SpinnerIcon, TrashIcon } from "@/components/layout/icons";
-import { initials } from "@/components/layout/navbar";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import {
   ActionDialog,
@@ -47,6 +47,7 @@ const QUERY_KEYS = [...VIEW_KEYS, "page", "page_size"];
 const COLUMNS = [
   { key: "phone", label: "Phone" },
   { key: "location", label: "Location" },
+  { key: "dealer", label: "Dealer" },
   { key: "plan", label: "Plan" },
   { key: "amount", label: "Amount" },
   { key: "status", label: "Status" },
@@ -231,7 +232,7 @@ export function LeadsPage() {
           aria-busy={loading}
           // With columns hidden the table is as wide as what's left needs, no wider. On a phone it is a stack of cards (data-stack).
           data-stack
-          className={`w-full text-sm transition-opacity ${columns.hiddenCount > 0 ? "min-w-max" : "min-w-280"} ${loading && loaded ? "opacity-60" : ""}`}
+          className={`w-full text-sm transition-opacity ${columns.hiddenCount > 0 ? "min-w-max" : "min-w-300"} ${loading && loaded ? "opacity-60" : ""}`}
         >
           <caption className="sr-only">Leads</caption>
           <thead>
@@ -254,6 +255,7 @@ export function LeadsPage() {
               </th>
               {shows("phone") && <th scope="col" className="px-3 py-2.5">Phone</th>}
               {shows("location") && <th scope="col" className="px-3 py-2.5">Location</th>}
+              {shows("dealer") && <th scope="col" className="px-3 py-2.5">Dealer</th>}
               {shows("plan") && <th scope="col" className="px-3 py-2.5">Plan</th>}
               {shows("amount") && <th scope="col" className="px-3 py-2.5 text-right">Amount</th>}
               {shows("status") && <th scope="col" className="px-3 py-2.5">Status</th>}
@@ -345,6 +347,11 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
           <span className="block max-w-[max(12rem,13cqw)] truncate">{location || "—"}</span>
         </td>
       )}
+      {shows("dealer") && (
+        <td data-label="Dealer" className="px-3 py-2">
+          <span className="block max-w-[max(10rem,11cqw)] truncate">{lead.dealer_name || "—"}</span>
+        </td>
+      )}
       {shows("plan") && <td data-label="Plan" className="px-3 py-2 whitespace-nowrap">{lead.plan_name ?? "—"}</td>}
       {shows("amount") && <td data-label="Amount" className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatMoney(lead.amount)}</td>}
       {shows("status") && (
@@ -354,19 +361,7 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
       )}
       {shows("assigned") && (
         <td data-label="Assigned" className="px-3 py-2 whitespace-nowrap">
-          {lead.assigned_to_name ? (
-            <span className="flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="grid size-6 shrink-0 place-items-center rounded-full bg-background text-[0.625rem] font-semibold ring-1 ring-border touch:text-xs"
-              >
-                {initials(lead.assigned_to_name)}
-              </span>
-              <span className="max-w-[max(12rem,13cqw)] truncate">{lead.assigned_to_name}</span>
-            </span>
-          ) : (
-            <span className="text-muted-foreground">Unassigned</span>
-          )}
+          <AssigneeNames people={lead.assignees} />
         </td>
       )}
       {shows("created") && <td data-label="Created" className="px-3 py-2 whitespace-nowrap">{formatDate(lead.created_at)}</td>}

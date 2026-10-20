@@ -1,5 +1,5 @@
-import { apiRequest, apiUpload } from "@/lib/api";
-import type { ActivityType } from "@/components/leads/api";
+import { ApiError, apiRequest, apiUpload } from "@/lib/api";
+import type { ActivityType, Assignee } from "@/components/leads/api";
 
 // The Work Pipeline, in order. Values and labels must match the backend's WorkStage choices.
 // The classes use the stage colour tokens in globals.css: a dot, and the column header's background and text.
@@ -146,9 +146,11 @@ export type WorkActivity = {
   type: ActivityType;
   type_display: string;
   description: string;
+  assignees: Assignee[]; // everyone it is assigned to, by name (none: unassigned)
+  // Deprecated, for older screens: the first assignee's id, and every assignee's name joined by commas.
   assigned_to: number | null;
   assigned_to_name: string | null;
-  due_date: string | null; // YYYY-MM-DD
+  due_date: string | null; // YYYY-MM-DD: a day, with no time of day
   status: ActivityStatus;
   completed_at: string | null;
   completed_by_name: string | null;
@@ -162,7 +164,8 @@ export type WorkActivity = {
   can_update_status: boolean;
 };
 
-export type WorkActivityInput = Pick<WorkActivity, "type" | "description" | "assigned_to" | "due_date" | "status">;
+// `assignee_ids` replaces who the activity is assigned to ([] for no one).
+export type WorkActivityInput = Pick<WorkActivity, "type" | "description" | "due_date" | "status"> & { assignee_ids: number[] };
 
 export function updateWork(id: number, changes: WorkChanges) {
   return apiRequest<Work>(`/works/${id}/`, { method: "PATCH", json: changes });
@@ -178,6 +181,13 @@ export function bulkChangeWorkStage(ids: number[], stage: WorkStage) {
 
 export function bulkDeleteWorks(ids: number[]) {
   return apiRequest<BulkResult>("/works/bulk-delete/", { method: "POST", json: { ids } });
+}
+
+// Admins only: one Work, from its row's menu, through the bulk endpoint, so the same rules apply as for several (its
+// activities and documents go with it, their files once that commits, and its lead stays Won). A refusal is thrown.
+export async function deleteWork(id: number) {
+  const { failed } = await bulkDeleteWorks([id]);
+  if (failed.length > 0) throw new ApiError(failed[0].reason, 409);
 }
 
 // Completing records when and by whom on the server; setting it back to Pending clears that.

@@ -10,8 +10,10 @@ import {
   FollowUpFields,
   FormDialog,
   StartsPending,
+  defaultFollowUpAssignees,
   emptyFollowUp,
   followUpDraft,
+  followUpField,
   toFollowUpInput,
   validateFollowUp,
   type FollowUpDraft,
@@ -19,7 +21,7 @@ import {
 } from "./lead-dialogs";
 import { inputClass } from "./ui";
 
-type LeadChoice = Pick<Lead, "id" | "name" | "assigned_to">;
+type LeadChoice = Pick<Lead, "id" | "name" | "assignees">;
 
 type LeadPickerProps = {
   id: string;
@@ -191,21 +193,14 @@ export function FollowUpDialog({ activity, lead: fixedLead, onClose, onSaved, on
   const assignees = useApi<Assignee[]>("/leads/assignees/");
   const [lead, setLead] = useState<LeadChoice | undefined>(fixedLead);
   const [values, setValues] = useState<FollowUpDraft>(() => (activity ? followUpDraft(activity) : emptyFollowUp()));
+  // Who does it: an edited one keeps its people until changed; a new one goes to the lead's staff until someone is
+  // chosen for it (defaultFollowUpAssignees).
+  const [people, setPeople] = useState<Assignee[] | undefined>(activity?.assignees);
   const [errors, setErrors] = useState<FollowUpErrors & { lead?: string }>({});
   const [formError, setFormError] = useState<string>();
   const [pending, setPending] = useState(false);
 
-  const options = assignees.data ?? [];
-  // A new one starts with the lead's staff, when they can be chosen (an admin can't pick a deactivated user); staff can
-  // assign a follow-up only to themselves, so their one choice is made for them.
-  const leadStaff = options.some((person) => person.id === lead?.assigned_to) ? String(lead?.assigned_to) : "";
-  const draft = {
-    ...values,
-    assigned_to: values.assigned_to || leadStaff || (options.length === 1 ? String(options[0].id) : ""),
-  };
-  // Whoever it's assigned to stays a choice when editing, even if this user couldn't pick them.
-  const keepAssignee =
-    activity?.assigned_to ? { id: activity.assigned_to, name: activity.assigned_to_name ?? `User #${activity.assigned_to}` } : undefined;
+  const draft = { ...values, assignees: people ?? defaultFollowUpAssignees(lead?.assignees ?? [], assignees.data) };
 
   function chooseLead(choice?: LeadChoice) {
     setLead(choice);
@@ -242,8 +237,8 @@ export function FollowUpDialog({ activity, lead: fixedLead, onClose, onSaved, on
       const fieldErrors: FollowUpErrors & { lead?: string } = {};
       const others: string[] = [];
       for (const [field, text] of Object.entries(apiError.fields)) {
-        if (field === "lead" || FOLLOW_UP_FIELDS.includes(field as keyof FollowUpDraft))
-          fieldErrors[field as keyof typeof fieldErrors] = text;
+        const shown = field === "lead" ? "lead" : followUpField(field);
+        if (shown) fieldErrors[shown] = text;
         // Messages for fields this form doesn't show are added to the summary, so none are lost.
         else others.push(text);
       }
@@ -287,12 +282,12 @@ export function FollowUpDialog({ activity, lead: fixedLead, onClose, onSaved, on
           values={draft}
           errors={errors}
           onChange={(field, value) => {
-            setValues((current) => ({ ...current, [field]: value }));
+            if (field === "assignees") setPeople(value as Assignee[]);
+            else setValues((current) => ({ ...current, [field]: value }));
             setErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
           }}
           assignees={assignees.data}
           assigneesError={assignees.error?.message}
-          keepAssignee={keepAssignee}
         />
         {!activity && <StartsPending />}
       </div>

@@ -296,17 +296,24 @@ export const boardCardClass =
   "group relative rounded-md border border-border bg-background p-3 text-sm shadow-xs transition-[opacity,border-color] hover:border-border-strong";
 
 // Who the card's record is assigned to, at the foot of the card.
-export function CardAssignee({ name }: { name: string | null }) {
+// A card's assignee, or for a lead with several, the first and how many more (all of them in the title).
+export function CardAssignee({ name, others = [] }: { name: string | null; others?: string[] }) {
   if (!name) return <span>Unassigned</span>;
   return (
-    <span className="flex min-w-0 items-center gap-1.5">
+    <span className="flex min-w-0 items-center gap-1.5" title={others.length > 0 ? [name, ...others].join(", ") : undefined}>
       <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-muted text-[0.625rem] font-semibold text-secondary-foreground touch:size-6 touch:text-xs">
         {initials(name)}
       </span>
       <span className="truncate">
         <span className="sr-only">Assigned to </span>
         {name}
+        {others.length > 0 && <span className="sr-only">, {others.join(", ")}</span>}
       </span>
+      {others.length > 0 && (
+        <span aria-hidden="true" className="shrink-0 text-muted-foreground">
+          +{others.length}
+        </span>
+      )}
     </span>
   );
 }

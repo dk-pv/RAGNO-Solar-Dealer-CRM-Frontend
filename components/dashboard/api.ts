@@ -93,14 +93,12 @@ export type TimelineEvent = {
 const ZONE = "Asia/Kolkata";
 const timeFormat = new Intl.DateTimeFormat("en-IN", { timeStyle: "short", timeZone: ZONE });
 const exactFormat = new Intl.DateTimeFormat("en-IN", { dateStyle: "full", timeStyle: "medium", timeZone: ZONE });
-const shortDateTime = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: ZONE });
 const dayKeyFormat = new Intl.DateTimeFormat("en-CA", { timeZone: ZONE });
 const dayHeading = new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "short", year: "numeric", timeZone: ZONE });
 
 export const formatTime = (value: string) => timeFormat.format(new Date(value));
 // The full moment, seconds included, for a title or screen readers.
 export const formatExact = (value: string) => exactFormat.format(new Date(value));
-export const formatShortDateTime = (value: string) => shortDateTime.format(new Date(value));
 // YYYY-MM-DD of a moment in the CRM's time zone.
 export const dayOf = (value: Date | string) => dayKeyFormat.format(typeof value === "string" ? new Date(value) : value);
 export const formatDayHeading = (day: string) => dayHeading.format(new Date(`${day}T12:00:00+05:30`));

@@ -12,6 +12,7 @@ import {
   type RefObject,
 } from "react";
 
+import { AssigneePicker } from "@/components/assignee-picker";
 import { CloseIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { toApiError, useApi } from "@/lib/api";
@@ -155,14 +156,15 @@ type FormValues = {
   district: string;
   area: string;
   pin_code: string;
+  dealer_name: string;
   plan: string;
   amount: string;
   source: string;
-  assigned_to: string;
   next_follow_up: string;
   notes: string;
 };
-type FieldName = keyof FormValues;
+// "assignees": the assigned staff, chosen with the AssigneePicker (its search box is named "assignees").
+type FieldName = keyof FormValues | "assignees";
 type FieldErrors = Partial<Record<FieldName, string>>;
 
 // Form order, used to focus the first field with an error.
@@ -171,6 +173,7 @@ const FIELD_ORDER: FieldName[] = [
   "country_code",
   "phone",
   "email",
+  "dealer_name",
   "state",
   "district",
   "area",
@@ -178,10 +181,13 @@ const FIELD_ORDER: FieldName[] = [
   "plan",
   "amount",
   "source",
-  "assigned_to",
+  "assignees",
   "next_follow_up",
   "notes",
 ];
+
+// The API names the assignees assignee_ids (or, for older clients, assigned_to); the forms show them as "assignees".
+const formField = (field: string) => (field === "assignee_ids" || field === "assigned_to" ? "assignees" : field);
 
 const plainAmount = (value: string | null) => (value === null || value === "" ? "" : String(Number(value)));
 const sameAmount = (typed: string, price: string) => typed !== "" && Number(typed) === Number(price);
@@ -198,16 +204,18 @@ function initialValues(lead: Lead | null): FormValues {
     district: lead?.district ?? "",
     area: lead?.area ?? "",
     pin_code: lead?.pin_code ?? "",
+    dealer_name: lead?.dealer_name ?? "",
     plan: lead?.plan ? String(lead.plan) : "",
     amount: plainAmount(lead?.amount ?? null),
     source: lead?.source ?? "",
-    assigned_to: lead?.assigned_to ? String(lead.assigned_to) : "",
     next_follow_up: lead?.next_follow_up ?? "",
     notes: lead?.notes ?? "",
   };
 }
 
 // Quick checks so people get a helpful message before saving. The API validates everything again and has the final say.
+// Only the name and the phone number are required; the plan and amount are optional (a plan without an amount gets the
+// plan's current price from the API).
 function validate(values: FormValues) {
   const errors: FieldErrors = {};
   const phone = nationalNumber(values.phone);
@@ -218,15 +226,14 @@ function validate(values: FormValues) {
   else if (phone.length < 6 || phone.length > 14) errors.phone = "Enter a phone number of 6 to 14 digits.";
   if (values.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim()))
     errors.email = "Enter a valid email address.";
-  if (!values.district.trim()) errors.district = "Enter the district.";
   if (values.pin_code.trim() && !/^[1-9]\d{5}$/.test(values.pin_code.trim())) errors.pin_code = "Enter a 6-digit PIN code.";
-  if (!values.plan) errors.plan = "Choose a plan.";
-  if (!values.amount) errors.amount = "Enter the amount.";
-  else if (!/^\d{1,10}(\.\d{1,2})?$/.test(values.amount)) errors.amount = "Enter the amount in rupees, using digits only.";
+  if (values.amount && !/^\d{1,10}(\.\d{1,2})?$/.test(values.amount))
+    errors.amount = "Enter the amount in rupees, using digits only.";
   return errors;
 }
 
-function toInput(values: FormValues): LeadInput {
+// `assignees` is sent only by someone who may assign the lead (an admin): the API keeps a staff member's lead theirs.
+function toInput(values: FormValues, assignees?: Assignee[]): LeadInput {
   return {
     name: values.name.trim(),
     country_code: values.country_code,
@@ -236,10 +243,11 @@ function toInput(values: FormValues): LeadInput {
     district: values.district.trim(),
     area: values.area.trim(),
     pin_code: values.pin_code.trim(),
+    dealer_name: values.dealer_name.trim(),
     plan: values.plan ? Number(values.plan) : null,
     amount: values.amount || null,
     source: values.source as LeadSource | "",
-    assigned_to: values.assigned_to ? Number(values.assigned_to) : null,
+    ...(assignees && { assignee_ids: assignees.map((person) => person.id) }),
     next_follow_up: values.next_follow_up || null,
     notes: values.notes.trim(),
   };
@@ -281,14 +289,17 @@ export function Field({ label, id, error, required, hint, wide, children }: Fiel
 }
 
 // A follow-up being added or edited, as the form holds it.
-export type FollowUpDraft = { title: string; type: ActivityType; assigned_to: string; due_date: string; description: string };
+export type FollowUpDraft = { title: string; type: ActivityType; assignees: Assignee[]; due_date: string; description: string };
 export type FollowUpErrors = Partial<Record<keyof FollowUpDraft, string>>;
-export const FOLLOW_UP_FIELDS: (keyof FollowUpDraft)[] = ["title", "type", "assigned_to", "due_date", "description"];
+export const FOLLOW_UP_FIELDS: (keyof FollowUpDraft)[] = ["title", "type", "assignees", "due_date", "description"];
+// The field of a follow-up form an API message is about ("assignee_ids" is the form's "assignees"), if it shows it.
+export const followUpField = (field: string) =>
+  FOLLOW_UP_FIELDS.find((name) => name === formField(field.replace(/^initial_follow_up\./, "")));
 
-export const emptyFollowUp = (assignedTo = ""): FollowUpDraft => ({
+export const emptyFollowUp = (): FollowUpDraft => ({
   title: "",
   type: "PHONE_CALL",
-  assigned_to: assignedTo,
+  assignees: [],
   due_date: "",
   description: "",
 });
@@ -296,7 +307,7 @@ export const emptyFollowUp = (assignedTo = ""): FollowUpDraft => ({
 export const followUpDraft = (activity: Activity): FollowUpDraft => ({
   title: activity.title,
   type: activity.type,
-  assigned_to: activity.assigned_to ? String(activity.assigned_to) : "",
+  assignees: activity.assignees,
   due_date: activity.due_date ?? "",
   description: activity.description,
 });
@@ -305,7 +316,7 @@ export const followUpDraft = (activity: Activity): FollowUpDraft => ({
 export function validateFollowUp(draft: FollowUpDraft) {
   const errors: FollowUpErrors = {};
   if (!draft.title.trim()) errors.title = "Enter a heading.";
-  if (!draft.assigned_to) errors.assigned_to = "Choose who does the follow-up.";
+  if (draft.assignees.length === 0) errors.assignees = "Choose at least one person to do the follow-up.";
   if (!draft.due_date) errors.due_date = "Choose the due date.";
   return errors;
 }
@@ -313,25 +324,32 @@ export function validateFollowUp(draft: FollowUpDraft) {
 export const toFollowUpInput = (draft: FollowUpDraft): ActivityInput => ({
   title: draft.title.trim(),
   type: draft.type,
-  assigned_to: Number(draft.assigned_to),
+  assignee_ids: draft.assignees.map((person) => person.id),
   due_date: draft.due_date,
   description: draft.description.trim(),
 });
+
+// Who a new follow-up goes to until someone is chosen for it: the lead's own staff who can be chosen (an admin can't
+// pick a deactivated user); staff assign a follow-up only to themselves, so their one choice is made for them.
+export function defaultFollowUpAssignees(leadAssignees: Assignee[], options: Assignee[] = []) {
+  const fromLead = leadAssignees.filter((person) => options.some((option) => option.id === person.id));
+  return fromLead.length > 0 ? fromLead : options.length === 1 ? options : [];
+}
 
 type FollowUpFieldsProps = {
   idPrefix: string;
   values: FollowUpDraft;
   errors: FollowUpErrors;
-  onChange: (field: keyof FollowUpDraft, value: string) => void;
+  onChange: <K extends keyof FollowUpDraft>(field: K, value: FollowUpDraft[K]) => void;
   assignees?: Assignee[]; // whom this user may assign: anyone active for an admin, only themselves for staff
   assigneesError?: string;
-  keepAssignee?: Assignee; // the current staff member when they aren't one of those (staff editing an admin's choice)
 };
 
-// A follow-up's heading, type, assigned staff, due date and notes. Its status isn't here: a new one starts Pending.
-export function FollowUpFields({ idPrefix, values, errors, onChange, assignees, assigneesError, keepAssignee }: FollowUpFieldsProps) {
+// A follow-up's heading, type, assigned staff (one or several), due date and notes. Its status isn't here: a new one
+// starts Pending. Someone already assigned who can't be chosen now (deactivated) stays until removed.
+export function FollowUpFields({ idPrefix, values, errors, onChange, assignees, assigneesError }: FollowUpFieldsProps) {
   const id = (field: keyof FollowUpDraft) => `${idPrefix}-${field}`;
-  const bind = (field: keyof FollowUpDraft) => ({
+  const bind = (field: Exclude<keyof FollowUpDraft, "assignees">) => ({
     id: id(field),
     name: `follow_up_${field}`,
     value: values[field],
@@ -342,10 +360,6 @@ export function FollowUpFields({ idPrefix, values, errors, onChange, assignees, 
     "aria-describedby": errors[field] ? `${id(field)}-error` : undefined,
     className: inputClass,
   });
-  const people = [
-    ...(assignees ?? []),
-    ...(keepAssignee && !assignees?.some((person) => person.id === keepAssignee.id) ? [keepAssignee] : []),
-  ];
 
   return (
     <>
@@ -361,24 +375,27 @@ export function FollowUpFields({ idPrefix, values, errors, onChange, assignees, 
           ))}
         </select>
       </Field>
-      <Field
-        label="Assigned staff"
-        id={id("assigned_to")}
-        required
-        error={errors.assigned_to}
-        hint={assigneesError ? `Staff couldn't be loaded: ${assigneesError}` : undefined}
-      >
-        <select {...bind("assigned_to")}>
-          <option value="">{assignees ? "Choose staff" : assigneesError ? "Staff unavailable" : "Loading staff…"}</option>
-          {people.map((person) => (
-            <option key={person.id} value={person.id}>
-              {person.name}
-            </option>
-          ))}
-        </select>
-      </Field>
       <Field label="Due date" id={id("due_date")} required error={errors.due_date}>
         <input {...bind("due_date")} type="date" />
+      </Field>
+      <Field
+        label="Assigned staff"
+        id={id("assignees")}
+        required
+        error={errors.assignees}
+        hint={assigneesError ? `Staff couldn't be loaded: ${assigneesError}` : "One or more people."}
+        wide
+      >
+        <AssigneePicker
+          id={id("assignees")}
+          name="follow_up_assignees"
+          value={values.assignees}
+          onChange={(people) => onChange("assignees", people)}
+          options={assignees}
+          optionsError={assigneesError}
+          invalid={Boolean(errors.assignees)}
+          describedBy={errors.assignees ? `${id("assignees")}-error` : undefined}
+        />
       </Field>
       <Field label="Notes" id={id("description")} error={errors.description} wide>
         <textarea {...bind("description")} rows={3} className={`${fieldClass} w-full py-2`} />
@@ -410,15 +427,20 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
   const plans = useApi<Plan[]>("/plans/");
   const assignees = useApi<Assignee[]>("/leads/assignees/");
   // Only admins assign leads; a lead staff add is assigned to them by the API.
-  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
-  const canAssign = lead ? lead.can_assign : isAdmin;
+  const me = useContext(CurrentUserContext);
+  const canAssign = lead ? lead.can_assign : me?.role === "ADMIN";
   const [values, setValues] = useState(() => initialValues(lead));
+  const [assigned, setAssigned] = useState<Assignee[]>(
+    () => lead?.assignees ?? (canAssign || !me ? [] : [{ id: me.id, name: me.name }]),
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string>();
   const [saving, setSaving] = useState(false);
-  // Add Lead only: the lead's first follow-up, saved with it by the API (both or neither).
+  // Add Lead only: the lead's first follow-up, saved with it by the API (both or neither). Its staff follow the lead's
+  // until someone is chosen for it (followUpPeople).
   const [addFollowUp, setAddFollowUp] = useState(false);
   const [followUp, setFollowUp] = useState(() => emptyFollowUp());
+  const [followUpPeople, setFollowUpPeople] = useState<Assignee[]>();
   const [followUpErrors, setFollowUpErrors] = useState<FollowUpErrors>({});
 
   useEffect(() => {
@@ -435,13 +457,8 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
   const selectedPlan = plans.data?.find((plan) => String(plan.id) === values.plan);
   // Inactive plans can't be chosen for new leads, but stay visible on a lead that already has one.
   const planOptions = plans.data?.filter((plan) => plan.is_active || String(plan.id) === values.plan) ?? [];
-  const assigneeOptions = assignees.data ?? [];
-  const keepAssignee =
-    lead?.assigned_to && !assigneeOptions.some((person) => person.id === lead.assigned_to)
-      ? { id: lead.assigned_to, name: lead.assigned_to_name ?? `User #${lead.assigned_to}` }
-      : undefined;
 
-  function bind(field: FieldName) {
+  function bind(field: keyof FormValues) {
     return {
       id: fieldId(field),
       name: field,
@@ -470,15 +487,7 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
     setErrors((current) => ({ ...current, plan: undefined, amount: next && amountFollowsPlan ? undefined : current.amount }));
   }
 
-  // It goes to the lead's assigned staff until someone is chosen for it; staff can assign a follow-up only to
-  // themselves, so their one choice is made for them.
-  const followUpValues = {
-    ...followUp,
-    assigned_to:
-      followUp.assigned_to ||
-      values.assigned_to ||
-      (assigneeOptions.length === 1 ? String(assigneeOptions[0].id) : ""),
-  };
+  const followUpValues = { ...followUp, assignees: followUpPeople ?? defaultFollowUpAssignees(assigned, assignees.data) };
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -498,7 +507,7 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
 
     setSaving(true);
     try {
-      const input = toInput(values);
+      const input = toInput(values, canAssign ? assigned : undefined);
       if (!lead && addFollowUp) input.initial_follow_up = toFollowUpInput(followUpValues);
       onSaved(await saveLead(input, lead?.id));
       dialogRef.current?.close();
@@ -514,10 +523,9 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
       const followUpFields: FollowUpErrors = {};
       const others: string[] = [];
       for (const [field, text] of Object.entries(apiError.fields)) {
-        const followUpField = field.replace(/^initial_follow_up\./, "") as keyof FollowUpDraft;
-        if (field in values) leadFields[field as FieldName] = text;
-        else if (field.startsWith("initial_follow_up.") && FOLLOW_UP_FIELDS.includes(followUpField))
-          followUpFields[followUpField] = text;
+        const ofFollowUp = field.startsWith("initial_follow_up.") ? followUpField(field) : undefined;
+        if (FIELD_ORDER.includes(formField(field) as FieldName)) leadFields[formField(field) as FieldName] = text;
+        else if (ofFollowUp) followUpFields[ofFollowUp] = text;
         // Messages for fields this form doesn't show are added to the summary, so none are lost.
         else others.push(text);
       }
@@ -611,14 +619,17 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
             <Field label="Email" id={fieldId("email")} error={errors.email}>
               <input {...bind("email")} type="email" autoComplete="off" />
             </Field>
+            <Field label="Dealer name" id={fieldId("dealer_name")} error={errors.dealer_name}>
+              <input {...bind("dealer_name")} maxLength={150} autoComplete="off" />
+            </Field>
           </Section>
 
           <Section title="Location">
             <Field label="State" id={fieldId("state")} error={errors.state}>
               <input {...bind("state")} autoComplete="off" />
             </Field>
-            <Field label="District" id={fieldId("district")} required error={errors.district}>
-              <input {...bind("district")} required autoComplete="off" />
+            <Field label="District" id={fieldId("district")} error={errors.district}>
+              <input {...bind("district")} autoComplete="off" />
             </Field>
             <Field label="Area / locality" id={fieldId("area")} error={errors.area}>
               <input {...bind("area")} autoComplete="off" />
@@ -632,12 +643,11 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
             <Field
               label="Plan"
               id={fieldId("plan")}
-              required
               error={errors.plan}
-              hint={plans.error && `Plans couldn't be loaded: ${plans.error.message}`}
+              hint={plans.error ? `Plans couldn't be loaded: ${plans.error.message}` : "Needed before the lead is converted to a Work."}
             >
-              <select {...bind("plan")} onChange={changePlan} required disabled={!plans.data}>
-                <option value="">{plans.data ? "Choose a plan" : plans.error ? "Plans unavailable" : "Loading plans…"}</option>
+              <select {...bind("plan")} onChange={changePlan} disabled={!plans.data}>
+                <option value="">{plans.data ? "No plan yet" : plans.error ? "Plans unavailable" : "Loading plans…"}</option>
                 {planOptions.map((plan) => (
                   <option key={plan.id} value={plan.id}>
                     {plan.name} · {formatMoney(plan.amount)}
@@ -650,7 +660,6 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
             <Field
               label="Amount"
               id={fieldId("amount")}
-              required
               error={errors.amount}
               hint={
                 selectedPlan && !sameAmount(values.amount, selectedPlan.amount) ? (
@@ -665,7 +674,7 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
                     </button>
                   </>
                 ) : (
-                  !selectedPlan && "Choosing a plan fills in its current price."
+                  !selectedPlan && "Optional. Choosing a plan fills in its current price."
                 )
               }
             >
@@ -675,7 +684,6 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
                 </span>
                 <input
                   {...bind("amount")}
-                  required
                   inputMode="decimal"
                   autoComplete="off"
                   className={`${inputClass} pl-7 tabular-nums`}
@@ -695,27 +703,36 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
                 ))}
               </select>
             </Field>
+            <Field label="Next follow-up" id={fieldId("next_follow_up")} error={errors.next_follow_up}>
+              <input {...bind("next_follow_up")} type="date" />
+            </Field>
             <Field
               label="Assigned staff"
-              id={fieldId("assigned_to")}
-              error={errors.assigned_to}
+              id={fieldId("assignees")}
+              error={errors.assignees}
               hint={
                 assignees.error
                   ? `Staff couldn't be loaded: ${assignees.error.message}`
-                  : !canAssign && "Only an admin can change who a lead is assigned to."
+                  : canAssign
+                    ? "One or more people, or no one yet."
+                    : "Only an admin can change who a lead is assigned to."
               }
+              wide
             >
-              <select {...bind("assigned_to")} disabled={!canAssign}>
-                <option value="">{canAssign ? "Unassigned" : "You"}</option>
-                {[...assigneeOptions, ...(keepAssignee ? [keepAssignee] : [])].map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Next follow-up" id={fieldId("next_follow_up")} error={errors.next_follow_up}>
-              <input {...bind("next_follow_up")} type="date" />
+              <AssigneePicker
+                id={fieldId("assignees")}
+                name="assignees"
+                value={assigned}
+                onChange={(people) => {
+                  setAssigned(people);
+                  setErrors((current) => (current.assignees ? { ...current, assignees: undefined } : current));
+                }}
+                options={assignees.data}
+                optionsError={assignees.error?.message}
+                disabled={!canAssign}
+                invalid={Boolean(errors.assignees)}
+                describedBy={errors.assignees ? `${fieldId("assignees")}-error` : undefined}
+              />
             </Field>
             <Field label="Notes" id={fieldId("notes")} error={errors.notes} wide>
               <textarea {...bind("notes")} rows={3} className={`${fieldClass} w-full py-2`} />
@@ -742,7 +759,8 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
                     values={followUpValues}
                     errors={followUpErrors}
                     onChange={(field, value) => {
-                      setFollowUp((current) => ({ ...current, [field]: value }));
+                      if (field === "assignees") setFollowUpPeople(value as Assignee[]);
+                      else setFollowUp((current) => ({ ...current, [field]: value }));
                       setFollowUpErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
                     }}
                     assignees={assignees.data}
@@ -896,7 +914,14 @@ export function ConvertDialog({ lead, onClose, onConverted }: ConvertDialogProps
         <dt className="text-muted-foreground">Amount</dt>
         <dd className="tabular-nums">{formatMoney(lead.amount)}</dd>
         <dt className="text-muted-foreground">Assigned</dt>
-        <dd>{lead.assigned_to_name ?? "Unassigned"}</dd>
+        <dd>
+          {lead.assignees[0]?.name ?? "Unassigned"}
+          {lead.assignees.length > 1 && (
+            <span className="block text-xs text-muted-foreground">
+              A Work has one assignee: the lead&apos;s first, by name. It can be changed on the Work.
+            </span>
+          )}
+        </dd>
       </dl>
       {error && (
         <p role="alert" className="mt-4 text-sm text-error">

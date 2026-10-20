@@ -67,7 +67,8 @@ const COLUMNS: Column<ActivityReportRow>[] = [
     ),
   },
   { header: "Customer", render: (activity) => <span className="block max-w-[max(11rem,12cqw)] truncate">{activity.customer_name}</span>, wide: true },
-  { header: "Assigned to", render: (activity) => activity.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>, className: "whitespace-nowrap" },
+  // Every assignee, joined by commas: wraps within the usual cap rather than widening the table.
+  { header: "Assigned to", render: (activity) => <span className="block max-w-[max(12rem,13cqw)]">{activity.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>}</span> },
   {
     header: "Due date",
     render: (activity) => (

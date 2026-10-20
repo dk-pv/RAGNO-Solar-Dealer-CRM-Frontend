@@ -27,6 +27,7 @@ import {
   formatMoney,
   formatPhone,
   isOverdue,
+  NO_DUE_DATE,
   sourceLabel,
   statusBlocker,
   statusLabel,
@@ -34,6 +35,7 @@ import {
   whatsappHref,
   withRow,
   type Activity,
+  type Assignee,
   type Lead,
   type Page,
 } from "./api";
@@ -189,7 +191,8 @@ export function LeadDetail({ id }: { id: number }) {
             title="Lead"
             items={[
               ["Lead source", lead.source ? sourceLabel(lead.source) : "—"],
-              ["Assigned staff", lead.assigned_to_name ?? "Unassigned"],
+              ["Dealer name", lead.dealer_name || "—"],
+              ["Assigned staff", names(lead.assignees) ?? "Unassigned"],
             ]}
           />
           {lead.notes && (
@@ -393,12 +396,12 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
                   </div>
                   <div>
                     <dt className="inline">Assigned: </dt>
-                    <dd className="inline text-foreground">{activity.assigned_to_name ?? "Not assigned"}</dd>
+                    <dd className="inline text-foreground">{names(activity.assignees) ?? "Not assigned"}</dd>
                   </div>
                   <div>
                     <dt className="inline">Due: </dt>
                     <dd className={`inline ${overdue ? "font-medium text-error" : "text-foreground"}`}>
-                      {activity.due_date ? formatDate(activity.due_date) : "No date"}
+                      {activity.due_date ? formatDate(activity.due_date) : NO_DUE_DATE}
                     </dd>
                   </div>
                 </dl>
@@ -415,6 +418,12 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
                     Added {formatDateTime(activity.created_at)}
                     {activity.created_by_name ? ` · ${activity.created_by_name}` : ""}
                   </span>
+                  {activity.completed_at && (
+                    <span>
+                      Completed {formatDateTime(activity.completed_at)}
+                      {activity.completed_by_name ? ` · ${activity.completed_by_name}` : ""}
+                    </span>
+                  )}
                   {activity.status === "PENDING" && activity.can_update_status && (
                     <button
                       type="button"
@@ -543,3 +552,6 @@ function Activities({ activities, lead, onScheduleFollowUp, notify }: Activities
 }
 
 const heading =(activity: Activity) => activity.title || activity.type_display;
+
+// Several people as one line, or null for no one.
+const names = (people: Assignee[]) => people.map((person) => person.name).join(", ") || null;

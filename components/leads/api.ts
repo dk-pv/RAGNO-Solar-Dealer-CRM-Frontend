@@ -46,13 +46,17 @@ export type Lead = {
   district: string;
   area: string;
   pin_code: string;
+  dealer_name: string; // the dealer the enquiry came through ("" if none)
+  // Optional until the customer chooses one; a lead needs a plan and an amount to be converted.
   plan: number | null;
   plan_name: string | null;
-  amount: string | null; // stored on the lead, so later plan price changes never alter it
+  amount: string | null; // stored on the lead, so later plan price changes never alter it; null without a plan or entry
   status: LeadStatus;
   // The statuses the backend lets this user move the lead to, Won included (from Superhot).
   allowed_transitions: LeadStatus[];
   source: LeadSource | "";
+  assignees: Assignee[]; // everyone the lead is assigned to, by name
+  // Deprecated, for older screens: the first assignee's id, and every assignee's name joined by commas.
   assigned_to: number | null;
   assigned_to_name: string | null;
   next_follow_up: string | null; // YYYY-MM-DD
@@ -71,8 +75,10 @@ export type Lead = {
 };
 
 // POST /api/leads/ and PATCH /api/leads/{id}/. The status is never sent: the server starts every lead as New.
-// A new lead can bring its first follow-up (initial_follow_up): the API saves both together, or neither.
-export type LeadInput = { initial_follow_up?: ActivityInput } & Pick<
+// Only the name and phone are required. A plan sent without an amount gets the plan's current price from the API.
+// `assignee_ids` replaces who the lead is assigned to. A new lead can bring its first follow-up (initial_follow_up): the
+// API saves both together, or neither.
+export type LeadInput = { assignee_ids?: number[]; initial_follow_up?: ActivityInput } & Pick<
   Lead,
   | "name"
   | "country_code"
@@ -82,10 +88,10 @@ export type LeadInput = { initial_follow_up?: ActivityInput } & Pick<
   | "district"
   | "area"
   | "pin_code"
+  | "dealer_name"
   | "plan"
   | "amount"
   | "source"
-  | "assigned_to"
   | "next_follow_up"
   | "notes"
 >;
@@ -127,12 +133,16 @@ export type Activity = {
   title: string; // the heading
   type: ActivityType;
   type_display: string;
-  assigned_to: number | null; // the follow-up's own staff, separate from the lead's
+  assignees: Assignee[]; // the follow-up's own staff, separate from the lead's, by name
+  // Deprecated, for older screens: the first assignee's id, and every assignee's name joined by commas.
+  assigned_to: number | null;
   assigned_to_name: string | null;
-  due_date: string | null; // YYYY-MM-DD
+  due_date: string | null; // YYYY-MM-DD: a day, with no time of day
   description: string; // notes
   status: FollowUpStatus; // Completed is final
   completion_note: string; // what was done, as noted when it was marked completed ("" if no note)
+  completed_at: string | null; // the moment it was marked completed
+  completed_by_name: string | null;
   created_by_name: string | null;
   created_at: string;
   updated_at: string;
@@ -146,8 +156,8 @@ export type Activity = {
 
 // The API's refusal when someone else tries to complete an activity; shown as the reason on the disabled control too.
 export const ACTIVITY_NOT_YOURS = "You can only update activities assigned to you.";
-// Adding or editing a follow-up: everything but the status, which the API starts at Pending.
-export type ActivityInput = { title: string; type: ActivityType; assigned_to: number; due_date: string; description: string };
+// Adding or editing a follow-up: everything but the status, which the API starts at Pending. At least one assignee.
+export type ActivityInput = { title: string; type: ActivityType; assignee_ids: number[]; due_date: string; description: string };
 export type Page<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 // The page with the saved version of one of its rows: shows a change at once (useApi's replace) while the page reloads.
@@ -241,6 +251,7 @@ export function convertBlocker(lead: Lead) {
   if (lead.work) return `Already converted to Work #${lead.work}.`;
   if (lead.status === "LOST") return "Lost leads can't be converted.";
   if (lead.status !== "WON") return "Only Won leads can be converted. Move the lead to Won first.";
+  if (lead.plan === null || lead.amount === null) return "Choose the lead's solar plan and amount before converting it.";
   return "You can view this lead but not convert it.";
 }
 
@@ -263,6 +274,9 @@ export function formatMoney(value: string | null) {
   return (Number.isInteger(amount) ? wholeRupees : exactRupees).format(amount);
 }
 
+// Dates and times, the same on every screen. The API sends moments (created, completed) with their offset, so they are
+// shown in the CRM's time zone (Asia/Kolkata) whatever the browser's own; no offset is ever added by hand. A due date is
+// a calendar day (YYYY-MM-DD) with no time of day: it is shown as that day and never given a time.
 const dateFormat = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" });
 // A YYYY-MM-DD value is a calendar date, not a moment, so it is read and shown in UTC to keep the same day.
 const calendarDateFormat = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" });
@@ -279,7 +293,15 @@ export function formatDate(value: string | null) {
     : dateFormat.format(new Date(value));
 }
 
+// A moment, such as "20 Oct 2026, 3:45 pm".
 export const formatDateTime = (value: string) => dateTimeFormat.format(new Date(value));
+
+// A moment's time of day alone, such as "3:45 pm" (see Moment in ui.tsx).
+const timeFormat = new Intl.DateTimeFormat("en-IN", { timeStyle: "short", timeZone: "Asia/Kolkata" });
+export const formatTime = (value: string) => timeFormat.format(new Date(value));
+
+// What a follow-up's due date column shows when it has none.
+export const NO_DUE_DATE = "No due date";
 
 type PhoneFields = Pick<Lead, "country_code" | "phone">;
 const digits = (value: string) => value.replace(/\D/g, "");

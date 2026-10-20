@@ -14,7 +14,7 @@ import {
 } from "@/components/layout/icons";
 import { canOpen } from "@/components/layout/navigation";
 import { CurrentUserContext, type ShellUser } from "@/components/layout/use-shell-session";
-import { formatDate, formatMoney, type Assignee } from "@/components/leads/api";
+import { NO_DUE_DATE, formatDate, formatDateTime, formatMoney, type Assignee } from "@/components/leads/api";
 import { useLeadActions } from "@/components/leads/lead-actions";
 import { ErrorState, StatusBadge, secondaryButton, segmentClass, segmentedClass, useNotice } from "@/components/leads/ui";
 import { stageFor, type StageSummary } from "@/components/works/api";
@@ -25,7 +25,6 @@ import {
   dayOf,
   formatDayHeading,
   formatExact,
-  formatShortDateTime,
   type DashboardSummary,
   type FollowUp,
   type FollowUpBucket,
@@ -407,20 +406,22 @@ function FollowUpItem({ item, today }: { item: FollowUp; today: string }) {
         </p>
         <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
           <span>Assigned: {item.assigned_to_name ?? "Unassigned"}</span>
-          {item.due_date && (
+          {item.due_date ? (
             <span className={overdue ? "font-medium text-error" : undefined}>
               {overdue ? "Was due" : "Due"} {formatDate(item.due_date)}
             </span>
+          ) : (
+            item.status === "PENDING" && <span>{NO_DUE_DATE}</span>
           )}
           {item.created_at && (
             <span title={formatExact(item.created_at)}>
-              Created {formatShortDateTime(item.created_at)}
+              Created {formatDateTime(item.created_at)}
               {item.created_by_name ? ` by ${item.created_by_name}` : ""}
             </span>
           )}
           {item.completed_at && (
             <span title={formatExact(item.completed_at)}>
-              Completed {formatShortDateTime(item.completed_at)}
+              Completed {formatDateTime(item.completed_at)}
               {item.completed_by_name ? ` by ${item.completed_by_name}` : ""}
             </span>
           )}
@@ -720,8 +721,8 @@ function RecordTimes({ assignee, created, updated }: { assignee: string | null; 
   return (
     <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
       <span>Assigned: {assignee ?? "Unassigned"}</span>
-      <span title={formatExact(created)}>Added {formatShortDateTime(created)}</span>
-      <span title={formatExact(updated)}>Updated {formatShortDateTime(updated)}</span>
+      <span title={formatExact(created)}>Added {formatDateTime(created)}</span>
+      <span title={formatExact(updated)}>Updated {formatDateTime(updated)}</span>
     </p>
   );
 }

@@ -78,12 +78,12 @@ export type LeadReportRow = {
   customer_name: string;
   status: LeadStatus;
   status_display: string;
-  assigned_to: number | null;
-  assigned_to_name: string | null;
+  assigned_to: number | null; // the first assignee
+  assigned_to_name: string | null; // every assignee, joined by commas
   source: string;
   source_display: string;
-  plan_name: string;
-  amount: string;
+  plan_name: string | null; // a lead's plan and amount are optional
+  amount: string | null;
   created_at: string;
   updated_at: string;
   latest_activity: LatestActivity;

@@ -3,14 +3,25 @@
 import Link from "next/link";
 import { useContext, useEffect, useId, useRef, useState, type FormEvent } from "react";
 
-import { CloseIcon, FileIcon, MoreIcon, PencilIcon, PhoneIcon, PinIcon, PlusIcon, WhatsAppIcon } from "@/components/layout/icons";
+import {
+  CloseIcon,
+  FileIcon,
+  MoreIcon,
+  PencilIcon,
+  PhoneIcon,
+  PinIcon,
+  PlusIcon,
+  TrashIcon,
+  WhatsAppIcon,
+} from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { formatDate, formatMoney, formatPhone, telHref, whatsappHref, type Assignee } from "@/components/leads/api";
 import { Field, Section, dialogClass } from "@/components/leads/lead-dialogs";
 import { menuItemClass, placeMenu } from "@/components/leads/lead-actions";
 import { Busy, iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
+import { ActionDialog } from "@/components/selection";
 import { toApiError, type ApiError } from "@/lib/api";
-import { WORK_STAGES, today, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
+import { WORK_STAGES, deleteWork, today, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
 import { ActivityDialog } from "./work-activities";
 
 type Notify = (notice: { text: string; error?: boolean }) => void;
@@ -19,11 +30,18 @@ export type WorkActions = ReturnType<typeof useWorkActions>;
 
 export const isOverdue = (work: Work) => work.due_date !== null && work.stage !== "COMPLETED" && work.due_date < today();
 
-// Edit, add a follow-up and pin, with their dialogs: what the board's cards, the list's rows and the Work's page do.
-// Render `dialogs` once on the page; `onChanged` reloads after any change, with the Work before and after it.
-export function useWorkActions(notify: Notify, onChanged: (before: Work, after: Work) => void, assignees: Assignees) {
+// Edit, add a follow-up, pin and delete, with their dialogs: what the board's cards, the list's rows and the Work's page
+// do. Render `dialogs` once on the page; `onChanged` reloads after any change, with the Work before and after it, and
+// `onDeleted` after a deletion (by default as a change to the same Work, which reloads its column or list).
+export function useWorkActions(
+  notify: Notify,
+  onChanged: (before: Work, after: Work) => void,
+  assignees: Assignees,
+  onDeleted: (work: Work) => void = (work) => onChanged(work, work),
+) {
   const [editing, setEditing] = useState<Work>();
   const [adding, setAdding] = useState<Work>();
+  const [deleting, setDeleting] = useState<Work>();
 
   async function togglePin(work: Work) {
     try {
@@ -57,10 +75,36 @@ export function useWorkActions(notify: Notify, onChanged: (before: Work, after: 
           }}
         />
       )}
+      {deleting && (
+        // The API refuses anyone but an admin, as the menu offers it only to them. While it runs the dialog can't be
+        // dismissed or confirmed again.
+        <ActionDialog
+          destructive
+          title={`Delete Work #${deleting.id}?`}
+          description={
+            <>
+              Work #{deleting.id} for <span className="font-semibold text-foreground">{deleting.customer_name}</span> will be
+              removed for good, with
+              {deleting.activity_count > 0 &&
+                ` its ${deleting.activity_count.toLocaleString("en-IN")} ${deleting.activity_count === 1 ? "activity" : "activities"} and`}{" "}
+              any uploaded documents. Lead #{deleting.lead} stays Won and can be converted again.
+            </>
+          }
+          confirmLabel="Delete Work"
+          pendingLabel="Deleting…"
+          onConfirm={async () => {
+            await deleteWork(deleting.id);
+            notify({ text: `Deleted Work #${deleting.id} (${deleting.customer_name}).` });
+            onDeleted(deleting);
+          }}
+          onClose={() => setDeleting(undefined)}
+          onError={(text) => notify({ text: `Couldn't delete Work #${deleting.id}. ${text}`, error: true })}
+        />
+      )}
     </>
   );
 
-  return { dialogs, edit: setEditing, addActivity: setAdding, togglePin };
+  return { dialogs, edit: setEditing, addActivity: setAdding, remove: setDeleting, togglePin };
 }
 
 type WorkPinButtonProps = { work: Work; actions: WorkActions; className?: string };
@@ -91,8 +135,10 @@ export function WorkPinButton({ work, actions, className = "size-8" }: WorkPinBu
 }
 
 // The Work's three-dot menu on the list's rows and the board's cards. Everything here is part of the Work module, which
-// the API checks on every request. Opening the Work, its activities and pinning it are on the row and card themselves.
+// the API checks on every request; deleting the Work is an admin's, so only admins are offered it. Opening the Work, its
+// activities and pinning it are on the row and card themselves.
 export function WorkMenu({ work, actions }: { work: Work; actions: WorkActions }) {
+  const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
   const menuId = useId();
   const hide = () => document.getElementById(menuId)?.hidePopover();
   const run = (action: () => void) => () => {
@@ -137,6 +183,15 @@ export function WorkMenu({ work, actions }: { work: Work; actions: WorkActions }
           <PhoneIcon className="size-4 text-muted-foreground" />
           Call
         </a>
+        {isAdmin && (
+          <>
+            <div className="my-1 border-t border-border" />
+            <button type="button" onClick={run(() => actions.remove(work))} className={`${menuItemClass} text-error`}>
+              <TrashIcon className="size-4" />
+              Delete Work
+            </button>
+          </>
+        )}
       </div>
     </>
   );

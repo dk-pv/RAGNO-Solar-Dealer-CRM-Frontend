@@ -6,8 +6,8 @@ import { useContext, useId, useState, type ReactNode } from "react";
 import { CloseIcon, DownloadIcon } from "@/components/layout/icons";
 import { canOpen } from "@/components/layout/navigation";
 import { CurrentUserContext, type ShellUser } from "@/components/layout/use-shell-session";
-import { formatExact, formatShortDateTime, type LatestActivity } from "@/components/dashboard/api";
-import { formatDate, type Assignee } from "@/components/leads/api";
+import { formatExact, type LatestActivity } from "@/components/dashboard/api";
+import { formatDate, formatDateTime, type Assignee } from "@/components/leads/api";
 import { Pagination } from "@/components/table";
 import { updateQuery } from "@/components/leads/leads-toolbar";
 import { ErrorState, emptyAreaClass, fieldClass, secondaryButton, tableAreaClass } from "@/components/leads/ui";
@@ -414,7 +414,7 @@ export function LatestCell({ latest }: { latest: LatestActivity }) {
     <span className="whitespace-nowrap">
       {latest.type_display}
       <time dateTime={latest.at} title={formatExact(latest.at)} className="block text-xs text-muted-foreground">
-        {formatShortDateTime(latest.at)}
+        {formatDateTime(latest.at)}
       </time>
     </span>
   ) : (

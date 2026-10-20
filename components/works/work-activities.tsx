@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useContext, useEffect, useId, useRef, useState, type FormEvent } from "react";
 
+import { AssigneeNames, AssigneePicker } from "@/components/assignee-picker";
 import { CompleteActivityDialog } from "@/components/complete-activity-dialog";
 import { EyeIcon, MoreIcon, PencilIcon, PlusIcon } from "@/components/layout/icons";
 import { canOpen } from "@/components/layout/navigation";
@@ -12,6 +13,7 @@ import {
   ACTIVITY_TYPES,
   formatDate,
   formatPhone,
+  NO_DUE_DATE,
   withRow,
   type ActivityType,
   type Assignee,
@@ -20,8 +22,10 @@ import {
 import { menuItemClass, placeMenu } from "@/components/leads/lead-actions";
 import { Field, FormDialog } from "@/components/leads/lead-dialogs";
 import {
+  CompletedAt,
   ErrorState,
   FollowUpBadge,
+  Moment,
   iconButton,
   inputClass,
   secondaryButton,
@@ -239,33 +243,24 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                   </td>
                   {shows("assigned") && (
                     <td data-label="Assigned to" className="px-3 py-2 whitespace-nowrap">
-                      {activity.assigned_to_name ? (
-                        <span className="block max-w-[max(12rem,13cqw)] truncate">{activity.assigned_to_name}</span>
-                      ) : (
-                        <span className="text-muted-foreground">Unassigned</span>
-                      )}
+                      <AssigneeNames people={activity.assignees} />
                     </td>
                   )}
                   {shows("due") && (
                     <td data-label="Due date" className={`px-3 py-2 whitespace-nowrap ${overdue ? "font-medium text-error" : ""}`}>
-                      {activity.due_date ? formatDate(activity.due_date) : <span className="text-muted-foreground">—</span>}
+                      {activity.due_date ? formatDate(activity.due_date) : <span className="text-muted-foreground">{NO_DUE_DATE}</span>}
                       {overdue && <span className="block text-xs">Overdue</span>}
                     </td>
                   )}
                   {shows("status") && (
-                    <td data-label="Status" className="px-3 py-2 whitespace-nowrap">
+                    <td data-label="Status" className="px-3 py-2">
                       <FollowUpBadge status={activity.status} />
-                      {activity.completed_at && (
-                        <span className="mt-1 block max-w-[max(12rem,13cqw)] truncate text-xs text-muted-foreground">
-                          {formatDate(activity.completed_at)}
-                          {activity.completed_by_name ? ` · ${activity.completed_by_name}` : ""}
-                        </span>
-                      )}
+                      <CompletedAt activity={activity} />
                     </td>
                   )}
                   {shows("created") && (
-                    <td data-label="Created" className="px-3 py-2 whitespace-nowrap">
-                      {formatDate(activity.created_at)}
+                    <td data-label="Created" className="px-3 py-2">
+                      <Moment value={activity.created_at} />
                       {activity.created_by_name && (
                         <span className="block max-w-[max(12rem,13cqw)] truncate text-xs text-muted-foreground">by {activity.created_by_name}</span>
                       )}
@@ -497,14 +492,11 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
   const target = work ?? pickedWork;
   const [type, setType] = useState<ActivityType>(activity?.type ?? "FOLLOW_UP");
   const [description, setDescription] = useState(activity?.description ?? "");
-  // A new follow-up goes to whoever the Work is assigned to (if they are still active), unless changed here.
-  const defaultAssignee = activity
-    ? activity.assigned_to
-    : assignees.data?.some((person) => person.id === target?.assigned_to)
-      ? target?.assigned_to
-      : null;
-  const [pickedAssignee, setAssignedTo] = useState<string>();
-  const assignedTo = pickedAssignee ?? (defaultAssignee ? String(defaultAssignee) : "");
+  // Its people: an edited one keeps its own until changed; a new one goes to whoever the Work is assigned to (if they are
+  // still active), unless changed here.
+  const [pickedPeople, setPickedPeople] = useState<Assignee[]>();
+  const people =
+    pickedPeople ?? activity?.assignees ?? (assignees.data ?? []).filter((person) => person.id === target?.assigned_to);
   const [dueDate, setDueDate] = useState(activity?.due_date ?? "");
   const [status, setStatus] = useState<ActivityStatus>(activity?.status ?? "PENDING");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -512,11 +504,8 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
   const [saving, setSaving] = useState(false);
 
   const fieldId = (field: string) => `${formId}-${field}`;
-  // Someone no longer active stays visible on an activity that already has them.
-  const keepAssignee =
-    activity?.assigned_to && !assignees.data?.some((person) => person.id === activity.assigned_to)
-      ? { id: activity.assigned_to, name: activity.assigned_to_name ?? `User #${activity.assigned_to}` }
-      : undefined;
+  // The API names them assignee_ids (assigned_to for older clients).
+  const assigneesError = errors.assignee_ids ?? errors.assigned_to;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -536,7 +525,7 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
       const input = {
         type,
         description: description.trim(),
-        assigned_to: assignedTo ? Number(assignedTo) : null,
+        assignee_ids: people.map((person) => person.id),
         due_date: dueDate || null,
         // Sent only when changed here: an untouched status (the disabled control included) is never a status change.
         ...(activity && status === activity.status ? {} : { status }),
@@ -612,26 +601,6 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
             className={`${inputClass} h-auto py-2`}
           />
         </Field>
-        <Field
-          label="Assigned staff"
-          id={fieldId("assigned_to")}
-          error={errors.assigned_to}
-          hint={assignees.error && `Staff couldn't be loaded: ${assignees.error.message}`}
-        >
-          <select
-            id={fieldId("assigned_to")}
-            value={assignedTo}
-            onChange={(event) => setAssignedTo(event.target.value)}
-            className={inputClass}
-          >
-            <option value="">Unassigned</option>
-            {[...(assignees.data ?? []), ...(keepAssignee ? [keepAssignee] : [])].map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.name}
-              </option>
-            ))}
-          </select>
-        </Field>
         <Field label="Due date" id={fieldId("due_date")} error={errors.due_date}>
           <input
             id={fieldId("due_date")}
@@ -639,6 +608,24 @@ export function ActivityDialog({ work, activity, assignees, onClose, onSaved }: 
             value={dueDate}
             onChange={(event) => setDueDate(event.target.value)}
             className={inputClass}
+          />
+        </Field>
+        <Field
+          label="Assigned staff"
+          id={fieldId("assignees")}
+          error={assigneesError}
+          hint={assignees.error ? `Staff couldn't be loaded: ${assignees.error.message}` : "One or more people, or no one."}
+          wide
+        >
+          <AssigneePicker
+            id={fieldId("assignees")}
+            name="assignees"
+            value={people}
+            onChange={setPickedPeople}
+            options={assignees.data}
+            optionsError={assignees.error?.message}
+            invalid={Boolean(assigneesError)}
+            describedBy={assigneesError ? `${fieldId("assignees")}-error` : undefined}
           />
         </Field>
       </div>

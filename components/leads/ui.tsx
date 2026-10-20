@@ -6,7 +6,16 @@ import { useEffect, useState, type ReactNode, type RefObject } from "react";
 
 import { CloseIcon, PinIcon, SpinnerIcon } from "@/components/layout/icons";
 import { toApiError } from "@/lib/api";
-import { FOLLOW_UP_STATUSES, setLeadPinned, statusLabel, type FollowUpStatus, type Lead, type LeadStatus } from "./api";
+import {
+  FOLLOW_UP_STATUSES,
+  formatDate,
+  formatTime,
+  setLeadPinned,
+  statusLabel,
+  type FollowUpStatus,
+  type Lead,
+  type LeadStatus,
+} from "./api";
 
 // A button's label while its action runs: a spinner, then the text ("Saving…"). The button disables itself.
 export function Busy({ children }: { children: ReactNode }) {
@@ -179,6 +188,27 @@ export function FollowUpBadge({ status }: { status: FollowUpStatus }) {
       className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${FOLLOW_UP_STYLES[status]}`}
     >
       {FOLLOW_UP_STATUSES.find((item) => item.value === status)?.label ?? status}
+    </span>
+  );
+}
+
+// A moment in Asia/Kolkata as formatDateTime writes it ("21 Oct 2026, 12:30 am"), able to wrap between the date and the
+// time (never inside either), so a table column with one takes two lines rather than widening the table.
+export function Moment({ value, className }: { value: string; className?: string }) {
+  return (
+    <time dateTime={value} className={className}>
+      <span className="whitespace-nowrap">{formatDate(value)},</span> <span className="whitespace-nowrap">{formatTime(value)}</span>
+    </time>
+  );
+}
+
+// When an activity was completed and by whom, under its badge in the Lead and Work activity tables.
+export function CompletedAt({ activity }: { activity: { completed_at: string | null; completed_by_name: string | null } }) {
+  if (!activity.completed_at) return null;
+  return (
+    <span className="mt-1 block text-xs text-muted-foreground">
+      <Moment value={activity.completed_at} className="block" />
+      {activity.completed_by_name && <span className="block max-w-[max(12rem,13cqw)] truncate">{activity.completed_by_name}</span>}
     </span>
   );
 }

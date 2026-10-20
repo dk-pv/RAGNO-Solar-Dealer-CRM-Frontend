@@ -69,7 +69,11 @@ export function WorksPage() {
   const assignees = useApi<Assignee[]>("/works/assignees/");
   const [clears, setClears] = useState(0);
   const [noticeElement, notify] = useNotice();
-  const actions = useWorkActions(notify, reload, assignees);
+  const actions = useWorkActions(notify, reload, assignees, () => {
+    // The last row of a later page went: show the page before it, rather than a page that no longer exists.
+    if (rows.length === 1 && page > 1) updateQuery({ page: page > 2 ? String(page - 1) : null });
+    reload();
+  });
   const columns = useColumns("works", COLUMNS);
   // Deleting Works is an admin's decision on the API; only admins are offered it.
   const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
