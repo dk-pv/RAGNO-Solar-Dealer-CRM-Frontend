@@ -89,7 +89,8 @@ export type LeadReportRow = {
   latest_activity: LatestActivity;
 };
 
-// GET /api/reports/works/summary/ and /api/reports/works/. Amounts are each Work's confirmed amount, fixed at conversion.
+// GET /api/reports/works/summary/ and /api/reports/works/. Amounts are what each customer pays: the Work's confirmed
+// amount, fixed at conversion, or an admin's offer price for that Work (offer_applied).
 export type WorkReportSummary = {
   totals: { created: number; amount: string; completed: number; completed_amount: string };
   by_stage: (Choice<WorkStage> & { amount: string })[];
@@ -106,6 +107,7 @@ export type WorkReportRow = {
   assigned_to_name: string | null;
   plan_name: string;
   amount: string;
+  offer_applied: boolean;
   due_date: string | null;
   created_at: string;
   updated_at: string;

@@ -54,9 +54,10 @@ export const moduleLabels = (keys: string[], modules?: Module[]) =>
 
 const ROLE_LABELS: Record<User["role"], string> = { ADMIN: "Admin", STAFF: "Staff" };
 
-const badgeClass = "inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset";
-const activeBadge = "bg-success-soft text-success ring-success-border";
-const inactiveBadge = "bg-neutral-soft text-neutral ring-neutral-border";
+// Active and Inactive, here and on the solar plans.
+export const badgeClass = "inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset";
+export const activeBadge = "bg-success-soft text-success ring-success-border";
+export const inactiveBadge = "bg-neutral-soft text-neutral ring-neutral-border";
 
 export function UsersPage() {
   const me = useContext(CurrentUserContext);

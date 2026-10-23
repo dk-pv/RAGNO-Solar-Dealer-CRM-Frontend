@@ -6,6 +6,7 @@ import { formatDate, formatDateTime, formatMoney } from "@/components/leads/api"
 import { fillClass } from "@/components/leads/ui";
 import { updateQuery } from "@/components/leads/leads-toolbar";
 import { WORK_STAGES, stageFor, type WorkStage } from "@/components/works/api";
+import { OfferBadge } from "@/components/works/work-offer";
 import { useApi } from "@/lib/api";
 import type { Page, WorkReportRow, WorkReportSummary } from "./api";
 import {
@@ -61,7 +62,20 @@ const COLUMNS: Column<WorkReportRow>[] = [
   { header: "Stage", render: (work) => <StageChip stage={work.stage} />, wide: true },
   { header: "Assigned to", render: (work) => work.assigned_to_name ?? <span className="text-muted-foreground">Unassigned</span>, className: "whitespace-nowrap" },
   { header: "Plan", render: (work) => work.plan_name, className: "whitespace-nowrap" },
-  { header: "Confirmed amount", render: (work) => formatMoney(work.amount), className: "text-right whitespace-nowrap tabular-nums" },
+  {
+    header: "Confirmed amount",
+    render: (work) => (
+      <>
+        {formatMoney(work.amount)}
+        {work.offer_applied && (
+          <span className="mt-1 block">
+            <OfferBadge />
+          </span>
+        )}
+      </>
+    ),
+    className: "text-right whitespace-nowrap tabular-nums",
+  },
   { header: "Due date", render: (work) => formatDate(work.due_date), className: "whitespace-nowrap" },
   { header: "Created (converted)", render: (work) => formatDateTime(work.created_at), className: "whitespace-nowrap" },
   { header: "Last updated", render: (work) => formatDateTime(work.updated_at), className: "whitespace-nowrap" },
@@ -91,7 +105,8 @@ export function WorkReport() {
         describe={(key, value) => (key === "stage" ? `Stage: ${stageFor(value as WorkStage).label}` : `Assigned: ${nameOf(value)}`)}
       />
       <p className="text-xs text-muted-foreground">
-        Works are counted by when their lead was converted. Amounts are each Work&apos;s confirmed amount, fixed at conversion.
+        Works are counted by when their lead was converted. Amounts are each Work&apos;s confirmed amount, fixed at conversion,
+        or the offer price an admin gave that Work.
         When a Work reached its stage isn&apos;t recorded, so &ldquo;Completed&rdquo; means Completed now.
       </p>
 

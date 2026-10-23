@@ -40,7 +40,8 @@ export const WORK_STAGES = [
 export type WorkStage = (typeof WORK_STAGES)[number]["value"];
 
 // GET /api/works/ (paginated) and PATCH /api/works/{id}/. The customer, plan and amount were copied from the lead when
-// it was converted; `amount` is the confirmed price and never follows later plan price changes.
+// it was converted; `amount` is the standard price and never follows later plan price changes. An admin can give one
+// Work an offer price (offer_amount): what the customer pays, `effective_amount`, is then the offer.
 export type Work = {
   id: number;
   lead: number;
@@ -55,6 +56,9 @@ export type Work = {
   plan: number;
   plan_name: string;
   amount: string;
+  offer_amount: string | null; // null: no offer
+  offer_note: string; // why the offer was given ("" if not noted)
+  effective_amount: string; // the amount to show as the Work's price: the offer, or else `amount`
   stage: WorkStage;
   assigned_to: number | null;
   assigned_to_name: string | null;
@@ -139,7 +143,7 @@ export type ActivityStatus = (typeof ACTIVITY_STATUSES)[number]["value"];
 
 // GET /api/activities/?work={id} (paginated: pending first, the soonest due first, then completed, the latest first), and
 // GET /api/activities/works/ (every Work's, each Work's together; needs the Activities module). Staff get only theirs.
-// The same activity log as the leads', with a Work's activities linked to the Work. Admins add and edit them.
+// The same activity log as the leads', with a Work's activities linked to the Work. Admins add, edit and delete them.
 export type WorkActivity = {
   id: number;
   work: number;
@@ -160,6 +164,7 @@ export type WorkActivity = {
   // The Work it belongs to, for tables that list several Works' activities.
   work_summary: Pick<Work, "id" | "customer_name" | "country_code" | "phone" | "plan_name" | "stage">;
   can_edit: boolean; // editing it (reassigning, reopening): admins
+  can_delete: boolean; // deleting it, for good: admins
   // Completing it: only the staff member it is assigned to, or an admin (the API refuses anyone else).
   can_update_status: boolean;
 };
@@ -188,6 +193,16 @@ export function bulkDeleteWorks(ids: number[]) {
 export async function deleteWork(id: number) {
   const { failed } = await bulkDeleteWorks([id]);
   if (failed.length > 0) throw new ApiError(failed[0].reason, 409);
+}
+
+// Admins only: this Work's offer price, with an optional note, or (offer_amount null) no offer. `expected_offer_amount` is
+// the offer shown when the admin decided: if someone changed it meanwhile, the API refuses (409) rather than overwrite it.
+// The standard amount, the plan's price and every other Work stay as they are. Answers the updated Work.
+export function saveWorkOffer(
+  id: number,
+  offer: { offer_amount: string | null; offer_note?: string; expected_offer_amount: string | null },
+) {
+  return apiRequest<Work>(`/works/${id}/offer/`, { method: "POST", json: offer });
 }
 
 // Completing records when and by whom on the server; setting it back to Pending clears that.

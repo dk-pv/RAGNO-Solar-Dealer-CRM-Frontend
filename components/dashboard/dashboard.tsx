@@ -606,7 +606,8 @@ function WorkOverview({ stages }: { stages: Loaded<StageSummary[]> }) {
           })}
         </ul>
         <p className="mt-3 border-t border-border pt-2 text-xs text-muted-foreground">
-          {/* The Works' own confirmed amounts, fixed at conversion: plan price changes never alter them. */}
+          {/* The Works' own confirmed amounts, fixed at conversion (plan price changes never alter them), or an admin's
+              offer price for a Work: what each customer pays. */}
           Confirmed value {formatMoney(String(total))} across {stages.data.reduce((sum, row) => sum + row.count, 0).toLocaleString("en-IN")}{" "}
           Works
         </p>

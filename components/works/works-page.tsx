@@ -7,7 +7,7 @@ import { useContext, useState } from "react";
 import { ChevronLeftIcon, FlagIcon, PinIcon, TrashIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
-import { formatDate, formatMoney, formatPhone, type Assignee, type Page } from "@/components/leads/api";
+import { formatDate, formatPhone, type Assignee, type Page } from "@/components/leads/api";
 import { pickParams, updateQuery } from "@/components/leads/leads-toolbar";
 import { fillClass, secondaryButton, stickyNameClass, useNotice } from "@/components/leads/ui";
 import {
@@ -37,6 +37,7 @@ import {
 } from "./api";
 import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
 import { DocumentStatus } from "./work-documents";
+import { WorkAmount } from "./work-offer";
 import { FILTER_KEYS, VIEW_KEYS, WorksHeader, WorksToolbar } from "./works-toolbar";
 
 // The URL query and the API query use the same names.
@@ -349,7 +350,11 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
         </td>
       )}
       {shows("plan") && <td data-label="Plan" className="px-3 py-2 whitespace-nowrap">{work.plan_name}</td>}
-      {shows("amount") && <td data-label="Confirmed amount" className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatMoney(work.amount)}</td>}
+      {shows("amount") && (
+        <td data-label="Confirmed amount" className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
+          <WorkAmount work={work} />
+        </td>
+      )}
       {shows("stage") && (
         <td data-label="Stage" data-slot="wide" className="px-3 py-2">
           <span className="relative inline-flex">

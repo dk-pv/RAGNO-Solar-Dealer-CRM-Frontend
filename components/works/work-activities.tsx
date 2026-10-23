@@ -5,7 +5,8 @@ import { useContext, useEffect, useId, useRef, useState, type FormEvent } from "
 
 import { AssigneeNames, AssigneePicker } from "@/components/assignee-picker";
 import { CompleteActivityDialog } from "@/components/complete-activity-dialog";
-import { EyeIcon, MoreIcon, PencilIcon, PlusIcon } from "@/components/layout/icons";
+import { DeleteActivityDialog } from "@/components/delete-activity-dialog";
+import { EyeIcon, MoreIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/layout/icons";
 import { canOpen } from "@/components/layout/navigation";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import {
@@ -15,6 +16,7 @@ import {
   formatPhone,
   NO_DUE_DATE,
   withRow,
+  withoutRow,
   type ActivityType,
   type Assignee,
   type Page,
@@ -139,6 +141,7 @@ type WorkActivityTableProps = {
   shows?: (column: WorkActivityColumn) => boolean;
   onEdit: (activity: WorkActivity) => void;
   onComplete: (activity: WorkActivity) => void;
+  onDelete: (activity: WorkActivity) => void;
 };
 
 const workBadgeClass =
@@ -147,7 +150,7 @@ const workBadgeClass =
 // Work activities as a table, one row each, with the same row actions as the lead follow-ups: Mark as Completed, and a
 // menu. A Work's rows share its colour (the row wash, the left edge and the badge's dot); where several Works are listed,
 // a stronger line marks where the next Work's activities start.
-export function WorkActivityTable({ rows, loading, showWork, shows = () => true, onEdit, onComplete }: WorkActivityTableProps) {
+export function WorkActivityTable({ rows, loading, showWork, shows = () => true, onEdit, onComplete, onDelete }: WorkActivityTableProps) {
   const optional = WORK_ACTIVITY_COLUMNS.filter((column) => (column.key === "customer" ? showWork : true) && shows(column.key));
   const hidden = optional.length < WORK_ACTIVITY_COLUMNS.length - (showWork ? 0 : 1);
   // Always shown: the Work (where several are listed), the activity and the actions.
@@ -283,7 +286,13 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
                       ) : (
                         <span className="px-2.5 text-xs whitespace-nowrap text-muted-foreground max-sm:flex-1">Completed</span>
                       )}
-                      <ActivityMenu activity={activity} label={label} withWork={linkWorks} onEdit={() => onEdit(activity)} />
+                      <ActivityMenu
+                        activity={activity}
+                        label={label}
+                        withWork={linkWorks}
+                        onEdit={() => onEdit(activity)}
+                        onDelete={() => onDelete(activity)}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -298,15 +307,15 @@ export function WorkActivityTable({ rows, loading, showWork, shows = () => true,
   );
 }
 
-type ActivityMenuProps = { activity: WorkActivity; label: string; withWork: boolean; onEdit: () => void };
+type ActivityMenuProps = { activity: WorkActivity; label: string; withWork: boolean; onEdit: () => void; onDelete: () => void };
 
-// The row's three-dot menu, as on the Works and leads tables: Edit for admins (can_edit), and the Work's page for whoever
-// can open it (`withWork`). With neither there is no menu. (Completing is the button beside it; an admin reopens a
-// completed activity from Edit.)
-function ActivityMenu({ activity, label, withWork, onEdit }: ActivityMenuProps) {
+// The row's three-dot menu, as on the Works and leads tables: Edit and Delete for admins (can_edit, can_delete), and the
+// Work's page for whoever can open it (`withWork`). With none of them there is no menu. (Completing is the button beside
+// it; an admin reopens a completed activity from Edit.)
+function ActivityMenu({ activity, label, withWork, onEdit, onDelete }: ActivityMenuProps) {
   const menuId = useId();
   const hide = () => document.getElementById(menuId)?.hidePopover();
-  if (!activity.can_edit && !withWork) return null;
+  if (!activity.can_edit && !activity.can_delete && !withWork) return null;
 
   return (
     <>
@@ -343,16 +352,36 @@ function ActivityMenu({ activity, label, withWork, onEdit }: ActivityMenuProps) 
             View Work #{activity.work}
           </Link>
         )}
+        {activity.can_delete && (
+          <button
+            type="button"
+            onClick={() => {
+              hide();
+              onDelete();
+            }}
+            className={`${menuItemClass} text-error`}
+          >
+            <TrashIcon className="size-4" />
+            Delete
+          </button>
+        )}
       </div>
     </>
   );
 }
 
-// Edit and Mark as Completed for a table of Work activities: their dialogs. Render `dialog` once; `onChanged` gets the
-// saved activity after a change, to show it at once and reload the activities (and anything that counts them).
-export function useActivityRowActions(notify: Notify, onChanged: (saved: WorkActivity) => void, assignees: Assignees) {
+// Edit, Mark as Completed and Delete for a table of Work activities: their dialogs. Render `dialog` once; `onChanged`
+// gets the saved activity after a change, to show it at once and reload the activities (and anything that counts them),
+// and `onDeleted` the activity that was deleted.
+export function useActivityRowActions(
+  notify: Notify,
+  onChanged: (saved: WorkActivity) => void,
+  assignees: Assignees,
+  onDeleted: (activity: WorkActivity) => void,
+) {
   const [editing, setEditing] = useState<WorkActivity>();
   const [completing, setCompleting] = useState<WorkActivity>();
+  const [deleting, setDeleting] = useState<WorkActivity>();
 
   const dialog = (
     <>
@@ -380,10 +409,24 @@ export function useActivityRowActions(notify: Notify, onChanged: (saved: WorkAct
           onError={(text) => notify({ text: `Couldn't complete the activity. ${text}`, error: true })}
         />
       )}
+      {deleting && (
+        <DeleteActivityDialog
+          activity={deleting}
+          subject={deleting.description}
+          customer={deleting.work_summary.customer_name}
+          record={{ label: "Work", id: deleting.work }}
+          onDeleted={() => {
+            notify({ text: `Deleted the ${deleting.type_display.toLowerCase()} for ${deleting.work_summary.customer_name}.` });
+            onDeleted(deleting);
+          }}
+          onClose={() => setDeleting(undefined)}
+          onError={(text) => notify({ text: `Couldn't delete the activity. ${text}`, error: true })}
+        />
+      )}
     </>
   );
 
-  return { dialog, edit: setEditing, complete: setCompleting };
+  return { dialog, edit: setEditing, complete: setCompleting, remove: setDeleting };
 }
 
 type WorkActivitiesProps = {
@@ -410,6 +453,11 @@ export function WorkActivities({ work, assignees, notify, onAdd, onChanged }: Wo
       onChanged();
     },
     assignees,
+    (deleted) => {
+      if (data) replace(withoutRow(data, deleted.id)); // gone at once, with the count
+      reload();
+      onChanged();
+    },
   );
   const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN"; // adding activities is for admins
 
@@ -436,6 +484,7 @@ export function WorkActivities({ work, assignees, notify, onAdd, onChanged }: Wo
           showWork={false}
           onEdit={rowActions.edit}
           onComplete={rowActions.complete}
+          onDelete={rowActions.remove}
         />
         {data && data.count > data.results.length && (
           <button

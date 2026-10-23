@@ -5,7 +5,7 @@ import { useContext, useId, useState, type ChangeEvent } from "react";
 
 import { PlusIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
-import { ACTIVITY_TYPES, withRow, type Assignee, type Page } from "@/components/leads/api";
+import { ACTIVITY_TYPES, withRow, withoutRow, type Assignee, type Page } from "@/components/leads/api";
 import { FilterToggle, SearchBox, SortSelect, StatusTabs, pickParams, updateQuery } from "@/components/leads/leads-toolbar";
 import { PageHeader, fillClass, inputClass, primaryButton, secondaryButton, useNotice } from "@/components/leads/ui";
 import { ColumnsButton, DEFAULT_PAGE_SIZE, EmptyState, ListShell, useColumns } from "@/components/table";
@@ -48,6 +48,13 @@ export function WorkActivitiesPage() {
       reload();
     },
     assignees,
+    (deleted) => {
+      // Off the list at once, with the count; the reload then fills the page. The last row of a later page shows the
+      // page before it, rather than a page that no longer exists.
+      if (data) replace(withoutRow(data, deleted.id));
+      if (data?.results.length === 1 && page > 1) updateQuery({ page: page > 2 ? String(page - 1) : null });
+      else reload();
+    },
   );
   const [adding, setAdding] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -140,6 +147,7 @@ export function WorkActivitiesPage() {
           shows={columns.shows}
           onEdit={rowActions.edit}
           onComplete={rowActions.complete}
+          onDelete={rowActions.remove}
         />
       </ListShell>
 

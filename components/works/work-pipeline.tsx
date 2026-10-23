@@ -24,6 +24,7 @@ import { toApiError, useApi } from "@/lib/api";
 import { WORK_STAGES, stageFor, today, updateWork, type StageSummary, type Work, type WorkStage } from "./api";
 import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
 import { DocumentStatus } from "./work-documents";
+import { WorkAmount } from "./work-offer";
 import { DEFAULT_ORDERING, FILTER_KEYS, SORT_OPTIONS, WorksHeader, WorksToolbar } from "./works-toolbar";
 
 type Stage = (typeof WORK_STAGES)[number];
@@ -416,7 +417,9 @@ function WorkCard({ work, saving, dragging, actions, onDragStart, onDragEnd }: W
       </p>
 
       <p className="mt-2.5 text-xs text-muted-foreground">{work.plan_name} plan</p>
-      <p className="font-semibold text-foreground tabular-nums">{formatMoney(work.amount)}</p>
+      <p className="font-semibold text-foreground tabular-nums">
+        <WorkAmount work={work} />
+      </p>
 
       <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <PhoneIcon className="size-3.5 shrink-0 text-faint" />

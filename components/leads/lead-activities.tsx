@@ -6,20 +6,20 @@ import { useContext, useId, useRef, useState, type ChangeEvent } from "react";
 
 import { AssigneeNames } from "@/components/assignee-picker";
 import { CompleteActivityDialog } from "@/components/complete-activity-dialog";
+import { DeleteActivityDialog } from "@/components/delete-activity-dialog";
 import { EyeIcon, MoreIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
-import { ActionDialog } from "@/components/selection";
 import { ColumnsButton, DEFAULT_PAGE_SIZE, EmptyState, ListShell, SkeletonRows, useColumns, type Columns } from "@/components/table";
 import { useApi } from "@/lib/api";
 import {
   ACTIVITY_TYPES,
   FOLLOW_UP_STATUSES,
-  deleteActivity,
   formatDate,
   formatPhone,
   isOverdue,
   NO_DUE_DATE,
   withRow,
+  withoutRow,
   type Activity,
   type Assignee,
   type Page,
@@ -235,16 +235,18 @@ export function LeadActivitiesPage() {
         />
       )}
       {deleting && (
-        <ActionDialog
-          destructive
-          title="Delete this follow-up?"
-          description={`"${heading(deleting)}" for ${deleting.lead_name} will be removed for good.`}
-          confirmLabel="Delete"
-          pendingLabel="Deleting…"
-          onConfirm={async () => {
-            await deleteActivity(deleting.id);
-            notify({ text: `Deleted the follow-up for ${deleting.lead_name}.` });
-            reload();
+        <DeleteActivityDialog
+          activity={deleting}
+          subject={deleting.title}
+          customer={deleting.lead_name}
+          record={{ label: "Lead", id: deleting.lead }}
+          onDeleted={() => {
+            notify({ text: `Deleted the ${deleting.type_display.toLowerCase()} "${heading(deleting)}" for ${deleting.lead_name}.` });
+            // Off the list at once, with the count; the reload then fills the page. The last row of a later page shows
+            // the page before it, rather than a page that no longer exists.
+            if (data) replace(withoutRow(data, deleting.id));
+            if (rows.length === 1 && page > 1) updateQuery({ page: page > 2 ? String(page - 1) : null });
+            else reload();
           }}
           onClose={() => {
             setDeleting(undefined);

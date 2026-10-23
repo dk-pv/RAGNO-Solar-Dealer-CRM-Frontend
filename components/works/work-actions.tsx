@@ -11,6 +11,7 @@ import {
   PhoneIcon,
   PinIcon,
   PlusIcon,
+  TagIcon,
   TrashIcon,
   WhatsAppIcon,
 } from "@/components/layout/icons";
@@ -21,8 +22,9 @@ import { menuItemClass, placeMenu } from "@/components/leads/lead-actions";
 import { Busy, iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
 import { ActionDialog } from "@/components/selection";
 import { toApiError, type ApiError } from "@/lib/api";
-import { WORK_STAGES, deleteWork, today, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
+import { WORK_STAGES, deleteWork, saveWorkOffer, today, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
 import { ActivityDialog } from "./work-activities";
+import { OfferDialog, WorkAmount } from "./work-offer";
 
 type Notify = (notice: { text: string; error?: boolean }) => void;
 type Assignees = { data?: Assignee[]; error?: ApiError };
@@ -30,9 +32,10 @@ export type WorkActions = ReturnType<typeof useWorkActions>;
 
 export const isOverdue = (work: Work) => work.due_date !== null && work.stage !== "COMPLETED" && work.due_date < today();
 
-// Edit, add a follow-up, pin and delete, with their dialogs: what the board's cards, the list's rows and the Work's page
-// do. Render `dialogs` once on the page; `onChanged` reloads after any change, with the Work before and after it, and
-// `onDeleted` after a deletion (by default as a change to the same Work, which reloads its column or list).
+// Edit, add a follow-up, pin, apply or remove an offer (admins) and delete, with their dialogs: what the board's cards,
+// the list's rows and the Work's page do. Render `dialogs` once on the page; `onChanged` reloads after any change, with
+// the Work before and after it, and `onDeleted` after a deletion (by default as a change to the same Work, which reloads
+// its column or list).
 export function useWorkActions(
   notify: Notify,
   onChanged: (before: Work, after: Work) => void,
@@ -42,6 +45,8 @@ export function useWorkActions(
   const [editing, setEditing] = useState<Work>();
   const [adding, setAdding] = useState<Work>();
   const [deleting, setDeleting] = useState<Work>();
+  const [offering, setOffering] = useState<Work>();
+  const [removingOffer, setRemovingOffer] = useState<Work>();
 
   async function togglePin(work: Work) {
     try {
@@ -101,10 +106,50 @@ export function useWorkActions(
           onError={(text) => notify({ text: `Couldn't delete Work #${deleting.id}. ${text}`, error: true })}
         />
       )}
+      {offering && (
+        <OfferDialog
+          work={offering}
+          onClose={() => setOffering(undefined)}
+          onSaved={(after) => {
+            notify({ text: `Offer applied to ${after.customer_name} (Work #${after.id}): ${formatMoney(after.effective_amount)}.` });
+            onChanged(offering, after);
+          }}
+        />
+      )}
+      {removingOffer && (
+        <ActionDialog
+          destructive
+          title="Remove this offer?"
+          description={
+            <>
+              Work #{removingOffer.id} for <span className="font-semibold text-foreground">{removingOffer.customer_name}</span>{" "}
+              goes back to its standard amount of {formatMoney(removingOffer.amount)}, and the offer price of{" "}
+              {formatMoney(removingOffer.offer_amount)} is removed.
+            </>
+          }
+          confirmLabel="Remove offer"
+          pendingLabel="Removing…"
+          onConfirm={async () => {
+            const after = await saveWorkOffer(removingOffer.id, { offer_amount: null, expected_offer_amount: removingOffer.offer_amount });
+            notify({ text: `Removed the offer for ${after.customer_name}: back to ${formatMoney(after.effective_amount)}.` });
+            onChanged(removingOffer, after);
+          }}
+          onClose={() => setRemovingOffer(undefined)}
+          onError={(text) => notify({ text: `Couldn't remove the offer for ${removingOffer.customer_name}. ${text}`, error: true })}
+        />
+      )}
     </>
   );
 
-  return { dialogs, edit: setEditing, addActivity: setAdding, remove: setDeleting, togglePin };
+  return {
+    dialogs,
+    edit: setEditing,
+    addActivity: setAdding,
+    remove: setDeleting,
+    togglePin,
+    offer: setOffering,
+    removeOffer: setRemovingOffer,
+  };
 }
 
 type WorkPinButtonProps = { work: Work; actions: WorkActions; className?: string };
@@ -135,8 +180,8 @@ export function WorkPinButton({ work, actions, className = "size-8" }: WorkPinBu
 }
 
 // The Work's three-dot menu on the list's rows and the board's cards. Everything here is part of the Work module, which
-// the API checks on every request; deleting the Work is an admin's, so only admins are offered it. Opening the Work, its
-// activities and pinning it are on the row and card themselves.
+// the API checks on every request; an offer and deleting the Work are an admin's, so only admins are offered them.
+// Opening the Work, its activities and pinning it are on the row and card themselves.
 export function WorkMenu({ work, actions }: { work: Work; actions: WorkActions }) {
   const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
   const menuId = useId();
@@ -185,6 +230,17 @@ export function WorkMenu({ work, actions }: { work: Work; actions: WorkActions }
         </a>
         {isAdmin && (
           <>
+            <div className="my-1 border-t border-border" />
+            <button type="button" onClick={run(() => actions.offer(work))} className={menuItemClass}>
+              <TagIcon className="size-4 text-muted-foreground" />
+              {work.offer_amount === null ? "Apply Offer" : "Change Offer"}
+            </button>
+            {work.offer_amount !== null && (
+              <button type="button" onClick={run(() => actions.removeOffer(work))} className={menuItemClass}>
+                <CloseIcon className="size-4 text-muted-foreground" />
+                Remove Offer
+              </button>
+            )}
             <div className="my-1 border-t border-border" />
             <button type="button" onClick={run(() => actions.remove(work))} className={`${menuItemClass} text-error`}>
               <TrashIcon className="size-4" />
@@ -297,9 +353,12 @@ export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProp
             <dt className="text-muted-foreground">Plan</dt>
             <dd>{work.plan_name}</dd>
             <dt className="text-muted-foreground">Confirmed amount</dt>
-            <dd>
-              <span className="font-semibold tabular-nums">{formatMoney(work.amount)}</span>
-              <span className="block text-xs text-muted-foreground">Fixed at conversion. Plan price changes don&apos;t affect it.</span>
+            <dd className="font-semibold tabular-nums">
+              <WorkAmount work={work} />
+              <span className="block text-xs font-normal text-muted-foreground">
+                {work.offer_amount === null ? "Fixed at conversion." : "An admin's offer for this customer."} Plan price
+                changes don&apos;t affect it.
+              </span>
             </dd>
             <dt className="text-muted-foreground">Phone</dt>
             <dd>

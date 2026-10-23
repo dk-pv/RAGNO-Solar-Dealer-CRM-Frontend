@@ -100,8 +100,9 @@ export type LeadInput = { assignee_ids?: number[]; initial_follow_up?: ActivityI
 // filters (the Lead Pipeline's column headers). Staff get their own leads' numbers.
 export type StatusSummary = { status: LeadStatus; label: string; count: number; total_amount: string };
 
-// GET /api/plans/. The amount is the plan's current default price, configured by an admin in Settings.
-export type Plan = { id: number; name: string; amount: string; is_active: boolean };
+// GET /api/plans/. The amount is the plan's current default price, configured by an admin in Settings → Solar Plans;
+// capacity is its size in kW ("5.00").
+export type Plan = { id: number; name: string; capacity: string; amount: string; is_active: boolean };
 // GET /api/leads/assignees/: the active users a lead can be assigned to.
 export type Assignee = { id: number; name: string };
 // Must match the backend's Activity types.
@@ -164,6 +165,13 @@ export type Page<T> = { count: number; next: string | null; previous: string | n
 export const withRow = <T extends { id: number }>(page: Page<T>, saved: T): Page<T> => ({
   ...page,
   results: page.results.map((row) => (row.id === saved.id ? saved : row)),
+});
+
+// The page without a deleted row, and one fewer in all: shows the deletion at once while the page reloads.
+export const withoutRow = <T extends { id: number }>(page: Page<T>, id: number): Page<T> => ({
+  ...page,
+  count: page.count - 1,
+  results: page.results.filter((row) => row.id !== id),
 });
 
 export function saveLead(input: LeadInput, id?: number) {

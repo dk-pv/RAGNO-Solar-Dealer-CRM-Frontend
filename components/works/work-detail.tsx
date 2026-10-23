@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, type ReactNode } from "react";
 
-import { ChevronLeftIcon, FileIcon, PencilIcon, PhoneIcon, PlusIcon, WhatsAppIcon } from "@/components/layout/icons";
+import { ChevronLeftIcon, CloseIcon, FileIcon, PencilIcon, PhoneIcon, PlusIcon, TagIcon, WhatsAppIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { formatDate, formatMoney, formatPhone, telHref, whatsappHref, type Assignee } from "@/components/leads/api";
 import { Details } from "@/components/leads/lead-detail";
@@ -13,6 +13,7 @@ import { stageFor, type Work } from "./api";
 import { WorkActivities } from "./work-activities";
 import { WorkPinButton, isOverdue, useWorkActions } from "./work-actions";
 import { DocumentStatus } from "./work-documents";
+import { WorkAmount } from "./work-offer";
 
 const outlinedIcon = `${iconButton} size-9 border border-border`;
 
@@ -65,8 +66,10 @@ export function WorkDetail({ id }: { id: number }) {
 
   const stage = stageFor(work.stage);
   const overdue = isOverdue(work);
+  const isAdmin = me?.role === "ADMIN";
   // The lead's page needs the Leads module.
-  const canOpenLeads = me?.role === "ADMIN" || me?.modules.includes("leads");
+  const canOpenLeads = isAdmin || me?.modules.includes("leads");
+  const offered = work.offer_amount !== null;
 
   return (
     <div>
@@ -139,13 +142,36 @@ export function WorkDetail({ id }: { id: number }) {
               ["PIN code", work.pin_code || "—"],
             ]}
           />
-          <Details
-            title="Solar plan"
-            items={[
-              ["Plan", work.plan_name],
-              ["Confirmed amount", <span key="amount" className="tabular-nums">{formatMoney(work.amount)}</span>],
-            ]}
-          />
+          {/* What the customer pays; an admin also sees the standard amount and the offer's note apart, and changes the offer. */}
+          <div>
+            <Details
+              title="Solar plan"
+              items={[
+                ["Plan", work.plan_name],
+                ["Confirmed amount", <span key="amount" className="tabular-nums"><WorkAmount work={work} standard={false} /></span>],
+                ...(isAdmin && offered
+                  ? ([
+                      ["Standard amount", <span key="standard" className="tabular-nums">{formatMoney(work.amount)}</span>],
+                      ["Offer note", work.offer_note || "—"],
+                    ] as [string, ReactNode][])
+                  : []),
+              ]}
+            />
+            {isAdmin && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => actions.offer(work)} className={secondaryButton}>
+                  <TagIcon className="size-4" />
+                  {offered ? "Change offer" : "Apply offer"}
+                </button>
+                {offered && (
+                  <button type="button" onClick={() => actions.removeOffer(work)} className={secondaryButton}>
+                    <CloseIcon className="size-4" />
+                    Remove offer
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <WorkActivities
             key={activitiesVersion}
             work={work}
