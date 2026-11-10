@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-
 import { useState, type ReactNode } from "react";
 
 import { iconButton } from "@/components/leads/ui";
@@ -70,12 +68,14 @@ export function Navbar({ user, onLogout, navigationId, navigationOpen, onOpenNav
       >
         <MenuIcon />
       </button>
-      {/* The brand, while the sidebar that shows it is hidden. A phone narrower than 400px shows the mark and "H&D"
+      {/* The brand, while the sidebar that shows it is hidden. A phone narrower than 400px shows the mark and "Ragno"
           (screen readers still hear the whole name), so it fits beside the actions instead of being cut off. */}
       <span className="flex min-w-0 items-center gap-2 md:hidden">
-        <Image src="/handd-mark-512.png" alt="" width={512} height={512} sizes="24px" className="size-6 shrink-0 rounded-md" />
+        <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-md bg-brand text-xs font-bold text-white">
+          R
+        </span>
         <span className="truncate text-sm font-semibold">
-          H&amp;D<span className="max-[25rem]:sr-only"> Technologies</span>
+          Ragno<span className="max-[25rem]:sr-only"> Power System</span>
         </span>
       </span>
 

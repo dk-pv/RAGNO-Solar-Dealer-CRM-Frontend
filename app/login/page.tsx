@@ -16,23 +16,27 @@ export default function LoginPage() {
     <main className="grid grid-cols-1 flex-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       {/* Brand panel, large screens only. Decorative rings echo the sun; text stays on the darker part of the gradient. */}
       <section
-        aria-label="H&D Technologies"
+        aria-label="Ragno Power System"
         className="relative hidden overflow-hidden bg-linear-to-br from-primary-active to-primary-hover p-10 text-white lg:flex lg:flex-col xl:p-14"
       >
         <span aria-hidden="true" className="absolute -top-40 -right-40 size-[28rem] rounded-full border border-white/10" />
         <span aria-hidden="true" className="absolute -top-24 -right-24 size-80 rounded-full border border-white/10" />
         <span aria-hidden="true" className="absolute -top-8 -right-8 size-48 rounded-full bg-white/5" />
 
-        {/* The logo carries the name and tagline itself; its white ground becomes a card on the gradient. */}
-        <Image
-          src="/handd-logo.png"
-          alt="H&D Technologies — House of Digital Solutions"
-          width={1536}
-          height={1024}
-          sizes="288px"
-          priority
-          className="relative w-72 max-w-full rounded-xl"
-        />
+        <div className="relative flex items-center gap-3">
+          <Image
+            src="/ragno-favicon-512.png"
+            alt="Ragno Power System logo"
+            width={512}
+            height={512}
+            sizes="80px"
+            className="size-20 shrink-0"
+          />
+          <div className="leading-tight">
+            <p className="font-semibold">Ragno Power System</p>
+            <p className="text-sm text-white/85">Solar Dealer CRM</p>
+          </div>
+        </div>
 
         <div className="relative my-auto max-w-md py-12">
           <p className="text-3xl leading-tight font-semibold tracking-tight xl:text-4xl">

@@ -8,7 +8,7 @@ import { Field, FormDialog } from "@/components/leads/lead-dialogs";
 import { fieldClass, inputClass, secondaryButton } from "@/components/leads/ui";
 
 // The business's own name, as the sidebar and the sign-in page show it: who a message says it is from.
-const COMPANY = "H&D Technologies";
+const COMPANY = "Ragno Power System";
 
 // The message templates. In a template's text, {name} stands for the chosen lead's name and {plan} for their solar plan;
 // the text stays editable before it is sent.

@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useId, useLayoutEffect, useRef, useSyncExternalStore } from "react";
@@ -103,10 +101,15 @@ export function SidebarPanel({ user, onLogout, collapsible = false, onClose }: S
   return (
     <div className="flex h-full flex-col bg-background text-secondary-foreground">
       <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-5">
-        <Image src="/handd-mark-512.png" alt="" width={512} height={512} sizes="32px" className="size-8 shrink-0 rounded-lg" />
+        <span
+          aria-hidden="true"
+          className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand text-sm font-bold text-white"
+        >
+          R
+        </span>
         <div className={`min-w-0 leading-tight ${fadeClass}`}>
-          <p className="whitespace-nowrap text-sm font-semibold text-foreground">H&amp;D Technologies</p>
-          <p className="whitespace-nowrap text-xs text-muted-foreground">House of Digital Solutions</p>
+          <p className="whitespace-nowrap text-sm font-semibold text-foreground">Ragno Power System</p>
+          <p className="whitespace-nowrap text-xs text-muted-foreground">Solar Dealer CRM</p>
         </div>
         {onClose && (
           <button

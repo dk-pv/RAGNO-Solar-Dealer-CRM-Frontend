@@ -22,7 +22,7 @@ export default function HomePage() {
     <PageLoading label="Opening the CRM…" />
   ) : (
     <section>
-      <h1 className="text-xl font-semibold">H&amp;D Technologies</h1>
+      <h1 className="text-xl font-semibold">Ragno Power System</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Your role doesn&apos;t include any section yet. Ask an admin for access.
       </p>

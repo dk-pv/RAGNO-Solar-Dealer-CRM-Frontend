@@ -13,10 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "H&D Technologies — Solar Dealer CRM",
+  title: "Ragno Power System — Solar Dealer CRM",
   description: "Solar Dealer CRM",
   // The only favicon: app/favicon.ico is gone because Next would list it ahead of this one.
-  icons: { icon: "/handd-mark-512.png" },
+  icons: { icon: "/ragno-favicon-512.png" },
 };
 
 // The page is as wide as the phone. On Android Chrome the on-screen keyboard resizes the page itself (not just what is

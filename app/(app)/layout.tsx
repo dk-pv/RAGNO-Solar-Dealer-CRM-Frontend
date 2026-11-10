@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 
 export const metadata: Metadata = {
-  title: { default: "H&D Technologies — Solar Dealer CRM", template: "%s | H&D Technologies" },
+  title: { default: "Ragno Power System — Solar Dealer CRM", template: "%s | Ragno Power System" },
 };
 
 // Every signed-in CRM page lives under app/(app)/ and gets the shared sidebar and navbar.
