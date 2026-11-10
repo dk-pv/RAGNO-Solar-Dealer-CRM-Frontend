@@ -713,6 +713,10 @@ function WorkPicker({ fieldId, picked, onPick, error }: WorkPickerProps) {
           type="search"
           value={text}
           onChange={(event) => setText(event.target.value)}
+          // Enter here searches (it already does as you type); it shouldn't submit the form before a Work is chosen.
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.preventDefault();
+          }}
           placeholder="Search customer, phone or Work ID"
           className={inputClass}
         />

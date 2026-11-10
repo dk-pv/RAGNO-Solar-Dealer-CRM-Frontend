@@ -7,9 +7,9 @@ import { useContext, useState } from "react";
 import { ChevronLeftIcon, FlagIcon, PinIcon, TrashIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
-import { formatDate, formatPhone, type Assignee, type Page } from "@/components/leads/api";
+import { formatDate, formatPhone, workTypeLabel, type Assignee, type Page } from "@/components/leads/api";
 import { pickParams, updateQuery } from "@/components/leads/leads-toolbar";
-import { fillClass, secondaryButton, stickyNameClass, useNotice } from "@/components/leads/ui";
+import { fillClass, secondaryButton, stickyNameClass, useNotice, useSelectIntent } from "@/components/leads/ui";
 import {
   ActionDialog,
   BulkAction,
@@ -25,12 +25,12 @@ import {
 import { ColumnsButton, DEFAULT_PAGE_SIZE, EmptyState, ListShell, SkeletonRows, useColumns, type Columns } from "@/components/table";
 import { toApiError, useApi } from "@/lib/api";
 import {
-  WORK_STAGES,
   bulkChangeWorkStage,
   bulkDeleteWorks,
   stageFor,
   today,
   updateWork,
+  useWorkStages,
   type Work,
   type WorkChanges,
   type WorkStage,
@@ -50,6 +50,7 @@ const COLUMNS = [
   { key: "location", label: "Location" },
   { key: "plan", label: "Plan" },
   { key: "amount", label: "Confirmed amount" },
+  { key: "work_type", label: "Work type" },
   { key: "stage", label: "Stage" },
   { key: "documents", label: "Documents" },
   { key: "assigned", label: "Assigned" },
@@ -76,6 +77,7 @@ export function WorksPage() {
     reload();
   });
   const columns = useColumns("works", COLUMNS);
+  const { stages } = useWorkStages();
   // Deleting Works is an admin's decision on the API; only admins are offered it.
   const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
@@ -87,12 +89,14 @@ export function WorksPage() {
 
   // Runs a bulk action on the selected Works and reports what went through and what didn't. The selection is kept when
   // nothing went through, so the user can change it and try again.
-  async function runBulk(request: (ids: number[]) => Promise<BulkResult>, past: string) {
+  async function runBulk(request: (ids: number[]) => Promise<BulkResult>, past: string, removes = false) {
     setBulkRunning(true);
     try {
       const result = await request(selection.selected);
       notify(describeBulkResult(result, "Work", past));
       if (result.succeeded.length > 0) selection.clear();
+      // Every row of a later page deleted: show the page before it, rather than a page that no longer exists.
+      if (removes && result.succeeded.length === rows.length && page > 1) updateQuery({ page: page > 2 ? String(page - 1) : null });
       reload();
     } finally {
       setBulkRunning(false);
@@ -116,7 +120,7 @@ export function WorksPage() {
         description="Every selected Work moves to the chosen stage of the Work Pipeline, in either direction, as the row's stage control does for one."
         label="Stage"
         placeholder="Choose a stage"
-        options={WORK_STAGES}
+        options={stages}
         confirmLabel="Update Stage"
         pendingLabel="Updating…"
         onConfirm={(value) => runBulk((ids) => bulkChangeWorkStage(ids, value as WorkStage), "updated")}
@@ -130,7 +134,7 @@ export function WorksPage() {
         description="This action will permanently remove these Works with their activity history and documents. Each lead stays Won and can be converted again. Users are never affected."
         confirmLabel="Delete"
         pendingLabel="Deleting…"
-        onConfirm={() => runBulk(bulkDeleteWorks, "deleted")}
+        onConfirm={() => runBulk(bulkDeleteWorks, "deleted", true)}
         onClose={() => setBulkAction(undefined)}
         onError={showError}
       />
@@ -138,10 +142,7 @@ export function WorksPage() {
 
   return (
     <div className={fillClass}>
-      <WorksHeader
-        title="Works"
-        description={data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "work" : "works"}` : undefined}
-      />
+      <WorksHeader title="Works" />
       <WorksToolbar key={clears} assignees={assignees.data}>
         <ColumnsButton columns={columns} />
       </WorksToolbar>
@@ -221,6 +222,7 @@ export function WorksPage() {
               {shows("location") && <th scope="col" className="px-3 py-2.5">Location</th>}
               {shows("plan") && <th scope="col" className="px-3 py-2.5">Plan</th>}
               {shows("amount") && <th scope="col" className="px-3 py-2.5 text-right">Confirmed amount</th>}
+              {shows("work_type") && <th scope="col" className="px-3 py-2.5">Work type</th>}
               {shows("stage") && <th scope="col" className="px-3 py-2.5">Stage</th>}
               {shows("documents") && <th scope="col" className="px-3 py-2.5">Documents</th>}
               {shows("assigned") && <th scope="col" className="px-3 py-2.5">Assigned</th>}
@@ -243,6 +245,7 @@ export function WorksPage() {
                   shows={shows}
                   selected={selection.isSelected(work.id)}
                   onToggle={() => selection.toggle(work.id)}
+                  stages={stages}
                   assignees={assignees.data}
                   actions={actions}
                   onSaved={(text) => {
@@ -271,6 +274,7 @@ type WorkRowProps = {
   shows: Columns<ColumnKey>["shows"];
   selected: boolean;
   onToggle: () => void;
+  stages: ReturnType<typeof stageFor>[];
   assignees?: Assignee[];
   actions: WorkActions;
   onSaved: (message: string) => void;
@@ -281,10 +285,12 @@ const chevron = (
   <ChevronLeftIcon className="pointer-events-none absolute top-1/2 right-1.5 size-3 -translate-y-1/2 -rotate-90 opacity-70" />
 );
 
-function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved, onError }: WorkRowProps) {
+function WorkRow({ work, shows, selected, onToggle, stages, assignees, actions, onSaved, onError }: WorkRowProps) {
   // A change being saved shows straight away; if the API refuses it, the saved value comes back.
   const [pending, setPending] = useState<WorkChanges>();
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState<{ changes: WorkChanges; message: string; question: string }>();
+  const intent = useSelectIntent();
   const location = [work.area, work.district].filter(Boolean).join(", ");
   const overdue = isOverdue(work);
   // Sticky cells need an opaque background: the row's own colour (selected or not), and the solid hover colour.
@@ -302,7 +308,9 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
   ];
   const assigneeName = people.find((person) => person.id === assigneeValue)?.name;
 
-  async function save(changes: WorkChanges, message: string) {
+  const failed = (message: string) => onError(`Couldn't update ${work.customer_name}. ${message}`);
+
+  async function commit(changes: WorkChanges, message: string) {
     setPending(changes);
     setSaving(true);
     try {
@@ -310,10 +318,16 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
       onSaved(message);
     } catch (error) {
       setPending(undefined);
-      onError(`Couldn't update ${work.customer_name}. ${toApiError(error).message}`);
+      throw error;
     } finally {
       setSaving(false);
     }
+  }
+
+  // A change picked with a pointer saves at once; one made from the keyboard is confirmed first (see useSelectIntent).
+  function save(changes: WorkChanges, message: string, question: string) {
+    if (!intent.byPointer()) return setConfirming({ changes, message, question });
+    commit(changes, message).catch((error) => failed(toApiError(error).message));
   }
 
   return (
@@ -355,20 +369,27 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
           <WorkAmount work={work} />
         </td>
       )}
+      {shows("work_type") && (
+        <td data-label="Work type" className={`px-3 py-2 whitespace-nowrap ${work.work_type ? "" : "text-muted-foreground"}`}>
+          {work.work_type ? workTypeLabel(work.work_type) : "—"}
+        </td>
+      )}
       {shows("stage") && (
         <td data-label="Stage" data-slot="wide" className="px-3 py-2">
           <span className="relative inline-flex">
             <select
               value={stageValue}
+              {...intent.intentProps}
               onChange={(event) => {
                 const next = event.target.value as WorkStage;
-                save({ stage: next }, `Moved ${work.customer_name} to ${stageFor(next).label}.`);
+                const label = stageFor(next).label;
+                save({ stage: next }, `Moved ${work.customer_name} to ${label}.`, `Move ${work.customer_name} to ${label}?`);
               }}
               disabled={saving}
               aria-label={`Stage for ${work.customer_name}`}
               className={`cursor-pointer appearance-none rounded-md py-0.5 pr-6 pl-2 text-xs font-medium hover:ring-1 hover:ring-border-strong touch:min-h-11 touch:text-base disabled:cursor-wait disabled:opacity-60 ${stage.header}`}
             >
-              {WORK_STAGES.map((option) => (
+              {stages.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -397,10 +418,15 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
             <span className="relative inline-flex">
               <select
                 value={assigneeValue ?? ""}
+                {...intent.intentProps}
                 onChange={(event) => {
                   const id = event.target.value ? Number(event.target.value) : null;
                   const name = people.find((person) => person.id === id)?.name;
-                  save({ assigned_to: id }, name ? `Assigned ${work.customer_name} to ${name}.` : `Unassigned ${work.customer_name}.`);
+                  save(
+                    { assigned_to: id },
+                    name ? `Assigned ${work.customer_name} to ${name}.` : `Unassigned ${work.customer_name}.`,
+                    name ? `Assign ${work.customer_name} to ${name}?` : `Unassign ${work.customer_name}?`,
+                  );
                 }}
                 // Until the staff list loads, only the current value could be chosen.
                 disabled={saving || !assignees}
@@ -435,6 +461,17 @@ function WorkRow({ work, shows, selected, onToggle, assignees, actions, onSaved,
       {shows("converted") && <td data-label="Converted" className="px-3 py-2 whitespace-nowrap">{formatDate(work.created_at)}</td>}
       <td data-slot="menu" className={`${stickyCell} right-0 px-2 py-1.5 shadow-[inset_1px_0_0_var(--color-border)]`}>
         <WorkMenu work={work} actions={actions} />
+        {confirming && (
+          <ActionDialog
+            title={confirming.question}
+            description="You changed this with the keyboard. Confirm to save it."
+            confirmLabel="Save"
+            pendingLabel="Saving…"
+            onConfirm={() => commit(confirming.changes, confirming.message)}
+            onClose={() => setConfirming(undefined)}
+            onError={failed}
+          />
+        )}
       </td>
     </tr>
   );

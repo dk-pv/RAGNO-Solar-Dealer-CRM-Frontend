@@ -267,10 +267,11 @@ function SummaryCard({ card }: { card: Card }) {
       <span className="mt-0.5 block text-xs text-muted-foreground">{card.hint}</span>
     </>
   );
-  // The hint wraps rather than cutting off its counts on a narrow tile. A column keeps every tile's text at the top when
-  // a neighbour's longer hint makes the row taller (a button would centre it).
+  // The hint wraps rather than cutting off its counts on a narrow tile. The tile's title, figure and hint are rows of the
+  // tiles' grid (a subgrid), so every figure in a row lines up when a neighbour's title wraps to two lines, and the text
+  // stays at the top when a longer hint makes the row taller (a button would centre it).
   const className =
-    "flex w-full flex-col rounded-lg border border-border bg-background p-4 text-left shadow-xs transition-colors hover:border-border-strong";
+    "row-span-3 grid w-full grid-rows-subgrid gap-y-0 rounded-lg border border-border bg-background p-4 text-left shadow-xs transition-colors hover:border-border-strong";
   return card.href ? (
     <Link href={card.href} className={className}>
       {body}
@@ -359,7 +360,7 @@ function FollowUpsPanel({ view, onView, counts, today, version, links, className
         </div>
       }
     >
-      <div role="group" aria-label="Which follow-ups" className="scrollbar-none -mx-1 mb-3 flex gap-1 overflow-x-auto px-1">
+      <div role="group" aria-label="Which follow-ups" className="mb-3 flex flex-wrap gap-1">
         {FOLLOW_UP_BUCKETS.map((item) => {
           const count = item.value === "completed" ? undefined : counts?.total[item.value];
           const pressed = item.value === bucket;

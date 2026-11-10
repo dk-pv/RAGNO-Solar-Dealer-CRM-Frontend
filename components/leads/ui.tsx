@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { CloseIcon, PinIcon, SpinnerIcon } from "@/components/layout/icons";
 import { toApiError } from "@/lib/api";
@@ -63,9 +63,9 @@ export const segmentedClass = "flex rounded-md border border-input bg-background
 export const segmentClass =
   "rounded px-3 py-1.5 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground touch:py-3";
 
-// A page's sub-navigation (Reports, Settings): the current tab is underlined in the brand colour. The list scrolls
-// sideways on narrow screens rather than wrapping.
-export const tabListClass = "scrollbar-none -mx-1 flex gap-1 overflow-x-auto border-b border-border px-1";
+// A page's sub-navigation (Reports, Settings): the current tab is underlined in the brand colour. On a narrow screen the
+// tabs wrap onto a second line, so every tab stays in sight (a strip scrolling sideways hid the last ones off-screen).
+export const tabListClass = "flex flex-wrap gap-x-1 border-b border-border";
 export const tabClass =
   "-mb-px shrink-0 border-b-2 border-transparent px-3 py-2 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground aria-[current=page]:border-primary aria-[current=page]:text-foreground touch:py-3";
 
@@ -102,7 +102,7 @@ export const stickyNameClass = "max-w-[max(min(13rem,40cqw),14cqw)]";
 
 type PageHeaderProps = {
   title: string;
-  /** The line under the title: a count, or what the page is for. Its place is kept while a count loads. */
+  /** The line under the title (the pipelines' total and hint); none on the lists, whose total is under the table. */
   description?: string;
   /** To move the keyboard focus to the title when what had it leaves the page. */
   titleRef?: RefObject<HTMLHeadingElement | null>;
@@ -111,17 +111,18 @@ type PageHeaderProps = {
 };
 
 // The heading of a list or board page, the same on every one: Leads, Works, both pipelines and both Activities pages.
-export function PageHeader({ title, description = " ", titleRef, children }: PageHeaderProps) {
+// The title and the controls share the first row and the description has a line of its own, so the controls stay in
+// the same place whether a page has a description or not (List and Pipeline views of the same records).
+export function PageHeader({ title, description, titleRef, children }: PageHeaderProps) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div>
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined} className="text-xl font-semibold">
           {title}
         </h1>
-        {/* min-h-5: the line is reserved while the count loads, so the title doesn't move when it arrives. */}
-        <p className="mt-0.5 min-h-5 text-sm text-muted-foreground">{description}</p>
+        {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
       </div>
-      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+      {description !== undefined && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
     </div>
   );
 }
@@ -146,8 +147,9 @@ export function ViewSwitch({ label, views, query = "" }: { label: string; views:
 }
 
 // Colour carries meaning only: neutral, information, attention, high priority, success, negative. The leads list's
-// inline status control wears the same colours as the badge.
-export const STATUS_STYLES: Record<LeadStatus, string> = {
+// inline status control wears the same colours as the badge. A stage an admin added has a plain tone of its own
+// (statusStyle, statusDot).
+const STATUS_STYLES: Record<string, string> = {
   NEW: "bg-neutral-soft text-neutral ring-neutral-border",
   INITIAL_CONTACT: "bg-info-soft text-info ring-info-border",
   HOT: "bg-warning-soft text-warning ring-warning-border",
@@ -158,7 +160,7 @@ export const STATUS_STYLES: Record<LeadStatus, string> = {
 };
 
 // Each status's dot, for the Lead Pipeline's column headers (as the Work stages have theirs).
-export const STATUS_DOTS: Record<LeadStatus, string> = {
+const STATUS_DOTS: Record<string, string> = {
   NEW: "bg-neutral",
   INITIAL_CONTACT: "bg-info",
   HOT: "bg-warning",
@@ -167,10 +169,13 @@ export const STATUS_DOTS: Record<LeadStatus, string> = {
   LOST: "bg-error",
 };
 
+export const statusStyle = (status: LeadStatus) => STATUS_STYLES[status] ?? "bg-muted text-secondary-foreground ring-border-strong";
+export const statusDot = (status: LeadStatus) => STATUS_DOTS[status] ?? "bg-faint";
+
 export function StatusBadge({ status }: { status: LeadStatus }) {
   return (
     <span
-      className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${STATUS_STYLES[status]}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${statusStyle(status)}`}
     >
       {statusLabel(status)}
     </span>
@@ -247,6 +252,49 @@ export function PinButton({ lead, onChanged, onError, className = "size-8" }: Pi
       <PinIcon className={`size-4 ${lead.is_pinned ? "text-brand" : ""}`} fill={lead.is_pinned ? "currentColor" : "none"} />
     </button>
   );
+}
+
+// Keeps a modal <dialog> open while its save runs, so a failure can't vanish with it. Refusing `cancel` isn't enough: a
+// browser lets a page refuse only the first close request since the last click, so a second Escape (or Android's back
+// gesture) closes the dialog anyway. closedby="none" turns close requests off (Chrome 134+, Firefox 141+); the key handler
+// covers Escape where that isn't supported, on the window because the focus is on <body> once the pressed button is
+// disabled. Closing it from code, as a save does when it's done, still works.
+export function useHoldDialogOpen(dialogRef: RefObject<HTMLDialogElement | null>, busy: boolean) {
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!busy || !dialog) return;
+    const blockEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") event.preventDefault();
+    };
+    dialog.setAttribute("closedby", "none");
+    window.addEventListener("keydown", blockEscape, true);
+    return () => {
+      dialog.removeAttribute("closedby");
+      window.removeEventListener("keydown", blockEscape, true);
+    };
+  }, [dialogRef, busy]);
+}
+
+// For a <select> in a table row that saves when it changes. A mouse or a finger picks from the open list, but on Windows
+// an arrow key or a typed letter changes a closed, focused select at once: `byPointer()` says whether the change
+// followed a pointer press, so a change made from the keyboard can be confirmed before it saves.
+export function useSelectIntent() {
+  const pointer = useRef(false);
+  return {
+    intentProps: {
+      onPointerDown: () => {
+        pointer.current = true;
+      },
+      onKeyDown: () => {
+        pointer.current = false;
+      },
+    },
+    byPointer() {
+      const was = pointer.current;
+      pointer.current = false;
+      return was;
+    },
+  };
 }
 
 // `persist`: the notice stays until dismissed (a list of rows that need reading, say) instead of going away by itself.

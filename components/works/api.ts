@@ -1,43 +1,32 @@
 import { ApiError, apiRequest, apiUpload } from "@/lib/api";
-import type { ActivityType, Assignee } from "@/components/leads/api";
+import { stageName, useStages } from "@/lib/stages";
+import type { ActivityType, Assignee, WorkType } from "@/components/leads/api";
 
-// The Work Pipeline, in order. Values and labels must match the backend's WorkStage choices.
-// The classes use the stage colour tokens in globals.css: a dot, and the column header's background and text.
-export const WORK_STAGES = [
-  { value: "LOAN_DOCUMENTS", label: "Loan Work / Documents", dot: "bg-stage-loan", header: "bg-stage-loan-soft text-stage-loan-text" },
-  {
-    value: "FEASIBILITY",
-    label: "Feasibility",
-    dot: "bg-stage-feasibility",
-    header: "bg-stage-feasibility-soft text-stage-feasibility-text",
-  },
-  {
-    value: "STRUCTURE",
-    label: "Structure Work",
-    dot: "bg-stage-structure",
-    header: "bg-stage-structure-soft text-stage-structure-text",
-  },
-  {
-    value: "ELECTRICAL",
-    label: "Electrical Work",
-    dot: "bg-stage-electrical",
-    header: "bg-stage-electrical-soft text-stage-electrical-text",
-  },
-  { value: "KSEB_DOCUMENTATION", label: "KSEB Documentation", dot: "bg-stage-kseb", header: "bg-stage-kseb-soft text-stage-kseb-text" },
-  {
-    value: "SUBSIDY_DOCUMENTATION",
-    label: "Subsidy Documentation",
-    dot: "bg-stage-subsidy",
-    header: "bg-stage-subsidy-soft text-stage-subsidy-text",
-  },
-  {
-    value: "COMPLETED",
-    label: "Completed",
-    dot: "bg-stage-completed",
-    header: "bg-stage-completed-soft text-stage-completed-text",
-  },
-] as const;
-export type WorkStage = (typeof WORK_STAGES)[number]["value"];
+// A Work's stage: the key of one of the Work Pipeline's stages, a system one (LOAN_DOCUMENTS … COMPLETED) or one an admin
+// added in Settings → Pipeline Stages (lib/stages.ts). It is never a Work Type (Loan or Cash Work).
+export type WorkStage = string;
+
+// The system stages' colours (the stage tokens in globals.css): a dot, and the column header's background and text. A stage
+// an admin added has a plain one.
+const STAGE_TONES: Record<string, { dot: string; header: string }> = {
+  LOAN_DOCUMENTS: { dot: "bg-stage-loan", header: "bg-stage-loan-soft text-stage-loan-text" },
+  FEASIBILITY: { dot: "bg-stage-feasibility", header: "bg-stage-feasibility-soft text-stage-feasibility-text" },
+  STRUCTURE: { dot: "bg-stage-structure", header: "bg-stage-structure-soft text-stage-structure-text" },
+  ELECTRICAL: { dot: "bg-stage-electrical", header: "bg-stage-electrical-soft text-stage-electrical-text" },
+  KSEB_DOCUMENTATION: { dot: "bg-stage-kseb", header: "bg-stage-kseb-soft text-stage-kseb-text" },
+  SUBSIDY_DOCUMENTATION: { dot: "bg-stage-subsidy", header: "bg-stage-subsidy-soft text-stage-subsidy-text" },
+  COMPLETED: { dot: "bg-stage-completed", header: "bg-stage-completed-soft text-stage-completed-text" },
+};
+const CUSTOM_TONE = { dot: "bg-neutral", header: "bg-neutral-soft text-neutral" };
+
+// A stage's name and colours.
+export const stageFor = (value: WorkStage) => ({ value, label: stageName(value), ...(STAGE_TONES[value] ?? CUSTOM_TONE) });
+
+// The Work Pipeline's stages in the board's order, each with its name and colours. `fresh`: see useStages.
+export function useWorkStages(options?: { fresh?: boolean }) {
+  const stages = useStages("WORK", options);
+  return { ...stages, stages: stages.stages.map((stage) => stageFor(stage.key)) };
+}
 
 // GET /api/works/ (paginated) and PATCH /api/works/{id}/. The customer, plan and amount were copied from the lead when
 // it was converted; `amount` is the standard price and never follows later plan price changes. An admin can give one
@@ -59,6 +48,7 @@ export type Work = {
   offer_amount: string | null; // null: no offer
   offer_note: string; // why the offer was given ("" if not noted)
   effective_amount: string; // the amount to show as the Work's price: the offer, or else `amount`
+  work_type: WorkType | ""; // the lead's at conversion ("" if none); can be set on the Work afterwards
   stage: WorkStage;
   assigned_to: number | null;
   assigned_to_name: string | null;
@@ -85,17 +75,30 @@ export type DocumentSummary = {
 // GET /api/works/summary/: every stage with its number of Works and their total confirmed amount.
 export type StageSummary = { stage: WorkStage; label: string; count: number; total_amount: string };
 
-// The pipeline fields, the pin and the email change (the email is one of the required documents); the backend accepts
-// any stage, in either direction, and validates everything.
-export type WorkChanges = Partial<Pick<Work, "stage" | "assigned_to" | "due_date" | "is_pinned" | "email">>;
+// The pipeline fields, the pin, the work type and the email change (the email is one of the required documents); the
+// backend accepts any Work stage, in either direction, and validates everything.
+export type WorkChanges = Partial<Pick<Work, "stage" | "assigned_to" | "due_date" | "is_pinned" | "email" | "work_type">>;
 
 // GET /api/works/{id}/documents/: every document the Work needs, in groups, as the backend defines them. A file is
-// uploaded for most; Email ID and Phone number are the Work's own email and phone.
+// uploaded for most; Email ID and Phone number are the Work's own email and phone. Apart from them, any number of
+// additional documents, never counted as required ones.
 export type DocumentChecklist = {
   work: Work;
   groups: { key: string; label: string; items: DocumentItem[] }[];
+  additional: AdditionalDocument[]; // newest first
+  additional_categories: { value: string; label: string }[];
+  accept: string[]; // the extensions any upload may have, such as ".pdf"
   max_file_size: number; // bytes
   can_delete: boolean; // deleting a document is for admins only
+};
+
+// A file uploaded beside the required documents, with its own title, category and optional description.
+export type AdditionalDocument = UploadedDocument & {
+  id: number;
+  title: string;
+  category: string;
+  category_label: string;
+  description: string;
 };
 
 export type DocumentItem = {
@@ -132,6 +135,29 @@ export function uploadWorkDocument(workId: number, key: string, file: File, opti
 // Admins only: deletes a document's file. Answers the updated checklist.
 export function deleteWorkDocument(workId: number, key: string) {
   return apiRequest<DocumentChecklist>(`/works/${workId}/documents/${key}/`, { method: "DELETE" });
+}
+
+// An additional document's file, sent after the same access check as the Work's (apiBlob / apiDownload).
+export const additionalFilePath = (workId: number, id: number) => `/works/${workId}/additional-documents/${id}/file/`;
+
+// Uploads an additional document with its details, reporting its progress (see apiUpload). Answers the updated checklist.
+export function uploadAdditionalDocument(
+  workId: number,
+  details: { title: string; category: string; description: string },
+  file: File,
+  options: Parameters<typeof apiUpload>[2],
+) {
+  const form = new FormData();
+  form.append("title", details.title);
+  form.append("category", details.category);
+  form.append("description", details.description);
+  form.append("file", file);
+  return apiUpload<DocumentChecklist>(`/works/${workId}/additional-documents/`, form, options);
+}
+
+// Admins only: deletes an additional document and its file. Answers the updated checklist.
+export function deleteAdditionalDocument(workId: number, id: number) {
+  return apiRequest<DocumentChecklist>(`/works/${workId}/additional-documents/${id}/`, { method: "DELETE" });
 }
 
 // Must match the backend's Activity statuses.
@@ -214,5 +240,3 @@ export function saveWorkActivity(input: Partial<WorkActivityInput>, target: { id
 
 // Today in the CRM's time zone (YYYY-MM-DD), to mark what is overdue.
 export const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
-
-export const stageFor = (value: WorkStage) => WORK_STAGES.find((stage) => stage.value === value) ?? WORK_STAGES[0];

@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type ComponentType, type ReactNode 
 
 import { CloseIcon, SpinnerIcon, type IconProps } from "@/components/layout/icons";
 import { dialogClass } from "@/components/leads/lead-dialogs";
-import { Busy, destructiveButton, iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
+import { Busy, destructiveButton, iconButton, inputClass, primaryButton, secondaryButton, useHoldDialogOpen } from "@/components/leads/ui";
 import { toApiError } from "@/lib/api";
 
 // ---- Selecting rows ----
@@ -205,6 +205,7 @@ export function ActionDialog({ title, description, confirmLabel, pendingLabel, d
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [pending, setPending] = useState(false);
+  useHoldDialogOpen(dialogRef, pending);
   const [error, setError] = useState<string>();
 
   useEffect(() => {

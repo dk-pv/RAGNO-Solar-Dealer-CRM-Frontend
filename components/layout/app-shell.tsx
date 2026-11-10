@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { ErrorState, PageLoading } from "@/components/leads/ui";
+import { useStagesReady } from "@/lib/stages";
 import { Navbar } from "./navbar";
 import { blockedEntryFor, startPageFor } from "./navigation";
 import { Sidebar, SidebarPanel } from "./sidebar";
@@ -12,6 +13,9 @@ import { CurrentUserContext, useShellSession } from "./use-shell-session";
 export function AppShell({ children }: { children: ReactNode }) {
   // One session read for the whole shell, so the sidebar and the account menu share the same logout.
   const { signedIn, user, userError, reloadUser, logout: endSession } = useShellSession();
+  // The pipelines' stages, loaded once alongside the account, so every page names a lead's status or a Work's stage
+  // as the admins named it (lib/stages.ts).
+  const stagesReady = useStagesReady(Boolean(signedIn));
   const router = useRouter();
   const pathname = usePathname();
   const drawerRef = useRef<HTMLDialogElement>(null);
@@ -53,7 +57,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // A page renders once the user is known, and only if they can open its module, so a staff member without access
   // never loads it. This is only for people: the API refuses the same requests on its own.
   let content: ReactNode;
-  if (user) {
+  if (user && stagesReady) {
     const blocked = blockedEntryFor(user, pathname);
     // The way on is the page "/" opens for them: Lead Activities for Activities-only staff. Without one, "/" says so.
     const start = startPageFor(user);

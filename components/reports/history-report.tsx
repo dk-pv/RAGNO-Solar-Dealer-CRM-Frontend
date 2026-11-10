@@ -29,8 +29,9 @@ const COLUMNS: Column<TimelineEvent>[] = [
   },
   {
     header: "User",
-    render: (event) => <span className="block max-w-[max(11rem,12cqw)] truncate">{event.user?.name ?? "—"}</span>,
-    className: "whitespace-nowrap font-medium",
+    // The weight is on the name, not the column: a column's className applies to its header too.
+    render: (event) => <span className="block max-w-[max(11rem,12cqw)] truncate font-medium">{event.user?.name ?? "—"}</span>,
+    className: "whitespace-nowrap",
   },
   { header: "Event", render: (event) => EVENT_KINDS.find((kind) => kind.value === event.kind)?.label, className: "whitespace-nowrap" },
   {

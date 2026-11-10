@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { CalendarIcon, EyeIcon, MapPinIcon, PhoneIcon, PlusIcon } from "@/components/layout/icons";
-import { formatDate, formatMoney, formatPhone, type Assignee, type Page } from "@/components/leads/api";
+import { formatDate, formatMoney, formatPhone, workTypeLabel, type Assignee, type Page } from "@/components/leads/api";
 import { menuItemClass } from "@/components/leads/lead-actions";
 import { pickParams, updateQuery } from "@/components/leads/leads-toolbar";
 import { ErrorState, fillClass, secondaryButton, useNotice } from "@/components/leads/ui";
@@ -21,13 +21,13 @@ import {
   useBoardScroll,
 } from "@/components/pipeline";
 import { toApiError, useApi } from "@/lib/api";
-import { WORK_STAGES, stageFor, today, updateWork, type StageSummary, type Work, type WorkStage } from "./api";
+import { stageFor, today, updateWork, useWorkStages, type StageSummary, type Work, type WorkStage } from "./api";
 import { WorkMenu, WorkPinButton, isOverdue, useWorkActions, type WorkActions } from "./work-actions";
 import { DocumentStatus } from "./work-documents";
 import { WorkAmount } from "./work-offer";
 import { DEFAULT_ORDERING, FILTER_KEYS, SORT_OPTIONS, WorksHeader, WorksToolbar } from "./works-toolbar";
 
-type Stage = (typeof WORK_STAGES)[number];
+type Stage = ReturnType<typeof stageFor>;
 
 const PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100; // the API's largest page
@@ -45,8 +45,9 @@ type Move = { work: Work; from: WorkStage; to: WorkStage; saving: boolean; settl
 const without = <T,>(record: Record<number, T>, id: number) =>
   Object.fromEntries(Object.entries(record).filter(([key]) => Number(key) !== id)) as Record<number, T>;
 
-// The Work Pipeline: one column per stage of the installation work, with the same Works, search, filters and actions as
-// the list. A Work moves to any stage, in either direction, by dragging its card; the API validates and saves the move.
+// The Work Pipeline: one column per stage of the installation work (the system stages and any an admin added, in the
+// backend's order), with the same Works, search, filters and actions as the list. A Work moves to any stage, in either
+// direction, by dragging its card; the API validates and saves the move.
 export function WorkPipeline() {
   const searchParams = useSearchParams();
   // The search and filters the board shares with the list, kept in the URL.
@@ -54,7 +55,9 @@ export function WorkPipeline() {
   const chosenOrdering = searchParams.get("ordering");
   const ordering = PIPELINE_SORT_OPTIONS.find((option) => option.value === chosenOrdering)?.value ?? DEFAULT_ORDERING;
   const stageFilter = searchParams.get("stage") || null;
-  const unknownStage = stageFilter !== null && !WORK_STAGES.some((stage) => stage.value === stageFilter);
+  // Read again as the board opens, so a stage another admin added since shows.
+  const { stages, loaded: stagesLoaded, error: stagesError, reload: reloadStages } = useWorkStages({ fresh: true });
+  const unknownStage = stagesLoaded && stageFilter !== null && !stages.some((stage) => stage.value === stageFilter);
   // Bumped for a stage after a change there, so only the columns involved reload.
   const [versions, setVersions] = useState<Partial<Record<WorkStage, number>>>({});
   // The same versions, readable after an await, when the state above may already be newer.
@@ -118,7 +121,14 @@ export function WorkPipeline() {
   };
 
   let content;
-  if (unknownStage) {
+  if (!stagesLoaded && stagesError) {
+    // Without the stages, the board can't know its columns (an admin's stages included).
+    content = (
+      <div className="mt-4 rounded-lg border border-border bg-background">
+        <ErrorState title="Couldn't load the pipeline stages" message={stagesError.message} onRetry={reloadStages} />
+      </div>
+    );
+  } else if (unknownStage) {
     content = (
       <div className="mt-4 rounded-lg border border-border bg-background">
         <ErrorState
@@ -135,7 +145,7 @@ export function WorkPipeline() {
         <ErrorState
           title="Couldn't load Works"
           message={summary.error.message}
-          onRetry={() => refresh(...WORK_STAGES.map((stage) => stage.value))}
+          onRetry={() => refresh(...stages.map((stage) => stage.value))}
         />
       </div>
     );
@@ -148,7 +158,7 @@ export function WorkPipeline() {
           if (dragged) scrollWhileDragging(event.clientX);
         }}
       >
-        {WORK_STAGES.map((stage) => {
+        {stages.map((stage) => {
           const hidden = stageFilter !== null && stageFilter !== stage.value;
           return (
             <StageColumn
@@ -416,7 +426,10 @@ function WorkCard({ work, saving, dragging, actions, onDragStart, onDragEnd }: W
         <span className="shrink-0 text-faint tabular-nums">#{work.id}</span>
       </p>
 
-      <p className="mt-2.5 text-xs text-muted-foreground">{work.plan_name} plan</p>
+      <p className="mt-2.5 truncate text-xs text-muted-foreground">
+        {work.plan_name} plan
+        {work.work_type && ` · ${workTypeLabel(work.work_type)}`}
+      </p>
       <p className="font-semibold text-foreground tabular-nums">
         <WorkAmount work={work} />
       </p>

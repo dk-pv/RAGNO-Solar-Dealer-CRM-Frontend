@@ -5,7 +5,7 @@ import Link from "next/link";
 import { formatDate, formatDateTime, formatMoney } from "@/components/leads/api";
 import { fillClass } from "@/components/leads/ui";
 import { updateQuery } from "@/components/leads/leads-toolbar";
-import { WORK_STAGES, stageFor, type WorkStage } from "@/components/works/api";
+import { stageFor, useWorkStages, type WorkStage } from "@/components/works/api";
 import { OfferBadge } from "@/components/works/work-offer";
 import { useApi } from "@/lib/api";
 import type { Page, WorkReportRow, WorkReportSummary } from "./api";
@@ -88,13 +88,14 @@ export function WorkReport() {
   const summary = useApi<WorkReportSummary>(`/reports/works/summary/?${report.filters}`);
   const rows = useApi<Page<WorkReportRow>>(`/reports/works/?${report.rows}`);
   const people = useAssignees();
+  const { stages } = useWorkStages();
   const data = summary.data;
   const nameOf = (id: string) => (id === "none" ? "Unassigned" : (people?.find((person) => String(person.id) === id)?.name ?? `User #${id}`));
 
   return (
     <div className={`${fillClass} space-y-4`}>
       <div className="flex flex-wrap items-center gap-2">
-        <FilterSelect name="stage" label="Stage" all="All stages" options={WORK_STAGES.map(({ value, label }) => ({ value, label }))} />
+        <FilterSelect name="stage" label="Stage" all="All stages" options={stages.map(({ value, label }) => ({ value, label }))} />
         <FilterSelect name="assigned_to" label="Assigned staff" all="Anyone" options={assigneeOptions(people)} />
         <span className="ml-auto">
           <ExportButtons path="/reports/works/" query={report.filters} name="work-report" />

@@ -89,7 +89,9 @@ export function StaffReport() {
           score or a ranking: users are listed by name. Who edited a record isn&apos;t recorded, so there is no &ldquo;records
           updated&rdquo; column. Select a number to see its records.
         </p>
-        <ExportButtons path="/reports/staff/" query={report.filters} name="staff-report" />
+        <span className="ml-auto">
+          <ExportButtons path="/reports/staff/" query={report.filters} name="staff-report" />
+        </span>
       </div>
       <Panel title="Staff activity">
         {error ? (

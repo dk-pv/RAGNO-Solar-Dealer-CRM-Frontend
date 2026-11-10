@@ -22,6 +22,7 @@ import {
   secondaryButton,
   tableAreaClass,
   tableBoxClass,
+  useHoldDialogOpen,
   useNotice,
 } from "@/components/leads/ui";
 import { PasswordInput } from "@/components/password-input";
@@ -68,7 +69,7 @@ export function UsersPage() {
   const roles = useApi<Role[]>(isAdmin ? "/roles/" : null);
   const [dialog, setDialog] = useState<{ mode: Mode; user?: User }>();
   const [noticeElement, notify] = useNotice();
-  const columnCount = isAdmin ? 7 : 6;
+  const columnCount = isAdmin ? 6 : 5;
 
   let content;
   if (error) {
@@ -93,14 +94,13 @@ export function UsersPage() {
     content = (
       <>
         <div className={`${emptyHint ? tableBoxClass : tableAreaClass} relative mt-4`}>
-          <table aria-busy={loading} data-stack className={`w-full min-w-200 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}>
+          <table aria-busy={loading} data-stack className={`w-full min-w-160 text-sm transition-opacity ${loading && rows ? "opacity-60" : ""}`}>
             <caption className="sr-only">Users</caption>
             <thead>
               <tr className="border-b border-border bg-page text-left text-xs font-medium whitespace-nowrap text-secondary-foreground">
                 <th scope="col" className="px-3 py-2.5">Name</th>
                 <th scope="col" className="px-3 py-2.5">Email</th>
                 <th scope="col" className="px-3 py-2.5">Role</th>
-                <th scope="col" className="px-3 py-2.5">Department</th>
                 <th scope="col" className="px-3 py-2.5">Status</th>
                 <th scope="col" className="px-3 py-2.5">Access</th>
                 {isAdmin && (
@@ -120,10 +120,7 @@ export function UsersPage() {
                       <td data-label="Email" data-slot="wide" className="px-3 py-2">
                         <span className="block max-w-[max(16rem,17cqw)] truncate">{user.email}</span>
                       </td>
-                      <td data-label="Role" className="px-3 py-2">{ROLE_LABELS[user.role]}</td>
-                      <td data-label="Department" className="px-3 py-2 whitespace-nowrap">
-                        {user.department_name ?? <span className="text-muted-foreground">—</span>}
-                      </td>
+                      <td data-label="Role" className="px-3 py-2 whitespace-nowrap">{ROLE_LABELS[user.role]}</td>
                       <td data-label="Status" className="px-3 py-2">
                         <span className={`${badgeClass} ${user.is_active ? activeBadge : inactiveBadge}`}>
                           {user.is_active ? "Active" : "Inactive"}
@@ -137,7 +134,8 @@ export function UsersPage() {
                         )}
                       </td>
                       {isAdmin && (
-                        <td data-slot="actions" className="px-2 py-1.5 text-right whitespace-nowrap text-label">
+                        // In a narrow window Delete wraps under Edit and Deactivate rather than push the table sideways.
+                        <td data-slot="actions" className="min-w-40 px-2 py-1.5 text-right text-label">
                           {/* Your own account isn't changed here, so you can't lock yourself out. */}
                           {user.email !== me?.email && (
                             <>
@@ -290,6 +288,7 @@ function UserDialog({ mode, user, modules, roles, onClose, onSaved }: UserDialog
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  useHoldDialogOpen(dialogRef, saving);
 
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -298,6 +297,10 @@ function UserDialog({ mode, user, modules, roles, onClose, onSaved }: UserDialog
   }, []);
 
   const close = () => dialogRef.current?.close();
+  // Close and Cancel do nothing while saving, so a failure is never shown on a dialog that has gone.
+  const dismiss = () => {
+    if (!saving) close();
+  };
   const fieldId = (field: string) => `${formId}-${field}`;
   const selectedRole = roles.data?.find((role) => role.name === values.role);
 
@@ -372,6 +375,9 @@ function UserDialog({ mode, user, modules, roles, onClose, onSaved }: UserDialog
     <dialog
       ref={dialogRef}
       onClose={onClose}
+      onCancel={(event) => {
+        if (saving) event.preventDefault(); // Escape
+      }}
       aria-labelledby={`${formId}-title`}
       className={`${dialogClass} max-h-[calc(100dvh-2rem)] max-w-xl overflow-hidden p-0`}
     >
@@ -393,7 +399,7 @@ function UserDialog({ mode, user, modules, roles, onClose, onSaved }: UserDialog
               {user ? `${user.name} · ${user.email}` : "What they can open comes from the role you choose."}
             </p>
           </div>
-          <button type="button" onClick={close} aria-label="Close" className={`${iconButton} -mr-2 size-9`}>
+          <button type="button" onClick={dismiss} aria-label="Close" aria-disabled={saving || undefined} className={`${iconButton} -mr-2 size-9`}>
             <CloseIcon className="size-4.5" />
           </button>
         </div>
@@ -519,7 +525,7 @@ function UserDialog({ mode, user, modules, roles, onClose, onSaved }: UserDialog
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-          <button type="button" onClick={close} className={secondaryButton}>
+          <button type="button" onClick={dismiss} disabled={saving} className={secondaryButton}>
             Cancel
           </button>
           <button

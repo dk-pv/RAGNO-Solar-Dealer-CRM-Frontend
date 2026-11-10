@@ -25,7 +25,8 @@ export type LeadActions = ReturnType<typeof useLeadActions>;
 // Add, edit, update status, convert and delete, with their dialogs: what the list's and the pipeline's lead menus do.
 // Render `dialogs` once on the page; `onChanged` reloads the page's leads after any change, with the lead changed (or
 // deleted).
-export function useLeadActions(notify: Notify, onChanged: (lead?: Lead) => void) {
+// `onDeleted`, when given, replaces `onChanged` after a delete (a list steps back from a page that has gone).
+export function useLeadActions(notify: Notify, onChanged: (lead?: Lead) => void, onDeleted?: () => void) {
   const [formLead, setFormLead] = useState<Lead | null>(); // null: a new lead; undefined: the form is closed
   const [statusTarget, setStatusTarget] = useState<Lead>();
   const [convertTarget, setConvertTarget] = useState<Lead>();
@@ -43,7 +44,8 @@ export function useLeadActions(notify: Notify, onChanged: (lead?: Lead) => void)
           onConfirm={async () => {
             await deleteLead(deleteTarget.id);
             notify({ text: `Deleted ${deleteTarget.name}.` });
-            onChanged(deleteTarget);
+            if (onDeleted) onDeleted();
+            else onChanged(deleteTarget);
           }}
           onClose={() => setDeleteTarget(undefined)}
           onError={(text) => notify({ text, error: true })}

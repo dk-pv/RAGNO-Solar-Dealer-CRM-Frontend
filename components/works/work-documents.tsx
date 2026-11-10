@@ -19,18 +19,32 @@ import {
   TrashIcon,
   UploadIcon,
 } from "@/components/layout/icons";
-import { formatDateTime, formatPhone } from "@/components/leads/api";
+import { formatDateTime, formatPhone, workTypeLabel } from "@/components/leads/api";
 import { Field, FormDialog, dialogClass } from "@/components/leads/lead-dialogs";
-import { Busy, ErrorState, PageLoading, iconButton, inputClass, secondaryButton, secondaryDangerButton, useNotice } from "@/components/leads/ui";
+import {
+  Busy,
+  ErrorState,
+  PageLoading,
+  fieldClass,
+  iconButton,
+  inputClass,
+  secondaryButton,
+  secondaryDangerButton,
+  useNotice,
+} from "@/components/leads/ui";
 import { Stats } from "@/components/reports/report-ui";
 import { ActionDialog } from "@/components/selection";
 import { apiBlob, apiDownload, toApiError, useApi } from "@/lib/api";
 import {
+  additionalFilePath,
+  deleteAdditionalDocument,
   deleteWorkDocument,
   documentFilePath,
   stageFor,
   updateWork,
+  uploadAdditionalDocument,
   uploadWorkDocument,
+  type AdditionalDocument,
   type DocumentChecklist,
   type DocumentItem,
   type UploadedDocument,
@@ -74,8 +88,10 @@ export function DocumentStatus({
 export function WorkDocuments({ id }: { id: number }) {
   const { data: checklist, error, reload, replace } = useApi<DocumentChecklist>(`/works/${id}/documents/`);
   const [noticeElement, notify] = useNotice();
-  const [previewing, setPreviewing] = useState<DocumentItem>();
+  const [previewing, setPreviewing] = useState<FileTarget>();
   const [deleting, setDeleting] = useState<DocumentItem>();
+  const [deletingExtra, setDeletingExtra] = useState<AdditionalDocument>();
+  const [adding, setAdding] = useState(false);
   const [editingEmail, setEditingEmail] = useState(false);
 
   if (!checklist) {
@@ -117,7 +133,7 @@ export function WorkDocuments({ id }: { id: number }) {
             {work.customer_name}
           </h1>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-            Work #{work.id} · {work.plan_name} plan
+            Work #{work.id} · {work.plan_name} plan{work.work_type && ` · ${workTypeLabel(work.work_type)}`}
             <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ${stage.header}`}>
               <span aria-hidden="true" className={`size-1.5 rounded-full ${stage.dot}`} />
               {stage.label}
@@ -181,7 +197,9 @@ export function WorkDocuments({ id }: { id: number }) {
                     reload();
                     notify({ text: "Upload cancelled." });
                   }}
-                  onPreview={() => setPreviewing(item)}
+                  onPreview={() =>
+                    item.document && setPreviewing({ path: documentFilePath(work.id, item.key), name: item.name, document: item.document })
+                  }
                   onDelete={() => setDeleting(item)}
                 />
               ),
@@ -190,8 +208,77 @@ export function WorkDocuments({ id }: { id: number }) {
         </section>
       ))}
 
-      {previewing?.document && (
-        <PreviewDialog workId={work.id} item={previewing} document={previewing.document} onClose={() => setPreviewing(undefined)} />
+      {/* Apart from the checklist above, and never counted in it. */}
+      <section aria-labelledby="documents-additional" className="mt-10 border-t border-border pt-8">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="max-w-3xl">
+            <h2 id="documents-additional" tabIndex={-1} className="text-sm font-semibold">
+              Additional documents
+              <span className="ml-2 font-normal text-muted-foreground tabular-nums">{checklist.additional.length}</span>
+            </h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Any other file for this customer, such as an agreement, a quotation or an invoice. They don&apos;t count towards
+              the required documents above.
+            </p>
+          </div>
+          <button type="button" onClick={() => setAdding(true)} className={secondaryButton}>
+            <UploadIcon className="size-4" />
+            Add document
+          </button>
+        </div>
+        {checklist.additional.length === 0 ? (
+          <p className="mt-3 rounded-lg border border-dashed border-border-strong bg-background px-4 py-8 text-center text-sm text-muted-foreground">
+            No additional documents yet.
+          </p>
+        ) : (
+          <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),1fr))] gap-3">
+            {checklist.additional.map((extra) => (
+              <AdditionalCard
+                key={extra.id}
+                workId={work.id}
+                document={extra}
+                canDelete={checklist.can_delete}
+                notify={notify}
+                onPreview={() => setPreviewing({ path: additionalFilePath(work.id, extra.id), name: extra.title, document: extra })}
+                onDelete={() => setDeletingExtra(extra)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {previewing && <PreviewDialog {...previewing} onClose={() => setPreviewing(undefined)} />}
+      {adding && (
+        <AddDocumentDialog
+          checklist={checklist}
+          onClose={() => setAdding(false)}
+          onUploaded={(next, title) => {
+            replace(next);
+            notify({ text: `Uploaded "${title}" for ${work.customer_name}.` });
+          }}
+          // Stop is offered only until the server has the whole file; reloaded all the same, in case the last bytes went
+          // just as it was pressed.
+          onStopped={reload}
+        />
+      )}
+      {deletingExtra && (
+        <ActionDialog
+          destructive
+          title={`Delete "${deletingExtra.title}"?`}
+          description={`"${deletingExtra.original_filename}" is deleted for good, from the CRM and from its storage.`}
+          confirmLabel="Delete document"
+          pendingLabel="Deleting…"
+          onConfirm={async () => {
+            replace(await deleteAdditionalDocument(work.id, deletingExtra.id));
+            notify({ text: `Deleted "${deletingExtra.title}" for ${work.customer_name}.` });
+          }}
+          onClose={() => {
+            setDeletingExtra(undefined);
+            // The card that opened this may be gone: the place goes to the section's heading.
+            document.getElementById("documents-additional")?.focus();
+          }}
+          onError={(text) => notify({ text, error: true })}
+        />
       )}
       {deleting?.document && (
         <ActionDialog
@@ -262,35 +349,33 @@ function ItemBadge({ item, done }: { item: DocumentItem; done: string }) {
 }
 
 // The words and icon of a Download button. `compact`: only the icon shows on a phone (the preview's header).
-function DownloadLabel({ item, compact }: { item: DocumentItem; compact: boolean }) {
+function DownloadLabel({ name, compact }: { name: string; compact: boolean }) {
   return (
     <>
       <DownloadIcon className="size-4" />
       <span className={compact ? "max-sm:sr-only" : undefined}>Download</span>
-      <span className="sr-only"> the {item.name}</span>
+      <span className="sr-only"> the {name}</span>
     </>
   );
 }
 
-type DownloadButtonProps = {
-  workId: number;
-  item: DocumentItem;
-  document: UploadedDocument;
-  onError: (message: string) => void;
-  compact?: boolean;
-};
+// A stored file the page can show and download: its API path (documentFilePath or additionalFilePath), the document's
+// name, and its details.
+type FileTarget = { path: string; name: string; document: UploadedDocument };
+
+type DownloadButtonProps = FileTarget & { onError: (message: string) => void; compact?: boolean };
 
 // Fetches the document's file and saves it under its original name.
-function DownloadButton({ workId, item, document, onError, compact = false }: DownloadButtonProps) {
+function DownloadButton({ path, name, document, onError, compact = false }: DownloadButtonProps) {
   const [downloading, setDownloading] = useState(false);
 
   async function download() {
     if (downloading) return;
     setDownloading(true);
     try {
-      await apiDownload(documentFilePath(workId, item.key), document.original_filename);
+      await apiDownload(path, document.original_filename);
     } catch (error) {
-      onError(`Couldn't download the ${item.name}. ${toApiError(error).message}`);
+      onError(`Couldn't download the ${name}. ${toApiError(error).message}`);
     } finally {
       setDownloading(false);
     }
@@ -298,7 +383,7 @@ function DownloadButton({ workId, item, document, onError, compact = false }: Do
 
   return (
     <button type="button" onClick={download} aria-disabled={downloading || undefined} className={`${secondaryButton} aria-disabled:opacity-50`}>
-      {downloading ? <Busy>Downloading…</Busy> : <DownloadLabel item={item} compact={compact} />}
+      {downloading ? <Busy>Downloading…</Busy> : <DownloadLabel name={name} compact={compact} />}
     </button>
   );
 }
@@ -310,8 +395,9 @@ const cardTitleId = (key: string) => `document-${key}`;
 function CardTitle({ ref, id, icon, name, badge }: { ref?: Ref<HTMLHeadingElement>; id: string; icon: ReactNode; name: string; badge: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3">
-      <h3 ref={ref} id={id} tabIndex={-1} className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-        {icon}
+      <h3 ref={ref} id={id} tabIndex={-1} className="flex min-w-0 items-start gap-2 text-sm font-semibold">
+        {/* As tall as the title's first line, so the icon stays beside it when a long name wraps. */}
+        <span className="flex h-5 shrink-0 items-center">{icon}</span>
         <span className="break-words">{name}</span>
       </h3>
       {badge}
@@ -490,8 +576,8 @@ function DocumentCard({ workId, item, maxFileSize, canDelete, notify, onUploaded
                   Preview<span className="sr-only"> the {item.name}</span>
                 </button>
                 <DownloadButton
-                  workId={workId}
-                  item={item}
+                  path={documentFilePath(workId, item.key)}
+                  name={item.name}
                   document={document}
                   onError={(text) => notify({ text, error: true })}
                 />
@@ -527,23 +613,247 @@ function DocumentCard({ workId, item, maxFileSize, canDelete, notify, onUploaded
   );
 }
 
-type PreviewProps = { workId: number; item: DocumentItem; document: UploadedDocument; onClose: () => void };
+type AdditionalCardProps = {
+  workId: number;
+  document: AdditionalDocument;
+  canDelete: boolean;
+  notify: Notify;
+  onPreview: () => void;
+  onDelete: () => void;
+};
+
+// An additional document: its title and category, the file, who uploaded it and when, its description, and Preview,
+// Download (and Delete for admins).
+function AdditionalCard({ workId, document, canDelete, notify, onPreview, onDelete }: AdditionalCardProps) {
+  return (
+    <li className={cardClass}>
+      <CardTitle
+        id={`additional-${document.id}`}
+        icon={<FileIcon className="size-4 shrink-0 text-faint" />}
+        name={document.title}
+        badge={<StateBadge tone="optional">{document.category_label}</StateBadge>}
+      />
+      <div className="mt-3 flex-1 text-sm">
+        <p className="truncate font-medium" title={document.original_filename}>
+          {document.original_filename}
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {typeLabel(document.content_type)} · {formatFileSize(document.file_size)}
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Uploaded {formatDateTime(document.uploaded_at)}
+          {document.uploaded_by_name && ` by ${document.uploaded_by_name}`}
+        </p>
+        {document.description && <p className="mt-2 break-words whitespace-pre-line text-secondary-foreground">{document.description}</p>}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onPreview} className={secondaryButton}>
+          <EyeIcon className="size-4" />
+          Preview<span className="sr-only"> {document.title}</span>
+        </button>
+        <DownloadButton
+          path={additionalFilePath(workId, document.id)}
+          name={document.title}
+          document={document}
+          onError={(text) => notify({ text, error: true })}
+        />
+        {canDelete && (
+          <button type="button" onClick={onDelete} className={secondaryDangerButton}>
+            <TrashIcon className="size-4" />
+            Delete<span className="sr-only"> {document.title}</span>
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+type AddDocumentProps = {
+  checklist: DocumentChecklist;
+  onClose: () => void;
+  onUploaded: (checklist: DocumentChecklist, title: string) => void;
+  onStopped: () => void;
+};
+
+// Uploads one more document for the Work, beside the required ones: a title, a category, an optional description and
+// the file. The upload shows its progress; while it runs the form can't be sent again or closed, and it can be stopped
+// until the server has the whole file. The API checks everything again, the file's contents included.
+function AddDocumentDialog({ checklist, onClose, onUploaded, onStopped }: AddDocumentProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const formId = useId();
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("OTHER");
+  const [description, setDescription] = useState("");
+  const [file, setFile] = useState<File>();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string>();
+  // `sent`: the server has the whole file, so stopping the request would no longer stop the upload.
+  const [uploading, setUploading] = useState<{ controller: AbortController; progress: number; sent: boolean }>();
+  const fieldId = (field: string) => `${formId}-${field}`;
+  const titleId = fieldId("title");
+  const percent = Math.round((uploading?.progress ?? 0) * 100);
+
+  useEffect(() => {
+    // Start in the first field rather than on the close button (FormDialog has opened by now).
+    document.getElementById(titleId)?.focus();
+  }, [titleId]);
+
+  async function submit() {
+    const found: Record<string, string> = {};
+    if (!title.trim()) found.title = "Enter a title for the document.";
+    const problem = file ? fileProblem(file, checklist.accept, checklist.max_file_size) : "Choose the file to upload.";
+    if (problem) found.file = problem;
+    setErrors(found);
+    setFormError(undefined);
+    const firstInvalid = ["title", "file"].find((field) => found[field]);
+    if (firstInvalid || !file) {
+      document.getElementById(fieldId(firstInvalid ?? "file"))?.focus();
+      return;
+    }
+    const controller = new AbortController();
+    setUploading({ controller, progress: 0, sent: false });
+    try {
+      const details = { title: title.trim(), category, description: description.trim() };
+      const next = await uploadAdditionalDocument(checklist.work.id, details, file, {
+        signal: controller.signal,
+        onProgress: (progress) => setUploading((current) => current && { ...current, progress }),
+        onSent: () => setUploading((current) => current && { ...current, progress: 1, sent: true }),
+      });
+      onUploaded(next, details.title);
+      dialogRef.current?.close();
+    } catch (error) {
+      setUploading(undefined);
+      if (controller.signal.aborted) {
+        setFormError("The upload was stopped.");
+        onStopped();
+        return;
+      }
+      const apiError = toApiError(error);
+      setErrors(apiError.fields);
+      setFormError(apiError.fields.file ?? apiError.message);
+    }
+  }
+
+  return (
+    <FormDialog
+      ref={dialogRef}
+      title="Add document"
+      subtitle={`Work #${checklist.work.id} · ${checklist.work.customer_name}`}
+      width="max-w-lg"
+      busy={uploading !== undefined}
+      error={formError}
+      submitLabel="Upload"
+      busyLabel="Uploading…"
+      onSubmit={submit}
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+        <Field label="Title" id={titleId} required error={errors.title} hint="Such as: Signed agreement, Quotation v2.">
+          <input
+            id={titleId}
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            maxLength={150}
+            autoComplete="off"
+            disabled={uploading !== undefined}
+            aria-invalid={errors.title ? true : undefined}
+            aria-describedby={errors.title ? `${titleId}-error` : undefined}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Category" id={fieldId("category")} error={errors.category}>
+          <select
+            id={fieldId("category")}
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+            disabled={uploading !== undefined}
+            className={inputClass}
+          >
+            {checklist.additional_categories.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Description" id={fieldId("description")} error={errors.description} hint="Optional.">
+          <textarea
+            id={fieldId("description")}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            maxLength={1000}
+            rows={3}
+            disabled={uploading !== undefined}
+            className={`${fieldClass} w-full py-2`}
+          />
+        </Field>
+        <Field
+          label="File"
+          id={fieldId("file")}
+          required
+          error={errors.file}
+          hint={`${describeTypes(checklist.accept)} · up to ${formatFileSize(checklist.max_file_size)}`}
+        >
+          <input
+            id={fieldId("file")}
+            type="file"
+            accept={checklist.accept.join(",")}
+            onChange={(event) => {
+              setFile(event.target.files?.[0]);
+              setErrors((current) => (current.file ? { ...current, file: "" } : current));
+            }}
+            disabled={uploading !== undefined}
+            aria-invalid={errors.file ? true : undefined}
+            aria-describedby={errors.file ? `${fieldId("file")}-error` : undefined}
+            className="block w-full min-w-0 text-sm text-secondary-foreground file:mr-3 file:h-9 file:cursor-pointer file:rounded-md file:border file:border-input file:bg-background file:px-3 file:text-sm file:font-medium file:text-label hover:file:bg-muted touch:file:min-h-11"
+          />
+        </Field>
+        {uploading && (
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+                <SpinnerIcon className="size-4 shrink-0" />
+                <span className="truncate">{uploading.sent ? `Saving ${file?.name}…` : `Uploading ${file?.name}… ${percent}%`}</span>
+              </p>
+              <span
+                role="progressbar"
+                aria-label={`Uploading ${file?.name}`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percent}
+                className="mt-2 block h-1.5 overflow-hidden rounded-full bg-subtle"
+              >
+                <span className="block h-full rounded-full bg-primary transition-[width]" style={{ width: `${percent}%` }} />
+              </span>
+            </div>
+            {!uploading.sent && (
+              <button type="button" onClick={() => uploading.controller.abort()} className={secondaryButton}>
+                Stop<span className="sr-only"> the upload</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </FormDialog>
+  );
+}
+
+type PreviewProps = FileTarget & { onClose: () => void };
 // The file, fetched for one try (`attempt`): its address in the page, or why it couldn't be loaded.
 type Loaded = { attempt: number } & ({ url: string } | { error: string });
 
 // An uploaded document in the page: an image as it is, a PDF in the browser's own viewer where it has one. The file comes
 // through the API with the user's token, like every request, so it is never at a public address. Other files can only be
 // downloaded.
-function PreviewDialog({ workId, item, document, onClose }: PreviewProps) {
+function PreviewDialog({ path, name, document, onClose }: PreviewProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<Loaded>();
   // Shown in the dialog: a page notice would sit behind it.
   const [downloadError, setDownloadError] = useState<string>();
-  const path = documentFilePath(workId, item.key);
   const kind = document.content_type === "application/pdf" ? "pdf" : document.content_type.startsWith("image/") ? "image" : "other";
-  const label = `${item.name}: ${document.original_filename}`;
+  const label = `${name}: ${document.original_filename}`;
   // A retry shows the loader again until its own answer arrives.
   const current = loaded?.attempt === attempt ? loaded : undefined;
 
@@ -603,8 +913,8 @@ function PreviewDialog({ workId, item, document, onClose }: PreviewProps) {
       <div className="flex max-h-[calc(100dvh-2rem)] flex-col">
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-base font-semibold">
-              {item.name}
+            <h2 id={titleId} className="text-base font-semibold break-words">
+              {name}
             </h2>
             <p className="mt-1 truncate text-xs text-muted-foreground" title={document.original_filename}>
               {document.original_filename} · {typeLabel(document.content_type)} · {formatFileSize(document.file_size)}
@@ -614,10 +924,10 @@ function PreviewDialog({ workId, item, document, onClose }: PreviewProps) {
             {current && "url" in current ? (
               // The file shown is already here: saved as it is, with no second download.
               <a href={current.url} download={document.original_filename} className={secondaryButton}>
-                <DownloadLabel item={item} compact />
+                <DownloadLabel name={name} compact />
               </a>
             ) : (
-              <DownloadButton workId={workId} item={item} document={document} onError={setDownloadError} compact />
+              <DownloadButton path={path} name={name} document={document} onError={setDownloadError} compact />
             )}
             <button type="button" onClick={() => dialogRef.current?.close()} aria-label="Close preview" className={`${iconButton} size-9`}>
               <CloseIcon className="size-4.5" />

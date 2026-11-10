@@ -4,12 +4,12 @@ import { useSearchParams } from "next/navigation";
 import { useId, useState, type ChangeEvent, type ReactNode } from "react";
 
 import type { Assignee, Plan } from "@/components/leads/api";
-import { FilterToggle, SearchBox, SortSelect, pickParams, updateQuery } from "@/components/leads/leads-toolbar";
+import { FilterToggle, SearchBox, SortSelect, WorkTypeFilter, pickParams, updateQuery } from "@/components/leads/leads-toolbar";
 import { PageHeader, ViewSwitch, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
 import { useApi } from "@/lib/api";
-import { WORK_STAGES } from "./api";
+import { useWorkStages } from "./api";
 
-export const FILTER_KEYS = ["stage", "plan", "assigned_to", "created_after", "created_before"] as const;
+export const FILTER_KEYS = ["stage", "plan", "work_type", "assigned_to", "created_after", "created_before"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 // The search, filters and sort that the list and the pipeline share. The URL query and the API query use the same names.
 export const VIEW_KEYS = ["search", ...FILTER_KEYS, "ordering"];
@@ -79,6 +79,7 @@ type FilterPanelProps = { id: string; searchParams: URLSearchParams; assignees?:
 
 function FilterPanel({ id, searchParams, assignees, onDone }: FilterPanelProps) {
   const plans = useApi<Plan[]>("/plans/");
+  const { stages } = useWorkStages();
   const [draft, setDraft] = useState(
     () => Object.fromEntries(FILTER_KEYS.map((key) => [key, searchParams.get(key) ?? ""])) as Record<FilterKey, string>,
   );
@@ -104,7 +105,7 @@ function FilterPanel({ id, searchParams, assignees, onDone }: FilterPanelProps) 
         <span className="mb-1.5 block font-medium text-label">Stage</span>
         <select {...bind("stage")}>
           <option value="">All stages</option>
-          {WORK_STAGES.map((stage) => (
+          {stages.map((stage) => (
             <option key={stage.value} value={stage.value}>
               {stage.label}
             </option>
@@ -122,6 +123,7 @@ function FilterPanel({ id, searchParams, assignees, onDone }: FilterPanelProps) 
           ))}
         </select>
       </label>
+      <WorkTypeFilter {...bind("work_type")} />
       <label className="text-sm">
         <span className="mb-1.5 block font-medium text-label">Assigned staff</span>
         <select {...bind("assigned_to")}>
@@ -141,7 +143,7 @@ function FilterPanel({ id, searchParams, assignees, onDone }: FilterPanelProps) 
         <span className="mb-1.5 block font-medium text-label">Converted to</span>
         <input type="date" min={draft.created_after || undefined} {...bind("created_before")} />
       </label>
-      <div className="flex items-end justify-end gap-2 sm:col-span-2 lg:col-span-1">
+      <div className="flex items-end justify-end gap-2 sm:col-span-2 lg:col-span-3">
         <button
           type="button"
           onClick={() => {

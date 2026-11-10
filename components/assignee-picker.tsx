@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { CloseIcon } from "@/components/layout/icons";
 import { initials } from "@/components/layout/navbar";
@@ -32,6 +32,7 @@ type AssigneePickerProps = {
 // stays until removed. The lead form, both follow-up forms and the Work activity form use it.
 export function AssigneePicker({ id, name, value, onChange, options, optionsError, disabled, invalid, describedBy }: AssigneePickerProps) {
   const listId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -80,7 +81,11 @@ export function AssigneePicker({ id, name, value, onChange, options, optionsErro
                 {!disabled && (
                   <button
                     type="button"
-                    onClick={() => remove(person)}
+                    onClick={(event) => {
+                      remove(person);
+                      // From the keyboard, the focus goes to the search box rather than off the page with the chip.
+                      if (event.detail === 0) inputRef.current?.focus();
+                    }}
                     aria-label={`Remove ${person.name}`}
                     className="grid size-5 shrink-0 place-items-center rounded text-muted-foreground hover:bg-subtle hover:text-foreground touch:min-h-11 touch:min-w-11"
                   >
@@ -95,6 +100,7 @@ export function AssigneePicker({ id, name, value, onChange, options, optionsErro
           value.length === 0 && <span className="px-1.5 py-1 text-muted-foreground">Unassigned</span>
         ) : (
           <input
+            ref={inputRef}
             id={id}
             name={name}
             role="combobox"

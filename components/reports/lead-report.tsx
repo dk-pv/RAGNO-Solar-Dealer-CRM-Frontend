@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { formatDateTime, LEAD_SOURCES, LEAD_STATUSES, statusLabel, type LeadStatus } from "@/components/leads/api";
+import { formatDateTime, LEAD_SOURCES, statusLabel, useLeadStatuses, type LeadStatus } from "@/components/leads/api";
 import { updateQuery } from "@/components/leads/leads-toolbar";
 import { StatusBadge, fillClass } from "@/components/leads/ui";
 import { useApi } from "@/lib/api";
@@ -60,13 +60,14 @@ export function LeadReport() {
   const summary = useApi<LeadReportSummary>(`/reports/leads/summary/?${report.filters}`);
   const rows = useApi<Page<LeadReportRow>>(`/reports/leads/?${report.rows}`);
   const people = useAssignees();
+  const statuses = useLeadStatuses();
   const data = summary.data;
   const nameOf = (id: string) => (id === "none" ? "Unassigned" : (people?.find((person) => String(person.id) === id)?.name ?? `User #${id}`));
 
   return (
     <div className={`${fillClass} space-y-4`}>
       <div className="flex flex-wrap items-center gap-2">
-        <FilterSelect name="status" label="Status" all="All statuses" options={LEAD_STATUSES.map((item) => ({ ...item }))} />
+        <FilterSelect name="status" label="Status" all="All statuses" options={statuses} />
         <FilterSelect name="assigned_to" label="Assigned staff" all="Anyone" options={assigneeOptions(people)} />
         <FilterSelect
           name="source"

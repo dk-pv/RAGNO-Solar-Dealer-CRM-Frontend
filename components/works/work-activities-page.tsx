@@ -75,10 +75,7 @@ export function WorkActivitiesPage() {
 
   return (
     <div className={fillClass}>
-      <PageHeader
-        title="Work Activities"
-        description={data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "activity" : "activities"}` : undefined}
-      >
+      <PageHeader title="Work Activities">
         {isAdmin && (
           <button type="button" onClick={() => setAdding(true)} className={primaryButton}>
             <PlusIcon className="size-4" />

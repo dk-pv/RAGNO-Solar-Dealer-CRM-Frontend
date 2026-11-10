@@ -17,8 +17,8 @@ import {
   useBoardScroll,
 } from "@/components/pipeline";
 import { apiRequest, toApiError, useApi, type ApiError } from "@/lib/api";
+import { useStages } from "@/lib/stages";
 import {
-  LEAD_STATUSES,
   changeLeadStatus,
   formatDate,
   formatMoney,
@@ -26,6 +26,7 @@ import {
   sourceLabel,
   statusLabel,
   today,
+  workTypeLabel,
   type Lead,
   type LeadStatus,
   type Page,
@@ -33,7 +34,7 @@ import {
 } from "./api";
 import { LeadMenu, menuItemClass, useLeadActions, type LeadActions } from "./lead-actions";
 import { LeadsHeader, LeadsToolbar, SORT_OPTIONS, VIEW_KEYS, pickParams, updateQuery } from "./leads-toolbar";
-import { ErrorState, PinButton, STATUS_DOTS, STATUS_STYLES, fillClass, secondaryButton, useNotice } from "./ui";
+import { ErrorState, PinButton, fillClass, secondaryButton, statusDot, statusStyle, useNotice } from "./ui";
 
 const FIRST_CARDS = 25; // the cards a column loads at first; "Show more" adds as many again
 const MAX_CARDS = 100; // the API's largest page
@@ -47,10 +48,10 @@ const LEAD_DRAG_TYPE = "application/x-ragno-lead";
 // Every card in a column has the same status, so sorting by status means nothing here.
 const PIPELINE_SORT_OPTIONS = SORT_OPTIONS.filter((option) => option.value !== "status");
 
-// The Lead Pipeline's stages, in order: New, Initial Contact, Hot, Superhot, Won. Lost is an outcome, not a stage: a
-// lead marked Lost leaves the board. The lane at the board's end counts the lost leads, takes a card dropped on it and
-// links to them in the list; it holds no cards.
-const STAGES: LeadStatus[] = LEAD_STATUSES.map((status) => status.value).filter((status) => status !== "LOST");
+// The Lead Pipeline's columns are its stages in order, as the backend keeps them (lib/stages.ts): New, Initial Contact,
+// Hot, Superhot and any an admin added, then Won. Lost is an outcome, not a stage: a lead marked Lost leaves the board.
+// The lane at the board's end counts the lost leads, takes a card dropped on it and links to them in the list; it holds
+// no cards.
 
 type Sizes = Partial<Record<LeadStatus, number>>;
 // Each stage's first page of leads, or null for a stage the Status filter leaves out.
@@ -67,16 +68,18 @@ const focusLost = () => !document.activeElement || document.activeElement === do
 
 // Loads every stage through the leads list API, one request per status, sent together with the page's search, filters
 // and sort. The last board stays on screen while the next one loads, and a newer load cancels the older one.
-function usePipeline(query: string, sizes: Sizes) {
+// `columns` is the stages' keys joined by commas, so a stage added or removed loads the board again.
+function usePipeline(query: string, sizes: Sizes, columns: string) {
   const [version, setVersion] = useState(0);
-  const key = `${version} ${query} ${JSON.stringify(sizes)}`;
+  const key = `${version} ${query} ${JSON.stringify(sizes)} ${columns}`;
   const [result, setResult] = useState<{ key?: string; board?: BoardData; error?: ApiError }>({});
 
   useEffect(() => {
     const controller = new AbortController();
     const onlyStatus = new URLSearchParams(query).get("status");
+    const statuses = columns.split(",");
     Promise.all(
-      STAGES.map((status) => {
+      statuses.map((status) => {
         if (onlyStatus && onlyStatus !== status) return null;
         const params = new URLSearchParams(query);
         params.set("status", status);
@@ -86,14 +89,14 @@ function usePipeline(query: string, sizes: Sizes) {
     ).then(
       (pages) => {
         if (controller.signal.aborted) return;
-        setResult({ key, board: Object.fromEntries(STAGES.map((status, i) => [status, pages[i]])) as BoardData });
+        setResult({ key, board: Object.fromEntries(statuses.map((status, i) => [status, pages[i]])) as BoardData });
       },
       (error: unknown) => {
         if (!controller.signal.aborted) setResult((previous) => ({ key, board: previous.board, error: toApiError(error) }));
       },
     );
     return () => controller.abort();
-  }, [key, query, sizes]);
+  }, [key, query, sizes, columns]);
 
   return {
     board: result.board,
@@ -110,9 +113,12 @@ export function LeadsPipeline() {
   const searchParams = useSearchParams();
   const query = pickParams(searchParams, VIEW_KEYS).toString();
   const statusFilter = searchParams.get("status") || null;
-  const unknownStatus = statusFilter !== null && !LEAD_STATUSES.some(({ value }) => value === statusFilter);
+  // Read again as the board opens, so a stage another admin added since shows.
+  const stages = useStages("LEAD", { fresh: true });
+  const stageKeys: LeadStatus[] = stages.stages.filter((stage) => stage.key !== "LOST").map((stage) => stage.key);
+  const unknownStatus = stages.loaded && statusFilter !== null && !stages.stages.some(({ key }) => key === statusFilter);
   const [sizes, setSizes] = useState<Sizes>({});
-  const { board, error, loading, reload } = usePipeline(query, sizes);
+  const { board, error, loading, reload } = usePipeline(query, sizes, stageKeys.join(","));
   // Each status's count and total amount under the same search and filters: the column headers and the Lost lane.
   const summary = useApi<StatusSummary[]>(unknownStatus ? null : query ? `/leads/summary/?${query}` : "/leads/summary/");
   const [noticeElement, notify] = useNotice();
@@ -160,7 +166,7 @@ export function LeadsPipeline() {
   }
 
   const totals = new Map((summary.data ?? []).map((row) => [row.status, row]));
-  const columns: Column[] = STAGES.map((status) => {
+  const columns: Column[] = stageKeys.map((status) => {
     const page = board?.[status];
     let leads = page?.results ?? [];
     let count = page?.count ?? 0;
@@ -206,7 +212,14 @@ export function LeadsPipeline() {
   };
 
   let content;
-  if (unknownStatus) {
+  if (!stages.loaded && stages.error) {
+    // Without the stages, the board can't know its columns (an admin's stages included).
+    content = (
+      <div className="mt-4 rounded-lg border border-border bg-background">
+        <ErrorState title="Couldn't load the pipeline stages" message={stages.error.message} onRetry={stages.reload} />
+      </div>
+    );
+  } else if (unknownStatus) {
     content = (
       <div className="mt-4 rounded-lg border border-border bg-background">
         <ErrorState
@@ -362,7 +375,7 @@ function PipelineColumn(props: PipelineColumnProps) {
   return (
     <BoardColumn
       title={statusLabel(status)}
-      tone={{ dot: STATUS_DOTS[status], header: STATUS_STYLES[status] }}
+      tone={{ dot: statusDot(status), header: statusStyle(status) }}
       count={page ? count : undefined}
       countNoun={count === 1 ? "lead" : "leads"}
       amount={amount}
@@ -478,7 +491,7 @@ function LostLane({ count, listHref, dragging, focusHeading, onFocused, onDrop }
       }`}
     >
       <h2 ref={headingRef} tabIndex={-1} className="flex items-center gap-2 text-sm font-semibold">
-        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${STATUS_DOTS.LOST}`} />
+        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${statusDot("LOST")}`} />
         <span className="flex-1">Lost</span>
         <span className="rounded-md bg-muted px-1.5 text-xs leading-5 font-medium tabular-nums">
           {count === undefined ? "–" : count.toLocaleString("en-IN")}
@@ -572,7 +585,10 @@ function PipelineCard(props: PipelineCardProps) {
         <span className="shrink-0 text-faint tabular-nums">#{lead.id}</span>
       </p>
 
-      <p className="mt-2.5 text-xs text-muted-foreground">{lead.plan_name ? `${lead.plan_name} plan` : "No plan"}</p>
+      <p className="mt-2.5 truncate text-xs text-muted-foreground">
+        {lead.plan_name ? `${lead.plan_name} plan` : "No plan"}
+        {lead.work_type && ` · ${workTypeLabel(lead.work_type)}`}
+      </p>
       <p className="font-semibold text-foreground tabular-nums">{formatMoney(lead.amount)}</p>
 
       <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">

@@ -22,7 +22,6 @@ import {
 import { ColumnsButton, DEFAULT_PAGE_SIZE, EmptyState, ListShell, SkeletonRows, useColumns, type Columns } from "@/components/table";
 import { toApiError, useApi } from "@/lib/api";
 import {
-  LEAD_STATUSES,
   bulkChangeLeadStatus,
   bulkConvertLeads,
   bulkDeleteLeads,
@@ -32,13 +31,15 @@ import {
   formatMoney,
   formatPhone,
   statusLabel,
+  useLeadStatuses,
+  workTypeLabel,
   type Lead,
   type LeadStatus,
   type Page,
 } from "./api";
 import { LeadMenu, useLeadActions, type LeadActions } from "./lead-actions";
 import { FILTER_KEYS, LeadsHeader, LeadsToolbar, VIEW_KEYS, pickParams, updateQuery } from "./leads-toolbar";
-import { Busy, PinButton, STATUS_STYLES, StatusBadge, fillClass, secondaryButton, stickyNameClass, useNotice } from "./ui";
+import { Busy, PinButton, StatusBadge, fillClass, secondaryButton, statusStyle, stickyNameClass, useNotice, useSelectIntent } from "./ui";
 
 // The URL query and the API query use the same names.
 const QUERY_KEYS = [...VIEW_KEYS, "page", "page_size"];
@@ -50,6 +51,7 @@ const COLUMNS = [
   { key: "dealer", label: "Dealer" },
   { key: "plan", label: "Plan" },
   { key: "amount", label: "Amount" },
+  { key: "work_type", label: "Work type" },
   { key: "status", label: "Status" },
   { key: "assigned", label: "Assigned" },
   { key: "created", label: "Created" },
@@ -68,8 +70,13 @@ export function LeadsPage() {
   const [exporting, setExporting] = useState(false);
   const [clears, setClears] = useState(0);
   const [noticeElement, notify] = useNotice();
-  const actions = useLeadActions(notify, reload);
+  const actions = useLeadActions(notify, reload, () => {
+    // The last row of a later page went: show the page before it, rather than a page that no longer exists.
+    if (rows.length === 1 && page > 1) updateQuery({ page: page > 2 ? String(page - 1) : null });
+    reload();
+  });
   const columns = useColumns("leads", COLUMNS);
+  const statuses = useLeadStatuses();
   // Exporting the whole customer list is admin-only on the API, so only admins are offered it.
   const isAdmin = useContext(CurrentUserContext)?.role === "ADMIN";
 
@@ -92,12 +99,14 @@ export function LeadsPage() {
 
   // Runs a bulk action on the selected leads and reports what went through and what didn't. The selection is kept when
   // nothing went through, so the user can change it and try again.
-  async function runBulk(request: (ids: number[]) => Promise<BulkResult>, past: string) {
+  async function runBulk(request: (ids: number[]) => Promise<BulkResult>, past: string, removes = false) {
     setBulkRunning(true);
     try {
       const result = await request(selection.selected);
       notify(describeBulkResult(result, "lead", past));
       if (result.succeeded.length > 0) selection.clear();
+      // Every row of a later page deleted: show the page before it, rather than a page that no longer exists.
+      if (removes && result.succeeded.length === rows.length && page > 1) updateQuery({ page: page > 2 ? String(page - 1) : null });
       reload();
     } finally {
       setBulkRunning(false);
@@ -132,7 +141,7 @@ export function LeadsPage() {
         description="Each lead moves only where the pipeline allows: forward, or to Won or Lost, which are final. Leads that can't move are listed afterwards and left as they are. Reaching Won doesn't create a Work: convert the lead for that."
         label="New status"
         placeholder="Choose a status"
-        options={LEAD_STATUSES}
+        options={statuses}
         confirmLabel="Update Status"
         pendingLabel="Updating…"
         onConfirm={(value) => runBulk((ids) => bulkChangeLeadStatus(ids, value as LeadStatus), "updated")}
@@ -156,7 +165,7 @@ export function LeadsPage() {
         description="This action will permanently remove these CRM records and related CRM activity data. A lead that has been converted keeps its Work and is not deleted."
         confirmLabel="Delete"
         pendingLabel="Deleting…"
-        onConfirm={() => runBulk(bulkDeleteLeads, "deleted")}
+        onConfirm={() => runBulk(bulkDeleteLeads, "deleted", true)}
         onClose={() => setBulkAction(undefined)}
         onError={showError}
       />
@@ -164,11 +173,7 @@ export function LeadsPage() {
 
   return (
     <div className={fillClass}>
-      <LeadsHeader
-        title="Leads"
-        description={data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "lead" : "leads"}` : undefined}
-        onAdd={actions.add}
-      />
+      <LeadsHeader title="Leads" onAdd={actions.add} />
       <LeadsToolbar key={clears}>
         <ColumnsButton columns={columns} />
         {isAdmin && (
@@ -258,6 +263,7 @@ export function LeadsPage() {
               {shows("dealer") && <th scope="col" className="px-3 py-2.5">Dealer</th>}
               {shows("plan") && <th scope="col" className="px-3 py-2.5">Plan</th>}
               {shows("amount") && <th scope="col" className="px-3 py-2.5 text-right">Amount</th>}
+              {shows("work_type") && <th scope="col" className="px-3 py-2.5">Work type</th>}
               {shows("status") && <th scope="col" className="px-3 py-2.5">Status</th>}
               {shows("assigned") && <th scope="col" className="px-3 py-2.5">Assigned</th>}
               {shows("created") && <th scope="col" className="px-3 py-2.5">Created</th>}
@@ -354,6 +360,11 @@ function LeadRow({ lead, shows, selected, onToggle, actions, onChanged, onStatus
       )}
       {shows("plan") && <td data-label="Plan" className="px-3 py-2 whitespace-nowrap">{lead.plan_name ?? "—"}</td>}
       {shows("amount") && <td data-label="Amount" className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatMoney(lead.amount)}</td>}
+      {shows("work_type") && (
+        <td data-label="Work type" className={`px-3 py-2 whitespace-nowrap ${lead.work_type ? "" : "text-muted-foreground"}`}>
+          {lead.work_type ? workTypeLabel(lead.work_type) : "—"}
+        </td>
+      )}
       {shows("status") && (
         <td data-label="Status" className="px-3 py-2">
           <InlineStatus lead={lead} onSaved={onStatusChanged} onError={onError} />
@@ -383,48 +394,72 @@ function InlineStatus({ lead, onSaved, onError }: InlineStatusProps) {
   // The status being saved, and the lead's last change when it started: the control stays busy until the list reloads a
   // changed lead (the saved one, or someone else's change), or the API refuses the move.
   const [saving, setSaving] = useState<{ status: LeadStatus; since: string }>();
+  // A status chosen from the keyboard, waiting for confirmation (see useSelectIntent).
+  const [confirming, setConfirming] = useState<LeadStatus>();
+  const intent = useSelectIntent();
+  const statuses = useLeadStatuses();
   if (saving !== undefined && saving.since !== lead.updated_at) setSaving(undefined);
   if (lead.allowed_transitions.length === 0) return <StatusBadge status={lead.status} />;
 
   const busy = saving !== undefined && saving.since === lead.updated_at;
   const shown = busy ? saving.status : lead.status;
+  const failed = (message: string) => onError(`Couldn't update ${lead.name}. ${message}`);
 
-  async function change(next: LeadStatus) {
-    if (busy || next === lead.status) return;
+  async function save(next: LeadStatus) {
     setSaving({ status: next, since: lead.updated_at });
     try {
       onSaved(await changeLeadStatus(lead.id, next));
     } catch (error) {
       setSaving(undefined); // back to the saved status
-      onError(`Couldn't update ${lead.name}. ${toApiError(error).message}`);
+      throw error;
     }
   }
 
+  function change(next: LeadStatus) {
+    if (busy || next === lead.status) return;
+    if (!intent.byPointer()) return setConfirming(next);
+    save(next).catch((error) => failed(toApiError(error).message));
+  }
+
   return (
-    <span className="relative inline-flex items-center">
-      <select
-        value={shown}
-        onChange={(event) => change(event.target.value as LeadStatus)}
-        disabled={busy}
-        aria-label={`Status for ${lead.name}`}
-        aria-busy={busy || undefined}
-        className={`cursor-pointer appearance-none rounded-md py-0.5 pr-6 pl-2 text-xs font-medium ring-1 ring-inset transition-colors hover:ring-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary touch:min-h-11 touch:text-base disabled:cursor-wait disabled:opacity-70 ${STATUS_STYLES[shown]}`}
-      >
-        {LEAD_STATUSES.map((option) => (
-          <option
-            key={option.value}
-            value={option.value}
-            disabled={option.value !== lead.status && !lead.allowed_transitions.includes(option.value)}
-          >
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {busy ? (
-        <SpinnerIcon className="pointer-events-none absolute right-1.5 size-3" />
-      ) : (
-        <ChevronLeftIcon className="pointer-events-none absolute top-1/2 right-1.5 size-3 -translate-y-1/2 -rotate-90 opacity-70" />
+    <>
+      {confirming !== undefined && (
+        <ActionDialog
+          title={`Move ${lead.name} to ${statusLabel(confirming)}?`}
+          description="A lead's status only moves forward, so it can't be moved back afterwards."
+          confirmLabel="Move"
+          pendingLabel="Moving…"
+          onConfirm={() => save(confirming)}
+          onClose={() => setConfirming(undefined)}
+          onError={failed}
+        />
       )}
-    </span>
+      <span className="relative inline-flex items-center">
+        <select
+          value={shown}
+          {...intent.intentProps}
+          onChange={(event) => change(event.target.value as LeadStatus)}
+          disabled={busy}
+          aria-label={`Status for ${lead.name}`}
+          aria-busy={busy || undefined}
+          className={`cursor-pointer appearance-none rounded-md py-0.5 pr-6 pl-2 text-xs font-medium ring-1 ring-inset transition-colors hover:ring-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary touch:min-h-11 touch:text-base disabled:cursor-wait disabled:opacity-70 ${statusStyle(shown)}`}
+        >
+          {statuses.map((option) => (
+            <option
+              key={option.value}
+              value={option.value}
+              disabled={option.value !== lead.status && !lead.allowed_transitions.includes(option.value)}
+            >
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {busy ? (
+          <SpinnerIcon className="pointer-events-none absolute right-1.5 size-3" />
+        ) : (
+          <ChevronLeftIcon className="pointer-events-none absolute top-1/2 right-1.5 size-3 -translate-y-1/2 -rotate-90 opacity-70" />
+        )}
+      </span>
+    </>
   );
 }

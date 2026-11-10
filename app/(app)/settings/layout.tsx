@@ -11,6 +11,7 @@ const TABS = [
   { label: "Users", href: "/settings/users", adminOnly: false },
   { label: "Roles & Access", href: "/settings/roles", adminOnly: true },
   { label: "Solar Plans", href: "/settings/plans", adminOnly: true },
+  { label: "Pipeline Stages", href: "/settings/stages", adminOnly: true },
   { label: "Data", href: "/settings/data", adminOnly: true },
 ];
 

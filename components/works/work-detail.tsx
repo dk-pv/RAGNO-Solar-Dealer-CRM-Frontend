@@ -5,7 +5,7 @@ import { useContext, useEffect, useState, type ReactNode } from "react";
 
 import { ChevronLeftIcon, CloseIcon, FileIcon, PencilIcon, PhoneIcon, PlusIcon, TagIcon, WhatsAppIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
-import { formatDate, formatMoney, formatPhone, telHref, whatsappHref, type Assignee } from "@/components/leads/api";
+import { formatDate, formatMoney, formatPhone, telHref, whatsappHref, workTypeLabel, type Assignee } from "@/components/leads/api";
 import { Details } from "@/components/leads/lead-detail";
 import { ErrorState, iconButton, secondaryButton, useNotice } from "@/components/leads/ui";
 import { useApi } from "@/lib/api";
@@ -191,6 +191,12 @@ export function WorkDetail({ id }: { id: number }) {
                 <dd className="mt-0.5">{stage.label}</dd>
               </div>
               <div>
+                <dt className="text-xs text-muted-foreground">Work type</dt>
+                <dd className={`mt-0.5 ${work.work_type ? "" : "text-muted-foreground"}`}>
+                  {work.work_type ? workTypeLabel(work.work_type) : "Not specified"}
+                </dd>
+              </div>
+              <div>
                 <dt className="text-xs text-muted-foreground">Assigned staff</dt>
                 <dd className="mt-0.5">{work.assigned_to_name ?? "Unassigned"}</dd>
               </div>
@@ -203,7 +209,8 @@ export function WorkDetail({ id }: { id: number }) {
             </dl>
             <button type="button" onClick={() => actions.edit(work)} className={`${secondaryButton} mt-4 w-full`}>
               <PencilIcon className="size-4" />
-              Change stage, staff or due date
+              {/* Short enough for the side panel at laptop widths; the fields it edits are listed just above. */}
+              Edit pipeline details
             </button>
           </section>
           <section className="border-t border-border pt-6">

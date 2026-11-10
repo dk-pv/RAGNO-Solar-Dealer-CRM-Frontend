@@ -256,8 +256,8 @@ export function Stats({ stats }: { stats?: Stat[] }) {
       {stats.map((stat) => {
         // A long figure (a total in rupees, ₹14,82,000 or ₹1,48,20,000) is sized to fit its tile on one line: a digit is
         // about 0.57em wide, so N characters fit in 175cqi / N (cqi: a percentage of the tile's inner width), at most
-        // the usual 1.5rem. A short count keeps the usual size. Tiles are flex columns, so one that is a button starts at
-        // the top like the others.
+        // the usual 1.5rem. A short count keeps the usual size. A tile that is a button starts at the top like the others
+        // (its rows come from the grid, so nothing is centred).
         const chars = String(stat.value).length;
         const fit = chars > 8 ? { fontSize: `min(1.5rem, calc(175cqi / ${chars}))` } : undefined;
         const body = (
@@ -269,7 +269,8 @@ export function Stats({ stats }: { stats?: Stat[] }) {
             {stat.hint && <span className="mt-0.5 block text-xs text-muted-foreground">{stat.hint}</span>}
           </>
         );
-        const className = "@container flex w-full flex-col rounded-lg border border-border bg-background p-4 text-left shadow-xs";
+        // Label, figure and hint are rows of the tiles' grid (a subgrid), so the figures in a row line up when one label wraps.
+        const className = "@container row-span-3 grid w-full grid-rows-subgrid gap-y-0 rounded-lg border border-border bg-background p-4 text-left shadow-xs";
         return stat.onClick ? (
           <button key={stat.label} type="button" onClick={stat.onClick} className={`${className} transition-colors hover:border-primary/50`}>
             {body}

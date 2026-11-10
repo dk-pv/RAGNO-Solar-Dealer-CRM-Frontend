@@ -1,16 +1,23 @@
 import { apiDownload, apiRequest } from "@/lib/api";
+import { stageName, useStages } from "@/lib/stages";
 
-// The Lead Pipeline. Values and labels must match the backend's Lead status choices.
-// Work Pipeline statuses belong to Works and never appear in the Leads module.
-export const LEAD_STATUSES = [
-  { value: "NEW", label: "New" },
-  { value: "INITIAL_CONTACT", label: "Initial Contact" },
-  { value: "HOT", label: "Hot" },
-  { value: "SUPERHOT", label: "Superhot" },
-  { value: "WON", label: "Won" },
-  { value: "LOST", label: "Lost" },
+// A lead's status: the key of one of the Lead Pipeline's stages, a system one (NEW … WON, LOST) or one an admin added in
+// Settings → Pipeline Stages (lib/stages.ts). Work Pipeline stages belong to Works and never appear in the Leads module.
+export type LeadStatus = string;
+
+// The Lead Pipeline's statuses in the board's order, as options.
+export function useLeadStatuses() {
+  return useStages("LEAD").stages.map((stage) => ({ value: stage.key, label: stage.name }));
+}
+
+// How the customer pays, on a lead and its Work. Optional ("" when not chosen) and never a pipeline stage. Must match the
+// backend's WorkType choices.
+export const WORK_TYPES = [
+  { value: "LOAN", label: "Loan Work" },
+  { value: "CASH", label: "Cash Work" },
 ] as const;
-export type LeadStatus = (typeof LEAD_STATUSES)[number]["value"];
+export type WorkType = (typeof WORK_TYPES)[number]["value"];
+export const workTypeLabel = (value: string) => WORK_TYPES.find((type) => type.value === value)?.label ?? "Not set";
 
 // Must match the backend's Lead source choices.
 export const LEAD_SOURCES = [
@@ -51,6 +58,7 @@ export type Lead = {
   plan: number | null;
   plan_name: string | null;
   amount: string | null; // stored on the lead, so later plan price changes never alter it; null without a plan or entry
+  work_type: WorkType | ""; // "" when not chosen; carried into the Work on conversion
   status: LeadStatus;
   // The statuses the backend lets this user move the lead to, Won included (from Superhot).
   allowed_transitions: LeadStatus[];
@@ -91,6 +99,7 @@ export type LeadInput = { assignee_ids?: number[]; initial_follow_up?: ActivityI
   | "dealer_name"
   | "plan"
   | "amount"
+  | "work_type"
   | "source"
   | "next_follow_up"
   | "notes"
@@ -263,8 +272,7 @@ export function convertBlocker(lead: Lead) {
   return "You can view this lead but not convert it.";
 }
 
-export const statusLabel = (status: LeadStatus) =>
-  LEAD_STATUSES.find((item) => item.value === status)?.label ?? status;
+export const statusLabel = (status: LeadStatus) => stageName(status);
 
 export const sourceLabel = (source: string) => LEAD_SOURCES.find((item) => item.value === source)?.label ?? source;
 

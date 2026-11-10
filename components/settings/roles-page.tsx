@@ -5,7 +5,7 @@ import { useContext, useEffect, useId, useRef, useState, type FormEvent } from "
 import { CloseIcon } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
 import { Section, dialogClass } from "@/components/leads/lead-dialogs";
-import { Busy, ErrorState, ghostButton, iconButton, primaryButton, secondaryButton, tableBoxClass, useNotice } from "@/components/leads/ui";
+import { Busy, ErrorState, ghostButton, iconButton, primaryButton, secondaryButton, tableBoxClass, useHoldDialogOpen, useNotice } from "@/components/leads/ui";
 import { apiRequest, toApiError, useApi } from "@/lib/api";
 import { moduleLabels, type Module, type Role } from "./users-page";
 
@@ -121,6 +121,7 @@ function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogP
   const [selected, setSelected] = useState<string[]>(role.modules.filter((key) => key === "activities"));
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  useHoldDialogOpen(dialogRef, saving);
 
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -128,6 +129,10 @@ function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogP
   }, []);
 
   const close = () => dialogRef.current?.close();
+  // Close and Cancel do nothing while saving, so a failure is never shown on a dialog that has gone.
+  const dismiss = () => {
+    if (!saving) close();
+  };
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -145,7 +150,15 @@ function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogP
   }
 
   return (
-    <dialog ref={dialogRef} onClose={onClose} aria-labelledby={titleId} className={`${dialogClass} max-w-lg p-0`}>
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      onCancel={(event) => {
+        if (saving) event.preventDefault(); // Escape
+      }}
+      aria-labelledby={titleId}
+      className={`${dialogClass} max-w-lg p-0`}
+    >
       <form noValidate onSubmit={submit}>
         <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <div>
@@ -156,7 +169,7 @@ function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogP
               Everyone with the {role.label} role gets exactly this access.
             </p>
           </div>
-          <button type="button" onClick={close} aria-label="Close" className={`${iconButton} -mr-2 size-9`}>
+          <button type="button" onClick={dismiss} aria-label="Close" aria-disabled={saving || undefined} className={`${iconButton} -mr-2 size-9`}>
             <CloseIcon className="size-4.5" />
           </button>
         </div>
@@ -196,7 +209,7 @@ function RoleAccessDialog({ role, modules, onClose, onSaved }: RoleAccessDialogP
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-          <button type="button" onClick={close} className={secondaryButton}>
+          <button type="button" onClick={dismiss} disabled={saving} className={secondaryButton}>
             Cancel
           </button>
           <button type="submit" disabled={saving} className={primaryButton}>

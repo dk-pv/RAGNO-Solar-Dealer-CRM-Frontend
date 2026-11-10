@@ -117,22 +117,22 @@ type BoardProps = {
   children: ReactNode;
 };
 
-// The columns, side by side. Each column scrolls its own cards; the board scrolls sideways and ends at the last column.
-// On phones a column snaps into view. `relative` keeps absolutely positioned content (screen-reader labels) inside the
-// board; otherwise it would widen the whole page.
-// The board fills the height left on its page (the page's root is a flex column: fillClass), so the columns, and the
-// footer under a column's cards, end at the bottom of the window whatever sits above them: the tabs, a wrapped
-// toolbar, the open filter panel. Given less than 18rem it keeps 18rem and the page scrolls; on a phone, where the
-// header and toolbar take most of the screen, it is as tall as the screen under the navbar (h-14) less main's bottom
-// padding, so a column shows several cards once the page is scrolled to it. basis-0 and the row's min-h-0 keep the
-// cards from growing it: flex-1's 0% basis would count them while the page's height is still open.
+// The columns, side by side. The board scrolls sideways and ends at the last column; on phones a column snaps into view.
+// `relative` keeps absolutely positioned content (screen-reader labels) inside the board; otherwise it would widen the
+// whole page.
+// From md the board fills the height left on its page (the page's root is a flex column: fillClass) and each column
+// scrolls its own cards, so the columns, and the footer under a column's cards, end at the bottom of the window whatever
+// sits above them: the tabs, a wrapped toolbar, the open filter panel. Given less than 18rem it keeps 18rem and the page
+// scrolls. basis-0 and the row's min-h-0 keep the cards from growing it: flex-1's 0% basis would count them while the
+// page's height is still open. On a phone, where the header and toolbar take most of the screen, the board is as tall
+// as its cards and only the page scrolls: a column scrolling inside a scrolling page caught the swipe meant for the page.
 export function Board({ boardRef, dragging, refreshing = false, busy, onDragOver, children }: BoardProps) {
   return (
     <div
       ref={boardRef}
       aria-busy={busy}
       onDragOver={onDragOver}
-      className={`scrollbar-none relative mt-4 flex min-h-72 grow basis-0 flex-col overflow-x-auto transition-opacity motion-reduce:transition-none max-md:min-h-[calc(100dvh-4.5rem)] ${
+      className={`scrollbar-none relative mt-4 flex min-h-72 grow basis-0 flex-col overflow-x-auto transition-opacity motion-reduce:transition-none max-md:grow-0 max-md:basis-auto ${
         dragging ? "" : "snap-x snap-mandatory lg:snap-none"
       } ${refreshing ? "opacity-60" : ""}`}
     >
@@ -256,7 +256,7 @@ export function BoardColumn({
 
       <div
         aria-busy={busy}
-        className={`scrollbar-none flex-1 space-y-2 overflow-y-auto p-2 transition-opacity motion-reduce:transition-none ${refreshing ? "opacity-60" : ""}`}
+        className={`scrollbar-none flex-1 space-y-2 overflow-y-auto p-2 transition-opacity motion-reduce:transition-none max-md:overflow-visible ${refreshing ? "opacity-60" : ""}`}
       >
         {drop === "over" && (
           <p className="rounded-md border-2 border-dashed border-primary/50 bg-primary-softer px-3 py-3 text-center text-xs font-medium text-primary-strong">

@@ -34,6 +34,7 @@ import {
   telHref,
   whatsappHref,
   withRow,
+  workTypeLabel,
   type Activity,
   type Assignee,
   type Lead,
@@ -185,6 +186,7 @@ export function LeadDetail({ id }: { id: number }) {
             items={[
               ["Plan", lead.plan_name ?? "—"],
               ["Amount", <span key="amount" className="tabular-nums">{formatMoney(lead.amount)}</span>],
+              ["Work type", lead.work_type ? workTypeLabel(lead.work_type) : "—"],
             ]}
           />
           <Details

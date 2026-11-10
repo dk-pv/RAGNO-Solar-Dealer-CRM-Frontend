@@ -20,11 +20,13 @@ import {
   ACTIVITY_TYPES,
   COUNTRY_CODES,
   LEAD_SOURCES,
-  LEAD_STATUSES,
+  WORK_TYPES,
   changeLeadStatus,
   convertLead,
   formatMoney,
   saveLead,
+  useLeadStatuses,
+  workTypeLabel,
   type Activity,
   type ActivityInput,
   type ActivityType,
@@ -34,8 +36,9 @@ import {
   type LeadSource,
   type LeadStatus,
   type Plan,
+  type WorkType,
 } from "./api";
-import { Busy, FollowUpBadge, StatusBadge, fieldClass, iconButton, inputClass, primaryButton, secondaryButton } from "./ui";
+import { Busy, FollowUpBadge, StatusBadge, fieldClass, iconButton, inputClass, primaryButton, secondaryButton, useHoldDialogOpen } from "./ui";
 
 // Callers add the padding and width.
 export const dialogClass =
@@ -83,6 +86,7 @@ export function FormDialog({
 }: FormDialogProps) {
   const ownRef = useRef<HTMLDialogElement>(null);
   const dialogRef = ref ?? ownRef;
+  useHoldDialogOpen(dialogRef, busy);
   const titleId = useId();
 
   useEffect(() => {
@@ -159,6 +163,7 @@ type FormValues = {
   dealer_name: string;
   plan: string;
   amount: string;
+  work_type: string;
   source: string;
   next_follow_up: string;
   notes: string;
@@ -180,6 +185,7 @@ const FIELD_ORDER: FieldName[] = [
   "pin_code",
   "plan",
   "amount",
+  "work_type",
   "source",
   "assignees",
   "next_follow_up",
@@ -207,6 +213,7 @@ function initialValues(lead: Lead | null): FormValues {
     dealer_name: lead?.dealer_name ?? "",
     plan: lead?.plan ? String(lead.plan) : "",
     amount: plainAmount(lead?.amount ?? null),
+    work_type: lead?.work_type ?? "",
     source: lead?.source ?? "",
     next_follow_up: lead?.next_follow_up ?? "",
     notes: lead?.notes ?? "",
@@ -246,6 +253,7 @@ function toInput(values: FormValues, assignees?: Assignee[]): LeadInput {
     dealer_name: values.dealer_name.trim(),
     plan: values.plan ? Number(values.plan) : null,
     amount: values.amount || null,
+    work_type: values.work_type as WorkType | "",
     source: values.source as LeadSource | "",
     ...(assignees && { assignee_ids: assignees.map((person) => person.id) }),
     next_follow_up: values.next_follow_up || null,
@@ -436,6 +444,7 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  useHoldDialogOpen(dialogRef, saving);
   // Add Lead only: the lead's first follow-up, saved with it by the API (both or neither). Its staff follow the lead's
   // until someone is chosen for it (followUpPeople).
   const [addFollowUp, setAddFollowUp] = useState(false);
@@ -690,6 +699,21 @@ export function LeadFormDialog({ lead, onClose, onSaved, onError }: LeadFormDial
                 />
               </div>
             </Field>
+            <Field
+              label="Work type"
+              id={fieldId("work_type")}
+              error={errors.work_type}
+              hint="Optional. Carried into the Work when the lead is converted."
+            >
+              <select {...bind("work_type")}>
+                <option value="">Not specified</option>
+                {WORK_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </Section>
 
           <Section title="Follow-up and assignment">
@@ -801,7 +825,9 @@ export function StatusDialog({ lead, onClose, onChanged }: StatusDialogProps) {
   const selectId = useId();
   const [status, setStatus] = useState<LeadStatus>(lead.status);
   const [pending, setPending] = useState(false);
+  useHoldDialogOpen(dialogRef, pending);
   const [error, setError] = useState<string>();
+  const statuses = useLeadStatuses();
 
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -821,7 +847,15 @@ export function StatusDialog({ lead, onClose, onChanged }: StatusDialogProps) {
   }
 
   return (
-    <dialog ref={dialogRef} onClose={onClose} aria-labelledby={titleId} className={`${dialogClass} max-w-sm p-5`}>
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      onCancel={(event) => {
+        if (pending) event.preventDefault(); // Escape
+      }}
+      aria-labelledby={titleId}
+      className={`${dialogClass} max-w-sm p-5`}
+    >
       <form onSubmit={submit}>
         <h2 id={titleId} className="text-base font-semibold">
           Update lead status
@@ -840,7 +874,7 @@ export function StatusDialog({ lead, onClose, onChanged }: StatusDialogProps) {
           onChange={(event) => setStatus(event.target.value as LeadStatus)}
           className={inputClass}
         >
-          {LEAD_STATUSES.map((item) => (
+          {statuses.map((item) => (
             <option
               key={item.value}
               value={item.value}
@@ -863,7 +897,7 @@ export function StatusDialog({ lead, onClose, onChanged }: StatusDialogProps) {
           </p>
         )}
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={() => dialogRef.current?.close()} className={secondaryButton}>
+          <button type="button" onClick={() => dialogRef.current?.close()} disabled={pending} className={secondaryButton}>
             Cancel
           </button>
           <button type="submit" disabled={pending || status === lead.status} className={primaryButton}>
@@ -882,6 +916,7 @@ export function ConvertDialog({ lead, onClose, onConverted }: ConvertDialogProps
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [pending, setPending] = useState(false);
+  useHoldDialogOpen(dialogRef, pending);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
@@ -901,7 +936,15 @@ export function ConvertDialog({ lead, onClose, onConverted }: ConvertDialogProps
   }
 
   return (
-    <dialog ref={dialogRef} onClose={onClose} aria-labelledby={titleId} className={`${dialogClass} max-w-md p-5`}>
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      onCancel={(event) => {
+        if (pending) event.preventDefault(); // Escape
+      }}
+      aria-labelledby={titleId}
+      className={`${dialogClass} max-w-md p-5`}
+    >
       <h2 id={titleId} className="text-base font-semibold">
         Convert lead to Work
       </h2>
@@ -913,6 +956,8 @@ export function ConvertDialog({ lead, onClose, onConverted }: ConvertDialogProps
         <dd>{lead.plan_name ?? "Not set"}</dd>
         <dt className="text-muted-foreground">Amount</dt>
         <dd className="tabular-nums">{formatMoney(lead.amount)}</dd>
+        <dt className="text-muted-foreground">Work type</dt>
+        <dd>{workTypeLabel(lead.work_type)}</dd>
         <dt className="text-muted-foreground">Assigned</dt>
         <dd>
           {lead.assignees[0]?.name ?? "Unassigned"}
@@ -929,7 +974,7 @@ export function ConvertDialog({ lead, onClose, onConverted }: ConvertDialogProps
         </p>
       )}
       <div className="mt-5 flex justify-end gap-2">
-        <button type="button" onClick={() => dialogRef.current?.close()} className={secondaryButton}>
+        <button type="button" onClick={() => dialogRef.current?.close()} disabled={pending} className={secondaryButton}>
           Cancel
         </button>
         <button type="button" onClick={convert} disabled={pending} className={primaryButton}>

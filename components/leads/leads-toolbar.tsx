@@ -5,10 +5,10 @@ import { useEffect, useId, useState, type ChangeEvent, type ReactNode } from "re
 
 import { FilterIcon, PlusIcon, SearchIcon } from "@/components/layout/icons";
 import { useApi } from "@/lib/api";
-import { LEAD_SOURCES, LEAD_STATUSES, type Assignee, type Plan } from "./api";
+import { LEAD_SOURCES, WORK_TYPES, useLeadStatuses, type Assignee, type Plan } from "./api";
 import { PageHeader, ViewSwitch, fieldClass, inputClass, primaryButton, secondaryButton, segmentClass, segmentedClass } from "./ui";
 
-export const FILTER_KEYS = ["status", "plan", "assigned_to", "source", "created_after", "created_before"] as const;
+export const FILTER_KEYS = ["status", "plan", "work_type", "assigned_to", "source", "created_after", "created_before"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 // The search, filters and sort that the list and the pipeline share. The URL query and the API query use the same names.
 export const VIEW_KEYS = ["search", ...FILTER_KEYS, "ordering"];
@@ -204,11 +204,32 @@ export function SortSelect({ options, defaultValue }: { options: { value: string
   );
 }
 
+type WorkTypeFilterProps = { value: string; onChange: (event: ChangeEvent<HTMLSelectElement>) => void; className: string };
+
+// The URL's ?work_type=: Loan Work, Cash Work, or "none" for records without one. The Leads and Works filters share it.
+export function WorkTypeFilter(props: WorkTypeFilterProps) {
+  return (
+    <label className="text-sm">
+      <span className="mb-1.5 block font-medium text-label">Work type</span>
+      <select {...props}>
+        <option value="">All work types</option>
+        {WORK_TYPES.map((type) => (
+          <option key={type.value} value={type.value}>
+            {type.label}
+          </option>
+        ))}
+        <option value="none">Not set</option>
+      </select>
+    </label>
+  );
+}
+
 type FilterPanelProps = { id: string; searchParams: URLSearchParams; onDone: () => void };
 
 function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
   const plans = useApi<Plan[]>("/plans/");
   const assignees = useApi<Assignee[]>("/leads/assignees/");
+  const statuses = useLeadStatuses();
   const [draft, setDraft] = useState(
     () => Object.fromEntries(FILTER_KEYS.map((key) => [key, searchParams.get(key) ?? ""])) as Record<FilterKey, string>,
   );
@@ -234,7 +255,7 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
         <span className="mb-1.5 block font-medium text-label">Status</span>
         <select {...bind("status")}>
           <option value="">All statuses</option>
-          {LEAD_STATUSES.map((status) => (
+          {statuses.map((status) => (
             <option key={status.value} value={status.value}>
               {status.label}
             </option>
@@ -252,6 +273,7 @@ function FilterPanel({ id, searchParams, onDone }: FilterPanelProps) {
           ))}
         </select>
       </label>
+      <WorkTypeFilter {...bind("work_type")} />
       <label className="text-sm">
         <span className="mb-1.5 block font-medium text-label">Assigned staff</span>
         <select {...bind("assigned_to")}>

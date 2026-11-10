@@ -112,11 +112,7 @@ export function LeadActivitiesPage() {
 
   return (
     <div className={fillClass}>
-      <PageHeader
-        title="Lead Activities"
-        titleRef={headingRef}
-        description={data ? `${data.count.toLocaleString("en-IN")} ${data.count === 1 ? "follow-up" : "follow-ups"}` : undefined}
-      >
+      <PageHeader title="Lead Activities" titleRef={headingRef}>
         {isAdmin && (
           <button type="button" onClick={() => setEditing(null)} className={primaryButton}>
             <PlusIcon className="size-4" />

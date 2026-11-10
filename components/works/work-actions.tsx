@@ -16,13 +16,13 @@ import {
   WhatsAppIcon,
 } from "@/components/layout/icons";
 import { CurrentUserContext } from "@/components/layout/use-shell-session";
-import { formatDate, formatMoney, formatPhone, telHref, whatsappHref, type Assignee } from "@/components/leads/api";
+import { WORK_TYPES, formatDate, formatMoney, formatPhone, telHref, whatsappHref, type Assignee } from "@/components/leads/api";
 import { Field, Section, dialogClass } from "@/components/leads/lead-dialogs";
 import { menuItemClass, placeMenu } from "@/components/leads/lead-actions";
-import { Busy, iconButton, inputClass, primaryButton, secondaryButton } from "@/components/leads/ui";
+import { Busy, iconButton, inputClass, primaryButton, secondaryButton, useHoldDialogOpen } from "@/components/leads/ui";
 import { ActionDialog } from "@/components/selection";
 import { toApiError, type ApiError } from "@/lib/api";
-import { WORK_STAGES, deleteWork, saveWorkOffer, today, updateWork, type Work, type WorkChanges, type WorkStage } from "./api";
+import { deleteWork, saveWorkOffer, today, updateWork, useWorkStages, type Work, type WorkChanges, type WorkStage } from "./api";
 import { ActivityDialog } from "./work-activities";
 import { OfferDialog, WorkAmount } from "./work-offer";
 
@@ -265,11 +265,14 @@ export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProp
   const dialogRef = useRef<HTMLDialogElement>(null);
   const formId = useId();
   const [stage, setStage] = useState<WorkStage>(work.stage);
+  const [workType, setWorkType] = useState<string>(work.work_type);
+  const { stages } = useWorkStages();
   const [assignedTo, setAssignedTo] = useState(work.assigned_to ? String(work.assigned_to) : "");
   const [dueDate, setDueDate] = useState(work.due_date ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  useHoldDialogOpen(dialogRef, saving);
 
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -279,6 +282,10 @@ export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProp
   // The lead's page needs the Leads module.
   const canOpenLeads = me?.role === "ADMIN" || me?.modules.includes("leads");
   const close = () => dialogRef.current?.close();
+  // Close and Cancel do nothing while saving, so a failure is never shown on a dialog that has gone.
+  const dismiss = () => {
+    if (!saving) close();
+  };
   const fieldId = (field: string) => `${formId}-${field}`;
   const location = [work.area, work.district, work.state, work.pin_code].filter(Boolean).join(", ");
   // Someone no longer active stays visible on a Work that already has them.
@@ -291,6 +298,7 @@ export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProp
     event.preventDefault();
     const changes: WorkChanges = {};
     if (stage !== work.stage) changes.stage = stage;
+    if (workType !== work.work_type) changes.work_type = workType as Work["work_type"];
     const assignee = assignedTo ? Number(assignedTo) : null;
     if (assignee !== work.assigned_to) changes.assigned_to = assignee;
     const due = dueDate || null;
@@ -317,6 +325,9 @@ export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProp
     <dialog
       ref={dialogRef}
       onClose={onClose}
+      onCancel={(event) => {
+        if (saving) event.preventDefault(); // Escape
+      }}
       aria-labelledby={`${formId}-title`}
       className={`${dialogClass} max-h-[calc(100dvh-2rem)] max-w-xl overflow-hidden p-0`}
     >
@@ -337,7 +348,7 @@ export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProp
               )}
             </p>
           </div>
-          <button type="button" onClick={close} aria-label="Close" className={`${iconButton} -mr-2 size-9`}>
+          <button type="button" onClick={dismiss} aria-label="Close" aria-disabled={saving || undefined} className={`${iconButton} -mr-2 size-9`}>
             <CloseIcon className="size-4.5" />
           </button>
         </div>
@@ -390,9 +401,24 @@ export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProp
                 onChange={(event) => setStage(event.target.value as WorkStage)}
                 className={inputClass}
               >
-                {WORK_STAGES.map((option) => (
+                {stages.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Work type" id={fieldId("work_type")} error={errors.work_type}>
+              <select
+                id={fieldId("work_type")}
+                value={workType}
+                onChange={(event) => setWorkType(event.target.value)}
+                className={inputClass}
+              >
+                <option value="">Not specified</option>
+                {WORK_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
                   </option>
                 ))}
               </select>
@@ -430,7 +456,7 @@ export function WorkDialog({ work, assignees, onClose, onSaved }: WorkDialogProp
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-          <button type="button" onClick={close} className={secondaryButton}>
+          <button type="button" onClick={dismiss} disabled={saving} className={secondaryButton}>
             Cancel
           </button>
           <button type="submit" disabled={saving} className={primaryButton}>

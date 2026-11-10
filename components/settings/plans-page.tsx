@@ -46,7 +46,7 @@ export function PlansPage() {
             and Works keep their own amounts.
           </p>
         </div>
-        {addButton}
+        <div className="ml-auto">{addButton}</div>
       </div>
 
       {plans.error ? (

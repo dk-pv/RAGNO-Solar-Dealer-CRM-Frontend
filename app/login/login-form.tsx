@@ -45,6 +45,11 @@ export function LoginForm() {
     setError(undefined);
     try {
       await signIn(String(form.get("email")).trim(), String(form.get("password")));
+      // The session lives in the browser's site storage; with that blocked, signing in can't stick.
+      if (!isSignedIn()) {
+        setError("Your browser is blocking this site's storage, so you can't stay signed in. Allow site data and try again.");
+        setPending(false);
+      }
     } catch (err) {
       setError(toApiError(err).message);
       setPending(false);
