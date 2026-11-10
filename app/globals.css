@@ -17,7 +17,7 @@
   }
 }
 
-/* The CRM's one colour system: soft red and warm cream on a light base. Components use these tokens, never raw colours.
+/* The CRM's one colour system: slate blue (the H&D logo) and warm cream on a light base. Components use these tokens, never raw colours.
    The CRM is light only, so it looks the same whatever the operating system's dark-mode setting. */
 :root {
   /* Native controls (selects, date pickers, scrollbars) stay light. */
@@ -47,21 +47,21 @@
   --input-hover: #cfc1b8;
   --border-strong: #d8ccc3;
 
-  /* Brand soft red: an accent for primary actions, active and selected states, links and focus */
-  --primary: #b85c5c;
-  --primary-hover: #a84f4f;
-  --primary-active: #964545;
-  --primary-strong: #984848; /* text on a primary-soft background */
-  --primary-soft: #f7e7e5;
-  --primary-softer: #fbf1f0;
-  --link: #a84f4f;
-  --link-hover: #8f4141;
-  --ring: #f1d3d0;
+  /* Brand slate blue, from the logo: an accent for primary actions, active and selected states, links and focus */
+  --primary: #45566b;
+  --primary-hover: #3b4a5c;
+  --primary-active: #31404f;
+  --primary-strong: #374659; /* text on a primary-soft background */
+  --primary-soft: #e8ecf1;
+  --primary-softer: #f2f4f7;
+  --link: #3b4a5c;
+  --link-hover: #2d3a48;
+  --ring: #cfd7e1;
 
   --destructive: #c94b4b;
   --destructive-hover: #b43f3f;
 
-  /* Status colours: soft backgrounds, readable text. Kept apart from the brand red so meanings stay distinct. */
+  /* Status colours: soft backgrounds, readable text. Kept apart from the brand blue so meanings stay distinct. */
   --success: #39734a;
   --success-soft: #e8f3ea;
   --success-border: #c9e1ce;

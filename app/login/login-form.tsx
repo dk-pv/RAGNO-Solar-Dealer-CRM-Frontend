@@ -62,20 +62,15 @@ export function LoginForm() {
   return (
     <div className="w-full max-w-sm">
       {/* The brand panel carries the logo on large screens; smaller screens show it here instead. */}
-      <div className="mb-8 flex items-center gap-3 sm:mb-10 lg:hidden">
-        <Image
-          src="/ragno-favicon-512.png"
-          alt="Ragno Power System logo"
-          width={512}
-          height={512}
-          sizes="(min-width: 640px) 80px, 64px"
-          className="size-16 shrink-0 sm:size-20"
-        />
-        <div className="leading-tight">
-          <p className="font-semibold">Ragno Power System</p>
-          <p className="text-sm text-muted-foreground">Solar Dealer CRM</p>
-        </div>
-      </div>
+      <Image
+        src="/handd-logo.png"
+        alt="H&D Technologies — House of Digital Solutions"
+        width={1536}
+        height={1024}
+        sizes="224px"
+        priority
+        className="mb-8 w-56 rounded-xl sm:mb-10 lg:hidden"
+      />
 
       <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
       <p className="mt-1.5 text-sm text-muted-foreground">Welcome back. Enter your details to open the CRM.</p>
